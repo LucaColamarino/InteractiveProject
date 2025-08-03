@@ -46,7 +46,6 @@ export function startLoop(p, c) {
 
 
       }
-      console.log(player.model.position.y);
       updateWyverns(delta);
       updateWalkingNpcs(delta);
       updateWater(delta);

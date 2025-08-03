@@ -1,16 +1,18 @@
-// 🔧 Updated formManager.js: stable shadows, fixed wyvern artifact, clean switching
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { scene } from './scene.js';
+import { scene, camera, renderer } from './scene.js';
 import { offset } from './cameraFollow.js';
 import { Player } from './core/Player.js';
 import { PlayerController } from './core/playerController.js';
 import { loadAnimations, fixAnimationLoop } from './core/AnimationLoader.js';
+
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 const modelCache = {};
 const textureCache = {};
+const materialCache = {};
+const cloneCache = {};
 
 export const abilitiesByForm = {
   human: {
@@ -66,8 +68,28 @@ export async function preloadAssets() {
         textureCache.normal = textureLoader.load('/textures/normal.png');
       if (!textureCache.specular)
         textureCache.specular = textureLoader.load('/textures/diffuse.png');
+
+      if (!materialCache.bird) {
+        materialCache.bird = new THREE.MeshPhongMaterial({
+          map: textureCache.diffuse,
+          normalMap: textureCache.normal,
+          specularMap: textureCache.specular,
+          shininess: 30
+        });
+      }
     }
+
+    prepareClone(formName);
+
+    const dummy = SkeletonUtils.clone(modelCache[formName]);
+    dummy.visible = false;
+    dummy.scale.set(0.01, 0.01, 0.01);
+    scene.add(dummy);
+    renderer.render(scene, camera); // forza upload alla GPU
+    scene.remove(dummy);
   }
+
+  renderer.compile(scene, camera); // compila shader e materiali
 }
 
 export async function changeForm(formName) {
@@ -75,29 +97,8 @@ export async function changeForm(formName) {
   if (!abilities) throw new Error(`Forma non trovata: ${formName}`);
 
   offset.copy(abilities.cameraOffset);
-
-  const original = modelCache[formName];
-  const fbx = SkeletonUtils.clone(original);
-  fbx.animations = original.animations;
-
-  fbx.castShadow = false;
-  fbx.receiveShadow = false;
-
-  fbx.traverse(child => {
-    if (child.isMesh && child.geometry) {
-      if (formName === 'bird') {
-        child.material = new THREE.MeshPhongMaterial({
-          map: textureCache.diffuse,
-          normalMap: textureCache.normal,
-          specularMap: textureCache.specular,
-          shininess: 30
-        });
-      }
-      child.castShadow = true;
-      child.receiveShadow = true;
-      console.log(child.name, 'castShadow:', child.castShadow);
-    }
-  });
+  const fbx = SkeletonUtils.clone(cloneCache[formName]);
+  fbx.animations = cloneCache[formName].animations;
 
   fbx.scale.set(0.01, 0.01, 0.01);
   fbx.rotation.set(0, abilities.rotationOffset || 0, 0);
@@ -141,6 +142,24 @@ export async function changeForm(formName) {
   return { player, controller };
 }
 
+function prepareClone(formName) {
+  const original = modelCache[formName];
+  const cloned = SkeletonUtils.clone(original);
+  cloned.animations = original.animations;
+
+  cloned.traverse(child => {
+    if (child.isMesh || child.type === 'SkinnedMesh') {
+      if (formName === 'bird') {
+        child.material = materialCache.bird;
+      }
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  cloneCache[formName] = cloned;
+}
+
 export function addTransformationEffect(position) {
   const geometry = new THREE.RingGeometry(0.5, 2.5, 64);
   const material = new THREE.MeshBasicMaterial({
@@ -157,7 +176,6 @@ export function addTransformationEffect(position) {
   scene.add(ring);
 
   let scale = 1;
-  const maxScale = 3;
   const fadeSpeed = 1.5;
 
   function animateRing() {
@@ -173,4 +191,3 @@ export function addTransformationEffect(position) {
 
   animateRing();
 }
-
