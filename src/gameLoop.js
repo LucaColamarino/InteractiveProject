@@ -36,6 +36,15 @@ export function startLoop(p, c) {
           controller.abilities.canFly ? controller.fly() : controller.jump();
         }
         controller.update(delta, moveVec, isShiftPressed(), isJumpPressed());
+        document.getElementById('form-label').innerText = `Form: ${controller.abilities.canFly ? 'bird' : 'human'}`;
+        document.getElementById('fly-indicator').style.opacity = controller.isFlying ? 1 : 0.3;
+
+        const maxFly = controller.abilities.maxFlyTime || 100;
+        const current = controller.flyTimer ?? maxFly;
+        const ratio = Math.max(0, Math.min(current / maxFly, 1));
+        document.getElementById('stamina-fill').style.width = `${ratio * 100}%`;
+
+
       }
       console.log(player.model.position.y);
       updateWyverns(delta);

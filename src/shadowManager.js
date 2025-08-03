@@ -4,7 +4,8 @@ import { scene } from './scene.js';
 export let sun;
 
 export function createSunLight() {
-  sun = new THREE.DirectionalLight(0xffffff, 1.5);
+  sun = new THREE.DirectionalLight(0x88bbff, 0.8); // più blu e tenue
+
   sun.castShadow = true;
 
   sun.shadow.mapSize.set(8192, 8192);

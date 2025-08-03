@@ -70,8 +70,9 @@ export function updateShadowUniforms() {
 export function createHeightmapTerrain() {
   const textureLoader = new THREE.TextureLoader();
 
-  scene.background = new THREE.Color(0xa8d0ff);
-  scene.fog = new THREE.Fog(0xa8d0ff, 100, 600);
+  scene.background = new THREE.Color(0x1a1e2a); // blu scuro/grigio
+  scene.fog = new THREE.Fog(0x1a1e2a, 60, 250);
+
 
   const heightMapImg = new Image();
   heightMapImg.src = '/textures/heightmap.png';
@@ -134,17 +135,7 @@ export function createHeightmapTerrain() {
 
   createSunLight();
 
-  const ambientLight = new THREE.AmbientLight(0xbfdfff, 0.6);
+  const ambientLight = new THREE.AmbientLight(0x445566, 0.4); // tono più freddo e debole
+
   scene.add(ambientLight);
-
-
-
-  const plane = new THREE.Mesh(
-  new THREE.PlaneGeometry(100, 100),
-  new THREE.MeshStandardMaterial({ color: 'white' })
-);
-plane.rotation.x = -Math.PI / 2;
-plane.position.y = 6;
-plane.receiveShadow = true;
-scene.add(plane);
 }

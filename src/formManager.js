@@ -137,5 +137,40 @@ export async function changeForm(formName) {
   const player = new Player(group, mixer, actions);
   const controller = new PlayerController(player, abilities);
   player.playAnimation('idle');
+  addTransformationEffect(group.position);
   return { player, controller };
 }
+
+export function addTransformationEffect(position) {
+  const geometry = new THREE.RingGeometry(0.5, 2.5, 64);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x66ccff,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.7,
+    depthWrite: false
+  });
+
+  const ring = new THREE.Mesh(geometry, material);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(position.x, position.y + 0.1, position.z);
+  scene.add(ring);
+
+  let scale = 1;
+  const maxScale = 3;
+  const fadeSpeed = 1.5;
+
+  function animateRing() {
+    scale += 0.05;
+    ring.scale.set(scale, scale, scale);
+    material.opacity -= 0.02 * fadeSpeed;
+    if (material.opacity <= 0) {
+      scene.remove(ring);
+      return;
+    }
+    requestAnimationFrame(animateRing);
+  }
+
+  animateRing();
+}
+

@@ -19,6 +19,42 @@
     top: 0;
     left: 0;
   }
+  #hud {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  color: white;
+  font-family: sans-serif;
+  z-index: 1000;
+}
+
+#form-label {
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+#fly-indicator {
+  font-size: 24px;
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
+}
+
+#stamina-bar {
+  width: 150px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+#stamina-fill {
+  height: 100%;
+  width: 100%;
+  background: limegreen;
+  transition: width 0.1s;
+}
+
 
 
 
@@ -26,6 +62,14 @@
 
   <body>
     <canvas id="three-canvas"></canvas>
+    <div id="hud">
+  <div id="form-label">Form: human</div>
+  <div id="fly-indicator">🕊️</div>
+  <div id="stamina-bar">
+    <div id="stamina-fill"></div>
+  </div>
+</div>
+
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
