@@ -4,8 +4,10 @@ import { updateCamera } from './cameraFollow.js';
 import { getInputVector, isJumpPressed, isShiftPressed, wasJumpJustPressed } from './inputManager.js';
 import { checkStonePickup } from './pickupSystem.js';
 import { changeForm } from './formManager.js';
-import { sun, updateShadowUniforms, updateWater } from './map.js';
+import { updateShadowUniforms, updateWater } from './map.js';
 import { updateWalkingNpcs, updateWyverns } from './npcSpawner.js';
+import { updateSunShadowCamera, sun } from './shadowManager.js';
+
 const clock = new THREE.Clock();
 
 let player = null;
@@ -20,6 +22,7 @@ async function handleFormChange(formName) {
 export function startLoop(p, c) {
   player = p;
   controller = c;
+
   function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
@@ -30,40 +33,30 @@ export function startLoop(p, c) {
       if (controller) {
         const moveVec = getInputVector();
         if (wasJumpJustPressed()) {
-          if (controller.abilities.canFly) {
-            controller.fly();
-          } else {
-            controller.jump();
-          }
+          controller.abilities.canFly ? controller.fly() : controller.jump();
         }
         controller.update(delta, moveVec, isShiftPressed(), isJumpPressed());
       }
 
       updateWyverns(delta);
       updateWalkingNpcs(delta);
-      updateShadowUniforms();
-
-
-      if (sun && player?.model) {
-        const playerPos = player.model.position;
-        sun.position.set(playerPos.x + 50, playerPos.y + 100, playerPos.z + 50);
-        sun.target.position.copy(playerPos);
-        sun.target.updateMatrixWorld();
+      updateWater(delta);
+      if (player?.model) {
+        updateSunShadowCamera(player.model.position);
+        updateShadowUniforms();
       }
 
       updateCamera(player);
-      updateWater(delta);
       checkStonePickup(player, handleFormChange);
-
       renderer.render(scene, camera);
     } catch (e) {
-  console.error('🚨 Render crash:', e);
-  scene.traverse(obj => {
-    if (obj.isMesh && (!obj.material || !obj.geometry)) {
-      console.warn('⚠️ Problema in mesh:', obj);
+      console.error('🚨 Render crash:', e);
+      scene.traverse(obj => {
+        if (obj.isMesh && (!obj.material || !obj.geometry)) {
+          console.warn('⚠️ Problema in mesh:', obj);
+        }
+      });
     }
-  });
-}
   }
 
   animate();

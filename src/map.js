@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { scene } from './scene.js';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import { createTerrainMaterial } from './terrainShader.js';
-
-export let sun;
+import { createSunLight } from './shadowManager.js';
+import { sun } from './shadowManager.js';
 let terrainMesh = null;
 export let water = null;
 export let terrainMaterial = null;
@@ -128,16 +128,8 @@ export function createHeightmapTerrain() {
     console.error("Errore nel caricamento della heightmap.");
   };
 
-  sun = new THREE.DirectionalLight(0xfff0cc, 1.5);
-  sun.position.set(100, 80, -100);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
-  sun.shadow.camera.top = 100;
-  sun.shadow.camera.bottom = -100;
-  sun.shadow.camera.left = -100;
-  sun.shadow.camera.right = 100;
-  sun.shadow.bias = -0.0005;
-  scene.add(sun);
+  createSunLight();
+
 
   const ambientLight = new THREE.AmbientLight(0xbfdfff, 0.6);
   scene.add(ambientLight);

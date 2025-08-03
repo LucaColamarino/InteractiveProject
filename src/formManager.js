@@ -1,4 +1,4 @@
-// ✅ FILE: formManager.js
+// 🔧 Updated formManager.js: stable shadows, fixed wyvern artifact, clean switching
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -7,7 +7,6 @@ import { offset } from './cameraFollow.js';
 import { Player } from './core/Player.js';
 import { PlayerController } from './core/playerController.js';
 import { loadAnimations, fixAnimationLoop } from './core/AnimationLoader.js';
-
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 const modelCache = {};
@@ -81,21 +80,24 @@ export async function changeForm(formName) {
   const fbx = SkeletonUtils.clone(original);
   fbx.animations = original.animations;
 
-fbx.traverse(child => {
-  if (child.isMesh || child.type === 'SkinnedMesh') {
-    if (formName === 'bird') {
-      child.material = new THREE.MeshPhongMaterial({
-        map: textureCache.diffuse,
-        normalMap: textureCache.normal,
-        specularMap: textureCache.specular,
-        shininess: 30
-      });
-    }
-    child.castShadow = true;
-    child.receiveShadow = true;
-  }
-});
+  fbx.castShadow = false;
+  fbx.receiveShadow = false;
 
+  fbx.traverse(child => {
+    if (child.isMesh && child.geometry) {
+      if (formName === 'bird') {
+        child.material = new THREE.MeshPhongMaterial({
+          map: textureCache.diffuse,
+          normalMap: textureCache.normal,
+          specularMap: textureCache.specular,
+          shininess: 30
+        });
+      }
+      child.castShadow = true;
+      child.receiveShadow = true;
+      console.log(child.name, 'castShadow:', child.castShadow);
+    }
+  });
 
   fbx.scale.set(0.01, 0.01, 0.01);
   fbx.rotation.set(0, abilities.rotationOffset || 0, 0);
@@ -118,7 +120,6 @@ fbx.traverse(child => {
   if (formName === 'bird') {
     mixer = new THREE.AnimationMixer(fbx);
     actions = {};
-
     const indexMap = abilities.animationIndices;
     for (const [key, index] of Object.entries(indexMap)) {
       let clip = fbx.animations[index];

@@ -11,6 +11,13 @@ export function createTerrainMaterial(textureLoader) {
 
   const splatMap = textureLoader.load('/textures/splatmap_more_grass.png');
 
+  // Abilita wrapping per tiling corretto
+  [grassColor, rockColor, snowColor, grassNormal, rockNormal, snowNormal].forEach(tex => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  });
+
+  console.log("Texture loaded:", grassColor, rockColor, snowColor, splatMap);
+
   const uniforms = THREE.UniformsUtils.merge([
     {
       grassColor: { value: grassColor },
@@ -22,23 +29,22 @@ export function createTerrainMaterial(textureLoader) {
       splatMap: { value: splatMap },
       lightDirection: { value: new THREE.Vector3(1, 1, 1).normalize() },
       shadowMap: { value: null },
-      shadowMatrix: { value: new THREE.Matrix4() }
+      shadowMatrix: { value: new THREE.Matrix4() },
+      fogColor: { value: new THREE.Color(0xa8d0ff) },
+      fogNear: { value: 100 },
+      fogFar: { value: 600 }
     },
-    THREE.UniformsLib.lights,
-    THREE.UniformsLib.fog
+    THREE.UniformsLib.lights
   ]);
 
-  const vertexShader = /* glsl */`
+  const vertexShader = `
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vWorldPosition;
     varying vec4 vShadowCoord;
+    varying float vFogDepth;
 
     uniform mat4 shadowMatrix;
-
-    #include <common>
-    #include <shadowmap_pars_vertex>
-    #include <fog_pars_vertex>
 
     void main() {
       vUv = uv;
@@ -46,17 +52,13 @@ export function createTerrainMaterial(textureLoader) {
       vec4 worldPosition = modelMatrix * vec4(position, 1.0);
       vWorldPosition = worldPosition.xyz;
       vShadowCoord = shadowMatrix * worldPosition;
-
-      #include <beginnormal_vertex>
-      #include <defaultnormal_vertex>
-      #include <begin_vertex>
-      #include <project_vertex>
-      #include <shadowmap_vertex>
-      #include <fog_vertex>
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vFogDepth = -mvPosition.z;
+      gl_Position = projectionMatrix * mvPosition;
     }
   `;
 
-  const fragmentShader = /* glsl */`
+  const fragmentShader = `
     uniform sampler2D grassColor;
     uniform sampler2D rockColor;
     uniform sampler2D snowColor;
@@ -66,69 +68,51 @@ export function createTerrainMaterial(textureLoader) {
     uniform sampler2D splatMap;
     uniform vec3 lightDirection;
     uniform sampler2D shadowMap;
+    uniform mat4 shadowMatrix;
+    uniform vec3 fogColor;
+    uniform float fogNear;
+    uniform float fogFar;
 
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vWorldPosition;
     varying vec4 vShadowCoord;
+    varying float vFogDepth;
 
-    #include <common>
     #include <packing>
-    #include <uv_pars_fragment>
-    #include <lights_pars_begin>
-    #include <shadowmap_pars_fragment>
-    #include <logdepthbuf_pars_fragment>
-    #include <fog_pars_fragment>
-
-    vec2 macroTiling(vec2 uv) {
-      float macroFreq = 6.0;
-      return fract(uv * 80.0 + sin(uv.yx * macroFreq) * 0.05);
-    }
 
     float getShadowFactor(vec4 shadowCoord) {
       vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
-      bvec4 inFrustum = bvec4(
-        projCoords.x >= 0.0, projCoords.x <= 1.0,
-        projCoords.y >= 0.0, projCoords.y <= 1.0
-      );
-
-      if (!all(inFrustum)) return 1.0;
-
+      if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0 || projCoords.z > 1.0) return 1.0;
       float closestDepth = texture2D(shadowMap, projCoords.xy).r;
       float currentDepth = projCoords.z;
-      float bias = 0.005;
-      return currentDepth - bias > closestDepth ? 0.5 : 1.0;
+      float bias = 0.003;
+      return currentDepth - bias > closestDepth ? 0.4 : 1.0;
     }
 
     void main() {
       vec4 splat = texture2D(splatMap, vUv);
       float total = splat.r + splat.g + splat.b;
-      if (total < 0.001) discard;
+      if (total < 0.0001) discard;
 
-      vec2 tiledUv = macroTiling(vUv);
-
+      vec2 tiledUv = vUv * 40.0;
       vec3 gTex = texture2D(grassColor, tiledUv).rgb;
       vec3 rTex = texture2D(rockColor, tiledUv).rgb;
       vec3 sTex = texture2D(snowColor, tiledUv).rgb;
 
-      vec3 gNorm = texture2D(grassNormal, tiledUv).rgb * 2.0 - 1.0;
-      vec3 rNorm = texture2D(rockNormal,  tiledUv).rgb * 2.0 - 1.0;
-      vec3 sNorm = texture2D(snowNormal,  tiledUv).rgb * 2.0 - 1.0;
-
       vec3 blendedColor = gTex * splat.r + rTex * splat.g + sTex * splat.b;
-      vec3 blendedNormal = normalize(gNorm * splat.r + rNorm * splat.g + sNorm * splat.b);
 
-      vec3 normal = normalize(blendedNormal);
       vec3 lightDir = normalize(lightDirection);
-      float diff = max(dot(normal, lightDir), 0.0);
+      float diff = max(dot(normalize(vNormal), lightDir), 0.0);
 
       float shadow = getShadowFactor(vShadowCoord);
-
       vec3 ambient = vec3(0.3);
       vec3 finalColor = blendedColor * (ambient + diff * shadow);
 
+      float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+      finalColor = mix(finalColor, fogColor, fogFactor);
+
       gl_FragColor = vec4(finalColor, 1.0);
-      #include <fog_fragment>
     }
   `;
 
@@ -140,6 +124,9 @@ export function createTerrainMaterial(textureLoader) {
     lights: true,
     side: THREE.FrontSide,
     shadowSide: THREE.FrontSide,
+    depthWrite: true,
+    depthTest: true,
+    transparent: false,
     extensions: { derivatives: true }
   });
 }

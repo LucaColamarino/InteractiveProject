@@ -1,3 +1,4 @@
+// 🔧 Updated scene.js for high-quality shadows
 import * as THREE from 'three';
 
 export const scene = new THREE.Scene();
@@ -9,6 +10,8 @@ camera.position.set(0, 2, 5);
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
