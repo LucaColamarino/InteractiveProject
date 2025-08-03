@@ -19,7 +19,7 @@ async function init() {
   await spawnFlyingWyvern(new THREE.Vector3(-50, 70, -100));
   //await spawnWalkingNpc(new THREE.Vector3(20, 0, 20));
   //await spawnWalkingNpc(new THREE.Vector3(-100, 0, 150));
-  spawnMagicStone(new THREE.Vector3(10, 20, 0), 'bird');
+  spawnMagicStone(new THREE.Vector3(10, 6, 0), 'bird');
   const result = await changeForm('human');
   player = result.player;
   controller = result.controller;

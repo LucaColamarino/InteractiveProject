@@ -4,6 +4,7 @@ import { Water } from 'three/examples/jsm/objects/Water.js';
 import { createTerrainMaterial } from './terrainShader.js';
 import { createSunLight } from './shadowManager.js';
 import { sun } from './shadowManager.js';
+
 let terrainMesh = null;
 export let water = null;
 export let terrainMaterial = null;
@@ -77,7 +78,7 @@ export function createHeightmapTerrain() {
 
   heightMapImg.onload = () => {
     const segments = 256;
-    const scale = 30;
+    const scale = 60; // ⬆️ Aumentato per avere maggiore dislivello
 
     const canvas = document.createElement('canvas');
     canvas.width = segments + 1;
@@ -101,9 +102,12 @@ export function createHeightmapTerrain() {
       const r = imgData[idx];
       const g = imgData[idx + 1];
       const b = imgData[idx + 2];
-      const height = (r + g + b) / (3 * 255);
+      let height = (r + g + b) / (3 * 255);
 
+      // 🔄 Stretch range: elevate mountains, lower valleys
+      height = Math.pow(height, 1.5); // accentua la differenza
       vertices.setZ(i, height * scale);
+
       maxH = Math.max(maxH, height);
       minH = Math.min(minH, height);
     }
@@ -129,7 +133,6 @@ export function createHeightmapTerrain() {
   };
 
   createSunLight();
-
 
   const ambientLight = new THREE.AmbientLight(0xbfdfff, 0.6);
   scene.add(ambientLight);

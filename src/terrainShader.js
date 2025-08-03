@@ -9,7 +9,7 @@ export function createTerrainMaterial(textureLoader) {
   const rockNormal = textureLoader.load('/textures/rock_normal.jpg');
   const snowNormal = textureLoader.load('/textures/snow_normal.jpg');
 
-  const splatMap = textureLoader.load('/textures/splatmap_more_grass.png');
+  const splatMap = textureLoader.load('/textures/splatmap.png');
 
   // Abilita wrapping per tiling corretto
   [grassColor, rockColor, snowColor, grassNormal, rockNormal, snowNormal].forEach(tex => {
