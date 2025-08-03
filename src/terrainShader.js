@@ -77,11 +77,22 @@ export function createTerrainMaterial(textureLoader) {
     float getShadowFactor(vec4 shadowCoord) {
       vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
       if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0 || projCoords.z > 1.0) return 1.0;
-      float closestDepth = texture2D(shadowMap, projCoords.xy).r;
-      float currentDepth = projCoords.z;
-      float bias = 0.003;
-      return currentDepth - bias > closestDepth ? 0.4 : 1.0;
+
+      float bias = -0.003;
+      float shadow = 0.0;
+      float texelSize = 1.0 / 8192.0;
+
+      for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+          vec2 offset = vec2(x, y) * texelSize;
+          float closestDepth = texture2D(shadowMap, projCoords.xy + offset).r;
+          shadow += (projCoords.z - bias > closestDepth) ? 0.4 : 1.0;
+        }
+      }
+
+      return shadow / 9.0;
     }
+
 
     void main() {
       vec2 tiledUv = vUv * 140.0;
@@ -123,6 +134,7 @@ export function createTerrainMaterial(textureLoader) {
     lights: true,
     side: THREE.FrontSide,
     shadowSide: THREE.FrontSide,
+    precision: 'highp',
     depthWrite: true,
     depthTest: true,
     transparent: false,

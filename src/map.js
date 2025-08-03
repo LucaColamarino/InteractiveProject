@@ -136,4 +136,15 @@ export function createHeightmapTerrain() {
 
   const ambientLight = new THREE.AmbientLight(0xbfdfff, 0.6);
   scene.add(ambientLight);
+
+
+
+  const plane = new THREE.Mesh(
+  new THREE.PlaneGeometry(100, 100),
+  new THREE.MeshStandardMaterial({ color: 'white' })
+);
+plane.rotation.x = -Math.PI / 2;
+plane.position.y = 6;
+plane.receiveShadow = true;
+scene.add(plane);
 }
