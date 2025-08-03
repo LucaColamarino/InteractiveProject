@@ -1,0 +1,70 @@
+import * as THREE from 'three';
+import { renderer, scene, camera } from './scene.js';
+import { updateCamera } from './cameraFollow.js';
+import { getInputVector, isJumpPressed, isShiftPressed, wasJumpJustPressed } from './inputManager.js';
+import { checkStonePickup } from './pickupSystem.js';
+import { changeForm } from './formManager.js';
+import { sun, updateShadowUniforms, updateWater } from './map.js';
+import { updateWalkingNpcs, updateWyverns } from './npcSpawner.js';
+const clock = new THREE.Clock();
+
+let player = null;
+let controller = null;
+
+async function handleFormChange(formName) {
+  const result = await changeForm(formName);
+  player = result.player;
+  controller = result.controller;
+}
+
+export function startLoop(p, c) {
+  player = p;
+  controller = c;
+  function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+
+    try {
+      if (player) player.update(delta);
+
+      if (controller) {
+        const moveVec = getInputVector();
+        if (wasJumpJustPressed()) {
+          if (controller.abilities.canFly) {
+            controller.fly();
+          } else {
+            controller.jump();
+          }
+        }
+        controller.update(delta, moveVec, isShiftPressed(), isJumpPressed());
+      }
+
+      updateWyverns(delta);
+      updateWalkingNpcs(delta);
+      updateShadowUniforms();
+
+
+      if (sun && player?.model) {
+        const playerPos = player.model.position;
+        sun.position.set(playerPos.x + 50, playerPos.y + 100, playerPos.z + 50);
+        sun.target.position.copy(playerPos);
+        sun.target.updateMatrixWorld();
+      }
+
+      updateCamera(player);
+      updateWater(delta);
+      checkStonePickup(player, handleFormChange);
+
+      renderer.render(scene, camera);
+    } catch (e) {
+  console.error('🚨 Render crash:', e);
+  scene.traverse(obj => {
+    if (obj.isMesh && (!obj.material || !obj.geometry)) {
+      console.warn('⚠️ Problema in mesh:', obj);
+    }
+  });
+}
+  }
+
+  animate();
+}
