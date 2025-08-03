@@ -8,30 +8,24 @@
   html, body {
     margin: 0;
     padding: 0;
-    overflow: hidden; /* 🔒 blocca lo scroll */
+    overflow: hidden; 
     height: 100%;
     width: 100%;
   }
 
   canvas {
-    display: block;      /* niente margini bianchi */
-    position: fixed;     /* riempie tutto lo schermo */
+    display: block;      
+    position: fixed;     
     top: 0;
     left: 0;
   }
-.hidden {
-  display: none;
-}
+
 
 
 </style>
 
   <body>
     <canvas id="three-canvas"></canvas>
-
-
-<button id="menuButton" onclick="toggleMenu()">☰</button>
-
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
