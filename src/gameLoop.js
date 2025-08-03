@@ -37,7 +37,7 @@ export function startLoop(p, c) {
         }
         controller.update(delta, moveVec, isShiftPressed(), isJumpPressed());
       }
-
+      console.log(player.model.position.y);
       updateWyverns(delta);
       updateWalkingNpcs(delta);
       updateWater(delta);

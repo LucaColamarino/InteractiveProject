@@ -9,14 +9,9 @@ export function createTerrainMaterial(textureLoader) {
   const rockNormal = textureLoader.load('/textures/rock_normal.jpg');
   const snowNormal = textureLoader.load('/textures/snow_normal.jpg');
 
-  const splatMap = textureLoader.load('/textures/splatmap.png');
-
-  // Abilita wrapping per tiling corretto
   [grassColor, rockColor, snowColor, grassNormal, rockNormal, snowNormal].forEach(tex => {
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   });
-
-  console.log("Texture loaded:", grassColor, rockColor, snowColor, splatMap);
 
   const uniforms = THREE.UniformsUtils.merge([
     {
@@ -26,7 +21,6 @@ export function createTerrainMaterial(textureLoader) {
       grassNormal: { value: grassNormal },
       rockNormal: { value: rockNormal },
       snowNormal: { value: snowNormal },
-      splatMap: { value: splatMap },
       lightDirection: { value: new THREE.Vector3(1, 1, 1).normalize() },
       shadowMap: { value: null },
       shadowMatrix: { value: new THREE.Matrix4() },
@@ -65,7 +59,6 @@ export function createTerrainMaterial(textureLoader) {
     uniform sampler2D grassNormal;
     uniform sampler2D rockNormal;
     uniform sampler2D snowNormal;
-    uniform sampler2D splatMap;
     uniform vec3 lightDirection;
     uniform sampler2D shadowMap;
     uniform mat4 shadowMatrix;
@@ -91,16 +84,22 @@ export function createTerrainMaterial(textureLoader) {
     }
 
     void main() {
-      vec4 splat = texture2D(splatMap, vUv);
-      float total = splat.r + splat.g + splat.b;
-      if (total < 0.0001) discard;
-
-      vec2 tiledUv = vUv * 40.0;
+      vec2 tiledUv = vUv * 140.0;
       vec3 gTex = texture2D(grassColor, tiledUv).rgb;
       vec3 rTex = texture2D(rockColor, tiledUv).rgb;
       vec3 sTex = texture2D(snowColor, tiledUv).rgb;
 
-      vec3 blendedColor = gTex * splat.r + rTex * splat.g + sTex * splat.b;
+      float h = vWorldPosition.y;
+      float gFactor = smoothstep(0.0, 15.0, h);
+      float rFactor = smoothstep(10.0, 25.0, h);
+      float sFactor = smoothstep(20.0, 60.0, h);
+
+      float total = gFactor + rFactor + sFactor + 0.0001;
+      gFactor /= total;
+      rFactor /= total;
+      sFactor /= total;
+
+      vec3 blendedColor = gTex * gFactor + rTex * rFactor + sTex * sFactor;
 
       vec3 lightDir = normalize(lightDirection);
       float diff = max(dot(normalize(vNormal), lightDir), 0.0);
@@ -129,4 +128,4 @@ export function createTerrainMaterial(textureLoader) {
     transparent: false,
     extensions: { derivatives: true }
   });
-}
+} 
