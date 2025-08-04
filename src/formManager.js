@@ -6,51 +6,41 @@ import { offset } from './cameraFollow.js';
 import { Player } from './core/Player.js';
 import { PlayerController } from './core/playerController.js';
 import { loadAnimations, fixAnimationLoop } from './core/AnimationLoader.js';
+import { ENTITY_CONFIG } from './entities.js';
 
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 
 const modelCache = {};
 const cloneCache = {};
-const textureDiffuse = textureLoader.load('/textures/wyvern/wyvern_diffuse.png');
-const textureNormal = textureLoader.load('/textures/wyvern/wyvern_normal.png');
-const textureWerewolfDiffuse = textureLoader.load('/textures/werewolf/werewolf_diffuse.jpg');
-const textureWerewolfNormal = textureLoader.load('/textures/werewolf/werewolf_normal.jpg');
 
-function createAbilities(formName, config) {
+function createAbilities(formName, overrides = {}) {
+  const config = ENTITY_CONFIG[formName];
   return {
-    ...config,
-    cameraOffset: config.cameraOffset || new THREE.Vector3(0, 2.5, -1.5),
-    rotationOffset: config.rotationOffset || 0,
-    yOffset: config.yOffset || 0.0,
+    modelPath: config.modelPath,
+    animationPaths: config.animations,
+    cameraOffset: overrides.cameraOffset || config.cameraOffset || new THREE.Vector3(0, 2.5, -1.5),
+    rotationOffset: overrides.rotationOffset || 0,
+    yOffset: overrides.yOffset ?? config.yOffset ?? 0.0,
+    canFly: overrides.canFly || false,
+    canJump: overrides.canJump || false,
+    speed: overrides.speed || 5,
+    jumpForce: overrides.jumpForce || 10,
+    gravity: overrides.gravity || -30,
     formName,
   };
 }
 
 export const abilitiesByForm = {
   human: createAbilities('human', {
-    modelPath: '/models/player.fbx',
-    animationPaths: {
-      idle: '/models/animations/YbotIdle.fbx',
-      walk: '/models/animations/YbotWalking.fbx',
-      run:  '/models/animations/YbotRunning.fbx',
-      jump: '/models/animations/YbotJumping.fbx',
-    },
     canFly: false,
     canJump: true,
     speed: 5,
     jumpForce: 12,
     gravity: -30,
   }),
-
+  
   werewolf: createAbilities('werewolf', {
-    modelPath: '/models/werewolf.fbx',
-    animationPaths: {
-      idle: '/models/animations/WerewolfIdle.fbx',
-      walk: '/models/animations/WerewolfWalk.fbx',
-      run:  '/models/animations/YbotRunning.fbx',
-      jump: '/models/animations/YbotJumping.fbx',
-    },
     canFly: false,
     canJump: true,
     speed: 10,
@@ -59,13 +49,6 @@ export const abilitiesByForm = {
   }),
 
   wyvern: createAbilities('wyvern', {
-    modelPath: '/models/wyvern.fbx',
-    animationIndices: {
-      idle: 2,
-      fly: 0,
-      jump: 1,
-      walk: 1,
-    },
     canFly: true,
     canJump: false,
     flyspeed: 50,
@@ -80,8 +63,9 @@ export const abilitiesByForm = {
 export async function preloadAssets() {
   for (const formName in abilitiesByForm) {
     const form = abilitiesByForm[formName];
+    const config = ENTITY_CONFIG[formName];
 
-    const baseModel = await loader.loadAsync(form.modelPath);
+    const baseModel = await loader.loadAsync(config.modelPath);
     modelCache[formName] = baseModel;
 
     const clone = SkeletonUtils.clone(baseModel);
@@ -89,29 +73,25 @@ export async function preloadAssets() {
 
     clone.traverse(child => {
       if (child.isMesh || child.type === 'SkinnedMesh') {
-        let material;
-        if (formName === 'wyvern') {
-          material = new THREE.MeshStandardMaterial({
-            map: textureDiffuse,
-            normalMap: textureNormal
+        if (formName !== 'human') {
+          const { diffuse, normal } = config.textures;
+          const material = new THREE.MeshStandardMaterial({
+            map: textureLoader.load(diffuse),
+            normalMap: textureLoader.load(normal)
           });
-        } else if (formName === 'werewolf') {
-          material = new THREE.MeshStandardMaterial({
-            map: textureWerewolfDiffuse,
-            normalMap: textureWerewolfNormal
-          });
+          child.material = material;
         }
-        if (material) child.material = material;
         child.castShadow = true;
         child.receiveShadow = true;
       }
     });
 
+
     cloneCache[formName] = clone;
 
     const dummy = SkeletonUtils.clone(clone);
     dummy.visible = false;
-    dummy.scale.set(0.01, 0.01, 0.01);
+    dummy.scale.copy(config.scale);
     scene.add(dummy);
     renderer.render(scene, camera);
     scene.remove(dummy);
@@ -127,18 +107,17 @@ export async function changeForm(formName) {
 
   const fbx = SkeletonUtils.clone(cloneCache[formName]);
   fbx.animations = cloneCache[formName].animations;
-  fbx.scale.set(0.01, 0.01, 0.01);
+  fbx.scale.copy(ENTITY_CONFIG[formName].scale);
   fbx.rotation.set(0, abilities.rotationOffset, 0);
 
   const group = new THREE.Group();
   const prevPlayer = scene.children.find(obj => obj.userData?.playerModel);
   const prevPosition = prevPlayer?.position?.clone() ?? new THREE.Vector3(0, 0, 0);
 
-  group.position.copy(prevPosition);  // 🔧 Mantieni la posizione!
+  group.position.copy(prevPosition);
   fbx.position.y += abilities.yOffset;
   group.add(fbx);
 
-  // Rimuove il precedente modello
   scene.children
     .filter(obj => obj.userData?.playerModel)
     .forEach(obj => scene.remove(obj));

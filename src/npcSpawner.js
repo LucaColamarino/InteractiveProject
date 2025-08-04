@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { scene } from './scene.js';
 import { getTerrainHeightAt } from './map.js';
-import { fixAnimationLoop } from './core/AnimationLoader.js';
-import { loadAnimations } from './core/AnimationLoader.js';
+import { fixAnimationLoop, loadAnimations } from './core/AnimationLoader.js';
+import { ENTITY_CONFIG } from './entities.js';
 
 let playerRef = null;
 export function setPlayerReference(player) {
@@ -20,10 +21,11 @@ const textureLoader = new THREE.TextureLoader();
 const MAX_DISTANCE = 150;
 
 export async function spawnFlyingWyvern(position) {
-  const fbx = await loader.loadAsync('/models/wyvern.fbx');
+  const config = ENTITY_CONFIG.wyvern;
+  const fbx = await loader.loadAsync(config.modelPath);
 
-  const diffuse = textureLoader.load('/textures/wyvern/wyvern_diffuse.png');
-  const normal = textureLoader.load('/textures/wyvern/wyvern_normal.png');
+  const diffuse = textureLoader.load(config.textures.diffuse);
+  const normal = textureLoader.load(config.textures.normal);
 
   fbx.traverse(child => {
     if (child.isMesh || child.type === 'SkinnedMesh') {
@@ -38,7 +40,7 @@ export async function spawnFlyingWyvern(position) {
     }
   });
 
-  fbx.scale.set(0.01, 0.01, 0.01);
+  fbx.scale.copy(config.scale);
   fbx.position.copy(position);
   fbx.rotation.y = Math.random() * Math.PI * 2;
   scene.add(fbx);
@@ -65,7 +67,6 @@ export function updateWyverns(delta) {
       wyv.model.position.x += Math.cos(wyv.angle) * 0.3;
       wyv.model.position.z += Math.sin(wyv.angle) * 0.3;
       wyv.model.position.y = baseY + Math.sin(wyv.angle * 2) * 2;
-      console.log(`Wyvern position: ${wyv.model.position.x.toFixed(2)}, ${wyv.model.position.y.toFixed(2)}, ${wyv.model.position.z.toFixed(2)}`);
 
       const dir = new THREE.Vector3(Math.cos(wyv.angle), 0, Math.sin(wyv.angle));
       const target = wyv.model.position.clone().add(dir);
@@ -75,26 +76,36 @@ export function updateWyverns(delta) {
 }
 
 export async function spawnWalkingNpc(position) {
-  const fbx = await loader.loadAsync('/models/player.fbx');
-
-  const tex = textureLoader.load('/textures/werewolf/werewolf_diffuse.jpg');
+  const config = ENTITY_CONFIG.human;
+  const baseModel = await loader.loadAsync(config.modelPath);
+  const fbx = SkeletonUtils.clone(baseModel);
 
   fbx.traverse(child => {
     if (child.isMesh || child.type === 'SkinnedMesh') {
-      child.material = new THREE.MeshPhongMaterial({ map: tex });
+      if (config.textures?.diffuse) {
+        const tex = textureLoader.load(config.textures.diffuse);
+        child.material = new THREE.MeshPhongMaterial({ map: tex });
+      }
       child.castShadow = true;
       child.receiveShadow = true;
       child.frustumCulled = true;
     }
   });
 
-  fbx.scale.set(0.01, 0.01, 0.01);
+  fbx.scale.copy(config.scale);
   position.y = getTerrainHeightAt(position.x, position.z);
   fbx.position.copy(position);
   scene.add(fbx);
 
-  walkers.push({ model: fbx, angle: Math.random() * Math.PI * 2 });
+  const { mixer, actions } = await loadAnimations(fbx, config.animations);
+
+  if (actions.walk) {
+    actions.walk.play();
+  }
+
+  walkers.push({ model: fbx, mixer, angle: Math.random() * Math.PI * 2 });
 }
+
 
 export function updateWalkingNpcs(delta) {
   const playerPos = playerRef?.model?.position ?? new THREE.Vector3();
@@ -104,7 +115,7 @@ export function updateWalkingNpcs(delta) {
     npc.model.visible = dist < MAX_DISTANCE;
     if (dist < MAX_DISTANCE) {
       npc.angle += delta * 0.2;
-      const moveSpeed = 0.5;
+      const moveSpeed = 5.0;
       const dir = new THREE.Vector3(Math.cos(npc.angle), 0, Math.sin(npc.angle));
       npc.model.position.addScaledVector(dir, moveSpeed * delta);
       const x = npc.model.position.x;
@@ -113,16 +124,18 @@ export function updateWalkingNpcs(delta) {
       npc.model.position.y = terrainY;
       const target = npc.model.position.clone().add(dir);
       npc.model.lookAt(target);
+
+      npc.mixer?.update(delta); // ✅ anima il walker
     }
   }
 }
 
 export async function spawnWerewolfNpc(position) {
-  const fbx = await loader.loadAsync('/models/werewolf.fbx');
-  console.log('📦 Werewolf model loaded');
-  console.log('📦 werewolf model animations:', fbx.animations);
+  const config = ENTITY_CONFIG.werewolf;
+  const baseModel = await loader.loadAsync(config.modelPath);
+  const fbx = SkeletonUtils.clone(baseModel);
 
-  const tex = textureLoader.load('/textures/werewolf/werewolf_diffuse.jpg');
+  const tex = textureLoader.load(config.textures.diffuse);
 
   fbx.traverse(child => {
     if (child.isMesh || child.type === 'SkinnedMesh') {
@@ -133,28 +146,20 @@ export async function spawnWerewolfNpc(position) {
     }
   });
 
-  fbx.scale.set(0.01, 0.01, 0.01);
-  position.y = getTerrainHeightAt(position.x, position.z)+6;
+  fbx.scale.copy(config.scale);
+  position.y = getTerrainHeightAt(position.x, position.z) + (config.yOffset ?? 0);
   fbx.position.copy(position);
   scene.add(fbx);
 
-  // 🔥 Carica animazioni
-  const { mixer, actions } = await loadAnimations(fbx, {
-    idle: '/models/animations/WerewolfIdle.fbx',
-    walk: '/models/animations/WerewolfWalk.fbx',
-    run: '/models/animations/WerewolfIdle.fbx',
-  });
+  const { mixer, actions } = await loadAnimations(fbx, config.animations);
 
-  console.log('✅ Animation actions:', actions);
   if (actions.walk) {
-    console.log('▶️ Playing action walk:', actions.walk);
     actions.walk.play();
-  } else {
-    console.warn('❌ Azione walk non trovata!');
   }
 
   werewolves.push({ model: fbx, mixer, angle: Math.random() * Math.PI * 2 });
 }
+
 export function updateWerewolfNpcs(delta) {
   const playerPos = playerRef?.model?.position ?? new THREE.Vector3();
 
@@ -173,12 +178,10 @@ export function updateWerewolfNpcs(delta) {
       const target = npc.model.position.clone().add(dir);
       npc.model.lookAt(target);
 
-      // 🌀 Avanza l'animazione
       npc.mixer?.update(delta);
     }
   }
 }
-
 
 export function spawnAreaEnemies() {
   for (let i = 0; i < 5; i++) {
@@ -195,7 +198,7 @@ export function spawnAreaEnemies() {
 
   for (let i = 0; i < 3; i++) {
     spawnFlyingWyvern(new THREE.Vector3(
-      250 + Math.random() * 100, 80, Math.random() * 100 - 50
+      250 + Math.random() * 100, 70, Math.random() * 100 - 50
     ));
   }
 }
