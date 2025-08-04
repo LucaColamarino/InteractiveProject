@@ -56,6 +56,7 @@ export const abilitiesByForm = {
 export async function preloadAssets() {
   for (const formName in abilitiesByForm) {
     const form = abilitiesByForm[formName];
+
     const baseModel = await loader.loadAsync(form.modelPath);
     modelCache[formName] = baseModel;
 
@@ -65,10 +66,9 @@ export async function preloadAssets() {
     clone.traverse(child => {
       if (child.isMesh || child.type === 'SkinnedMesh') {
         if (formName === 'bird') {
-          child.material = new THREE.MeshPhongMaterial({
+          child.material = new THREE.MeshStandardMaterial({
             map: textureDiffuse,
-            normalMap: textureNormal,
-            shininess: 30
+            normalMap: textureNormal
           });
         }
         child.castShadow = true;
@@ -78,7 +78,6 @@ export async function preloadAssets() {
 
     cloneCache[formName] = clone;
 
-    // GPU warm-up
     const dummy = SkeletonUtils.clone(clone);
     dummy.visible = false;
     dummy.scale.set(0.01, 0.01, 0.01);
