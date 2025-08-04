@@ -9,10 +9,11 @@ import { loadAnimations, fixAnimationLoop } from './core/AnimationLoader.js';
 
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
+
 const modelCache = {};
-const textureCache = {};
-const materialCache = {};
 const cloneCache = {};
+const textureDiffuse = textureLoader.load('/textures/diffuse.png');
+const textureNormal = textureLoader.load('/textures/normal.png');
 
 export const abilitiesByForm = {
   human: {
@@ -55,51 +56,47 @@ export const abilitiesByForm = {
 export async function preloadAssets() {
   for (const formName in abilitiesByForm) {
     const form = abilitiesByForm[formName];
+    const baseModel = await loader.loadAsync(form.modelPath);
+    modelCache[formName] = baseModel;
 
-    if (!modelCache[formName]) {
-      const fbx = await loader.loadAsync(form.modelPath);
-      modelCache[formName] = fbx;
-    }
+    const clone = SkeletonUtils.clone(baseModel);
+    clone.animations = baseModel.animations;
 
-    if (formName === 'bird') {
-      if (!textureCache.diffuse)
-        textureCache.diffuse = textureLoader.load('/textures/diffuse.png');
-      if (!textureCache.normal)
-        textureCache.normal = textureLoader.load('/textures/normal.png');
-      if (!textureCache.specular)
-        textureCache.specular = textureLoader.load('/textures/diffuse.png');
-
-      if (!materialCache.bird) {
-        materialCache.bird = new THREE.MeshPhongMaterial({
-          map: textureCache.diffuse,
-          normalMap: textureCache.normal,
-          specularMap: textureCache.specular,
-          shininess: 30
-        });
+    clone.traverse(child => {
+      if (child.isMesh || child.type === 'SkinnedMesh') {
+        if (formName === 'bird') {
+          child.material = new THREE.MeshPhongMaterial({
+            map: textureDiffuse,
+            normalMap: textureNormal,
+            shininess: 30
+          });
+        }
+        child.castShadow = true;
+        child.receiveShadow = true;
       }
-    }
+    });
 
-    prepareClone(formName);
+    cloneCache[formName] = clone;
 
-    const dummy = SkeletonUtils.clone(modelCache[formName]);
+    // GPU warm-up
+    const dummy = SkeletonUtils.clone(clone);
     dummy.visible = false;
     dummy.scale.set(0.01, 0.01, 0.01);
     scene.add(dummy);
-    renderer.render(scene, camera); // forza upload alla GPU
+    renderer.render(scene, camera);
     scene.remove(dummy);
   }
 
-  renderer.compile(scene, camera); // compila shader e materiali
+  renderer.compile(scene, camera);
 }
 
 export async function changeForm(formName) {
   const abilities = abilitiesByForm[formName];
   if (!abilities) throw new Error(`Forma non trovata: ${formName}`);
-
   offset.copy(abilities.cameraOffset);
+
   const fbx = SkeletonUtils.clone(cloneCache[formName]);
   fbx.animations = cloneCache[formName].animations;
-
   fbx.scale.set(0.01, 0.01, 0.01);
   fbx.rotation.set(0, abilities.rotationOffset || 0, 0);
 
@@ -107,12 +104,9 @@ export async function changeForm(formName) {
   fbx.position.y += abilities.yOffset || 0;
   group.add(fbx);
 
-  for (let i = scene.children.length - 1; i >= 0; i--) {
-    const obj = scene.children[i];
-    if (obj.userData && obj.userData.playerModel) {
-      scene.remove(obj);
-    }
-  }
+  scene.children
+    .filter(obj => obj.userData?.playerModel)
+    .forEach(obj => scene.remove(obj));
 
   group.userData.playerModel = true;
   scene.add(group);
@@ -121,13 +115,9 @@ export async function changeForm(formName) {
   if (formName === 'bird') {
     mixer = new THREE.AnimationMixer(fbx);
     actions = {};
-    const indexMap = abilities.animationIndices;
-    for (const [key, index] of Object.entries(indexMap)) {
-      let clip = fbx.animations[index];
-      clip = fixAnimationLoop(clip);
-      if (clip) {
-        actions[key] = mixer.clipAction(clip);
-      }
+    for (const [key, index] of Object.entries(abilities.animationIndices)) {
+      const clip = fixAnimationLoop(fbx.animations[index]);
+      if (clip) actions[key] = mixer.clipAction(clip);
     }
   } else {
     const result = await loadAnimations(fbx, abilities.animationPaths);
@@ -138,26 +128,9 @@ export async function changeForm(formName) {
   const player = new Player(group, mixer, actions);
   const controller = new PlayerController(player, abilities);
   player.playAnimation('idle');
+
   addTransformationEffect(group.position);
   return { player, controller };
-}
-
-function prepareClone(formName) {
-  const original = modelCache[formName];
-  const cloned = SkeletonUtils.clone(original);
-  cloned.animations = original.animations;
-
-  cloned.traverse(child => {
-    if (child.isMesh || child.type === 'SkinnedMesh') {
-      if (formName === 'bird') {
-        child.material = materialCache.bird;
-      }
-      child.castShadow = true;
-      child.receiveShadow = true;
-    }
-  });
-
-  cloneCache[formName] = cloned;
 }
 
 export function addTransformationEffect(position) {
