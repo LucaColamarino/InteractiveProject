@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
+import { getCurrentArea } from './areaManager.js';
 
 const magicStones = [];
 
-export function spawnMagicStone(position, formName = 'bird') {
+export function spawnMagicStone(position, formName = 'wyvern') {
   const geometry = new THREE.SphereGeometry(0.5, 16, 16);
   const material = new THREE.MeshStandardMaterial({
     color: 0x55aaff,
@@ -19,21 +20,29 @@ export function spawnMagicStone(position, formName = 'bird') {
   magicStones.push(stone);
 }
 
+
 export function checkStonePickup(player, onFormChange) {
   if (!player?.model) return;
 
   const playerPos = player.model.position;
+  const currentArea = getCurrentArea(playerPos);
 
   for (let i = magicStones.length - 1; i >= 0; i--) {
     const stone = magicStones[i];
-    const distance = playerPos.distanceTo(stone.position);
+    const form = stone.userData.formName;
 
+    const distance = playerPos.distanceTo(stone.position);
     if (distance < 1.5) {
-      const newForm = stone.userData.formName;
-      onFormChange(newForm); 
+      if (form !== currentArea) {
+        console.warn(`⚠️ Non puoi trasformarti in ${form} nell'area ${currentArea}`);
+        return;
+      }
+
+      onFormChange(form); 
       scene.remove(stone);
       magicStones.splice(i, 1);
       break;
     }
   }
 }
+

@@ -3,72 +3,94 @@
   <head>
     <meta charset="UTF-8" />
     <title>Three.js Project</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden; 
+        height: 100%;
+        width: 100%;
+        font-family: sans-serif;
+      }
+
+      canvas {
+        display: block;      
+        position: fixed;     
+        top: 0;
+        left: 0;
+      }
+
+      #hud-container {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 1000;
+      }
+
+      .hud-box {
+        background-color: rgba(0, 0, 0, 0.4);
+        color: white;
+        font-family: monospace;
+        font-size: 14px;
+        padding: 8px;
+        border-radius: 6px;
+        min-width: 150px;
+      }
+
+      #form-label {
+        font-size: 16px;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      #fly-indicator {
+        font-size: 20px;
+        opacity: 0.3;
+        transition: opacity 0.2s ease;
+      }
+
+      #stamina-bar {
+        width: 100%;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+
+      #stamina-fill {
+        height: 100%;
+        width: 100%;
+        background: limegreen;
+        transition: width 0.1s;
+      }
+
+      #compass {
+        margin-top: 5px;
+        font-size: 16px;
+      }
+    </style>
   </head>
-  <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    overflow: hidden; 
-    height: 100%;
-    width: 100%;
-  }
-
-  canvas {
-    display: block;      
-    position: fixed;     
-    top: 0;
-    left: 0;
-  }
-  #hud {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  color: white;
-  font-family: sans-serif;
-  z-index: 1000;
-}
-
-#form-label {
-  font-size: 18px;
-  margin-bottom: 5px;
-}
-
-#fly-indicator {
-  font-size: 24px;
-  opacity: 0.3;
-  transition: opacity 0.2s ease;
-}
-
-#stamina-bar {
-  width: 150px;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 5px;
-  margin-top: 8px;
-  overflow: hidden;
-}
-
-#stamina-fill {
-  height: 100%;
-  width: 100%;
-  background: limegreen;
-  transition: width 0.1s;
-}
-
-
-
-
-</style>
 
   <body>
     <canvas id="three-canvas"></canvas>
-    <div id="hud">
-  <div id="form-label">Form: human</div>
-  <div id="fly-indicator">🕊️</div>
-  <div id="stamina-bar">
-    <div id="stamina-fill"></div>
-  </div>
-</div>
+
+    <div id="hud-container">
+      <div class="hud-box">
+        <div id="form-label">Form: human</div>
+        <div id="fly-indicator">🕊️</div>
+        <div id="stamina-bar">
+          <div id="stamina-fill"></div>
+        </div>
+      </div>
+
+      <div class="hud-box">
+        <div id="coords">X: 0, Y: 0, Z: 0</div>
+        <div id="compass">🧭 N</div>
+      </div>
+    </div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

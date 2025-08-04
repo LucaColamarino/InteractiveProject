@@ -4,8 +4,7 @@ import { setupInput } from './inputManager.js';
 import { startLoop } from './gameLoop.js';
 import { createHeightmapTerrain, addWaterPlane } from './map.js';
 import { spawnMagicStone } from './pickupSystem.js';
-import { spawnFlyingWyvern, spawnWalkingNpc } from './npcSpawner.js';
-
+import {spawnAreaEnemies,setPlayerReference} from './npcSpawner.js';
 let player = null;
 let controller = null;
 function showLoadingScreen() {
@@ -38,14 +37,21 @@ async function init() {
   setupInput();
   createHeightmapTerrain();
   addWaterPlane();
-  await spawnFlyingWyvern(new THREE.Vector3(100, 60, 100));
-  await spawnFlyingWyvern(new THREE.Vector3(-50, 70, -100));
-  spawnMagicStone(new THREE.Vector3(10, 6, 0), 'bird');
+  spawnAreaEnemies();
+  // Aree centrali
+  //spawnMagicStone(new THREE.Vector3(0, 7, 0), 'wyvern');
+  // Zona wyvern (x > 200)
+  spawnMagicStone(new THREE.Vector3(250, 15, 20), 'wyvern');
+  // Zona lupo mannaro (x < -200)
+  spawnMagicStone(new THREE.Vector3(-250, 7, -20), 'werewolf');
+
   const result = await changeForm('human');
   player = result.player;
   controller = result.controller;
   hideLoadingScreen();
   startLoop(player, controller);
+  
+setPlayerReference(player);
 }
 
 init();

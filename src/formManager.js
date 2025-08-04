@@ -12,11 +12,23 @@ const textureLoader = new THREE.TextureLoader();
 
 const modelCache = {};
 const cloneCache = {};
-const textureDiffuse = textureLoader.load('/textures/diffuse.png');
-const textureNormal = textureLoader.load('/textures/normal.png');
+const textureDiffuse = textureLoader.load('/textures/wyvern/wyvern_diffuse.png');
+const textureNormal = textureLoader.load('/textures/wyvern/wyvern_normal.png');
+const textureWerewolfDiffuse = textureLoader.load('/textures/werewolf/werewolf_diffuse.jpg');
+const textureWerewolfNormal = textureLoader.load('/textures/werewolf/werewolf_normal.jpg');
+
+function createAbilities(formName, config) {
+  return {
+    ...config,
+    cameraOffset: config.cameraOffset || new THREE.Vector3(0, 2.5, -1.5),
+    rotationOffset: config.rotationOffset || 0,
+    yOffset: config.yOffset || 0.0,
+    formName,
+  };
+}
 
 export const abilitiesByForm = {
-  human: {
+  human: createAbilities('human', {
     modelPath: '/models/player.fbx',
     animationPaths: {
       idle: '/models/animations/YbotIdle.fbx',
@@ -29,12 +41,25 @@ export const abilitiesByForm = {
     speed: 5,
     jumpForce: 12,
     gravity: -30,
-    cameraOffset: new THREE.Vector3(0, 2.5, -1.5),
-    rotationOffset: 0,
-    yOffset: 0.0
-  },
-  bird: {
-    modelPath: '/models/Wyvern animated.fbx',
+  }),
+
+  werewolf: createAbilities('werewolf', {
+    modelPath: '/models/werewolf.fbx',
+    animationPaths: {
+      idle: '/models/animations/YbotIdle.fbx',
+      walk: '/models/animations/YbotWalking.fbx',
+      run:  '/models/animations/YbotRunning.fbx',
+      jump: '/models/animations/YbotJumping.fbx',
+    },
+    canFly: false,
+    canJump: true,
+    speed: 10,
+    jumpForce: 12,
+    gravity: -30,
+  }),
+
+  wyvern: createAbilities('wyvern', {
+    modelPath: '/models/wyvern.fbx',
     animationIndices: {
       idle: 2,
       fly: 0,
@@ -48,9 +73,8 @@ export const abilitiesByForm = {
     jumpForce: 10,
     gravity: -5,
     cameraOffset: new THREE.Vector3(0, 15, -20),
-    rotationOffset: 0,
-    yOffset: 5.2
-  }
+    yOffset: 5.2,
+  })
 };
 
 export async function preloadAssets() {
@@ -65,12 +89,19 @@ export async function preloadAssets() {
 
     clone.traverse(child => {
       if (child.isMesh || child.type === 'SkinnedMesh') {
-        if (formName === 'bird') {
-          child.material = new THREE.MeshStandardMaterial({
+        let material;
+        if (formName === 'wyvern') {
+          material = new THREE.MeshStandardMaterial({
             map: textureDiffuse,
             normalMap: textureNormal
           });
+        } else if (formName === 'werewolf') {
+          material = new THREE.MeshStandardMaterial({
+            map: textureWerewolfDiffuse,
+            normalMap: textureWerewolfNormal
+          });
         }
+        if (material) child.material = material;
         child.castShadow = true;
         child.receiveShadow = true;
       }
@@ -97,10 +128,10 @@ export async function changeForm(formName) {
   const fbx = SkeletonUtils.clone(cloneCache[formName]);
   fbx.animations = cloneCache[formName].animations;
   fbx.scale.set(0.01, 0.01, 0.01);
-  fbx.rotation.set(0, abilities.rotationOffset || 0, 0);
+  fbx.rotation.set(0, abilities.rotationOffset, 0);
 
   const group = new THREE.Group();
-  fbx.position.y += abilities.yOffset || 0;
+  fbx.position.y += abilities.yOffset;
   group.add(fbx);
 
   scene.children
@@ -111,7 +142,7 @@ export async function changeForm(formName) {
   scene.add(group);
 
   let mixer, actions;
-  if (formName === 'bird') {
+  if (abilities.animationIndices) {
     mixer = new THREE.AnimationMixer(fbx);
     actions = {};
     for (const [key, index] of Object.entries(abilities.animationIndices)) {

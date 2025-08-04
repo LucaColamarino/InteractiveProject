@@ -1,13 +1,12 @@
 import * as THREE from 'three';
 
 export function createTerrainMaterial(textureLoader) {
-  const grassColor = textureLoader.load('/textures/grass_color.jpg');
-  const rockColor = textureLoader.load('/textures/rock_color.jpg');
-  const snowColor = textureLoader.load('/textures/snow_color.jpg');
-
-  const grassNormal = textureLoader.load('/textures/grass_normal.jpg');
-  const rockNormal = textureLoader.load('/textures/rock_normal.jpg');
-  const snowNormal = textureLoader.load('/textures/snow_normal.jpg');
+  const grassColor = textureLoader.load('/textures/terrain/grass_color.jpg');
+  const rockColor = textureLoader.load('/textures/terrain/rock_color.jpg');
+  const snowColor = textureLoader.load('/textures/terrain/snow_color.jpg');
+  const grassNormal = textureLoader.load('/textures/terrain/grass_normal.jpg');
+  const rockNormal = textureLoader.load('/textures/terrain/rock_normal.jpg');
+  const snowNormal = textureLoader.load('/textures/terrain/snow_normal.jpg');
 
   [grassColor, rockColor, snowColor, grassNormal, rockNormal, snowNormal].forEach(tex => {
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;

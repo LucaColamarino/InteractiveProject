@@ -25,7 +25,7 @@ export function getTerrainHeightAt(x, z) {
 
 export function addWaterPlane() {
   const waterGeometry = new THREE.PlaneGeometry(1000, 1000);
-  const waterNormals = new THREE.TextureLoader().load('/textures/waternormals.jpg', texture => {
+  const waterNormals = new THREE.TextureLoader().load('/textures/terrain/waternormals.jpg', texture => {
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   });
 
@@ -78,7 +78,7 @@ export function createHeightmapTerrain() {
 
 
   const heightMapImg = new Image();
-  heightMapImg.src = '/textures/heightmap.png';
+  heightMapImg.src = '/textures/terrain/heightmap.png';
 
   heightMapImg.onload = () => {
     const segments = 256;

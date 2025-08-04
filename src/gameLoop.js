@@ -33,6 +33,26 @@ export function startLoop(p, c) {
 
     try {
       if (player) player.update(delta);
+      if (player?.model) {
+        const pos = player.model.position;
+        document.getElementById('coords').textContent =
+          `X: ${pos.x.toFixed(1)}, Y: ${pos.y.toFixed(1)}, Z: ${pos.z.toFixed(1)}`;
+
+        const dir = new THREE.Vector3();
+camera.getWorldDirection(dir);
+const angle = Math.atan2(dir.x, dir.z);
+const deg = THREE.MathUtils.radToDeg(angle);
+
+// Mostra solo direzioni cardinali approssimate
+let compassDir = 'N';
+if (deg >= -45 && deg < 45) compassDir = 'N';
+else if (deg >= 45 && deg < 135) compassDir = 'E';
+else if (deg >= -135 && deg < -45) compassDir = 'W';
+else compassDir = 'S';
+
+document.getElementById('compass').textContent = `🧭 ${compassDir}`;
+
+      }
 
       if (controller) {
         const moveVec = getInputVector();
@@ -40,7 +60,7 @@ export function startLoop(p, c) {
           controller.abilities.canFly ? controller.fly() : controller.jump();
         }
         controller.update(delta, moveVec, isShiftPressed(), isJumpPressed());
-        document.getElementById('form-label').innerText = `Form: ${controller.abilities.canFly ? 'bird' : 'human'}`;
+        document.getElementById('form-label').innerText = `Form: ${controller.abilities.canFly ? 'wyvern' : 'human'}`;
         document.getElementById('fly-indicator').style.opacity = controller.isFlying ? 1 : 0.3;
 
         const maxFly = controller.abilities.maxFlyTime || 100;

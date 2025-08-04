@@ -24,6 +24,7 @@ export class PlayerController {
     this.handleVerticalMovement(delta, isJumpPressed, isShiftPressed);
 
     const pos = this.player.model.position;
+    console.log(`Player position: ${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}`);
     const terrainY = getTerrainHeightAt(pos.x, pos.z);
     if (pos.y < terrainY) {
       pos.y = terrainY;
