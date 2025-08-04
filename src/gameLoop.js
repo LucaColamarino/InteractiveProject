@@ -5,10 +5,10 @@ import { getInputVector, isJumpPressed, isShiftPressed, wasJumpJustPressed } fro
 import { checkStonePickup } from './pickupSystem.js';
 import { changeForm } from './formManager.js';
 import { updateShadowUniforms, updateWater } from './map.js';
-import { updateWalkingNpcs, updateWyverns } from './npcSpawner.js';
+import { updateWalkingNpcs, updateWyverns, updateWerewolfNpcs } from './npcSpawner.js';
 import { updateSunShadowCamera, sun } from './shadowManager.js';
 import { terrainMaterial } from './map.js';
-
+import { getCurrentArea } from './areaManager.js';
 const clock = new THREE.Clock();
 
 let player = null;
@@ -39,19 +39,17 @@ export function startLoop(p, c) {
           `X: ${pos.x.toFixed(1)}, Y: ${pos.y.toFixed(1)}, Z: ${pos.z.toFixed(1)}`;
 
         const dir = new THREE.Vector3();
-camera.getWorldDirection(dir);
-const angle = Math.atan2(dir.x, dir.z);
-const deg = THREE.MathUtils.radToDeg(angle);
-
-// Mostra solo direzioni cardinali approssimate
-let compassDir = 'N';
-if (deg >= -45 && deg < 45) compassDir = 'N';
-else if (deg >= 45 && deg < 135) compassDir = 'E';
-else if (deg >= -135 && deg < -45) compassDir = 'W';
-else compassDir = 'S';
-
-document.getElementById('compass').textContent = `🧭 ${compassDir}`;
-
+        camera.getWorldDirection(dir);
+        const angle = Math.atan2(dir.x, dir.z);
+        const deg = THREE.MathUtils.radToDeg(angle);
+        let compassDir = 'N';
+        if (deg >= -45 && deg < 45) compassDir = 'N';
+        else if (deg >= 45 && deg < 135) compassDir = 'E';
+        else if (deg >= -135 && deg < -45) compassDir = 'W';
+        else compassDir = 'S';
+        document.getElementById('compass').textContent = `🧭 ${compassDir}`;
+        const currentArea = getCurrentArea(pos);
+        document.getElementById('zone-label').innerText = `Zona: ${currentArea}`;
       }
 
       if (controller) {
@@ -72,6 +70,7 @@ document.getElementById('compass').textContent = `🧭 ${compassDir}`;
       }
       updateWyverns(delta);
       updateWalkingNpcs(delta);
+      updateWerewolfNpcs(delta);
       updateWater(delta);
       if (player?.model) {
         updateSunShadowCamera(player.model.position);

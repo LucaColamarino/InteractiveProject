@@ -110,25 +110,29 @@ export function createTerrainMaterial(textureLoader) {
       rFactor /= total;
       sFactor /= total;
 
-      vec3 blendedColor = gTex * gFactor + rTex * rFactor + sTex * sFactor;
+      float werewolfZone = smoothstep(-220.0, -180.0, vWorldPosition.x);
+      float wyvernZone = smoothstep(180.0, 220.0, vWorldPosition.x);
+      float humanZone = 1.0 - werewolfZone - wyvernZone;
 
-      // Wetness + foam effect near shoreline
+      vec3 darkSoil = vec3(0.1, 0.08, 0.06);
+      vec3 blendedWerewolf = mix(darkSoil, rTex, 0.3);
+      vec3 werewolfColor = mix(blendedWerewolf, sTex, sFactor * 0.4);
+
+      vec3 wyvernColor = mix(rTex, sTex, sFactor);
+      vec3 humanColor = gTex * gFactor + rTex * rFactor + sTex * sFactor;
+
+      vec3 baseColor = werewolfColor * werewolfZone + wyvernColor * wyvernZone + humanColor * humanZone;
+
       float shoreFade = smoothstep(4.5, 6.0, h);
       vec3 wetColor = vec3(0.06, 0.08, 0.1);
-      vec3 baseWetBlend = mix(wetColor, blendedColor, shoreFade);
-
-      float foamFactor = 1.0 - smoothstep(4.7, 5.4, h);
-      float foamWave = 0.5 + 0.5 * sin(vUv.x * 50.0 + time * 2.0);
-      foamFactor *= foamWave;
-      vec3 foamColor = vec3(0.85, 0.9, 1.0);
-      blendedColor = mix(baseWetBlend, foamColor, foamFactor * 0.3);
+      vec3 finalColor = mix(wetColor, baseColor, shoreFade);
 
       vec3 lightDir = normalize(lightDirection);
       float diff = max(dot(normalize(vNormal), lightDir), 0.0);
-
       float shadow = getShadowFactor(vShadowCoord);
+
       vec3 ambient = vec3(0.3);
-      vec3 finalColor = blendedColor * (ambient + diff * shadow);
+      finalColor *= (ambient + diff * shadow);
 
       float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
       finalColor = mix(finalColor, fogColor, fogFactor);

@@ -46,8 +46,8 @@ export const abilitiesByForm = {
   werewolf: createAbilities('werewolf', {
     modelPath: '/models/werewolf.fbx',
     animationPaths: {
-      idle: '/models/animations/YbotIdle.fbx',
-      walk: '/models/animations/YbotWalking.fbx',
+      idle: '/models/animations/WerewolfIdle.fbx',
+      walk: '/models/animations/WerewolfWalk.fbx',
       run:  '/models/animations/YbotRunning.fbx',
       jump: '/models/animations/YbotJumping.fbx',
     },
@@ -131,9 +131,14 @@ export async function changeForm(formName) {
   fbx.rotation.set(0, abilities.rotationOffset, 0);
 
   const group = new THREE.Group();
+  const prevPlayer = scene.children.find(obj => obj.userData?.playerModel);
+  const prevPosition = prevPlayer?.position?.clone() ?? new THREE.Vector3(0, 0, 0);
+
+  group.position.copy(prevPosition);  // 🔧 Mantieni la posizione!
   fbx.position.y += abilities.yOffset;
   group.add(fbx);
 
+  // Rimuove il precedente modello
   scene.children
     .filter(obj => obj.userData?.playerModel)
     .forEach(obj => scene.remove(obj));
