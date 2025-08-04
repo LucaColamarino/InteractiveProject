@@ -26,7 +26,8 @@ export function createTerrainMaterial(textureLoader) {
       shadowMatrix: { value: new THREE.Matrix4() },
       fogColor: { value: new THREE.Color(0xa8d0ff) },
       fogNear: { value: 100 },
-      fogFar: { value: 600 }
+      fogFar: { value: 600 },
+      time: { value: 0.0 }
     },
     THREE.UniformsLib.lights
   ]);
@@ -65,6 +66,7 @@ export function createTerrainMaterial(textureLoader) {
     uniform vec3 fogColor;
     uniform float fogNear;
     uniform float fogFar;
+    uniform float time;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -93,7 +95,6 @@ export function createTerrainMaterial(textureLoader) {
       return shadow / 9.0;
     }
 
-
     void main() {
       vec2 tiledUv = vUv * 140.0;
       vec3 gTex = texture2D(grassColor, tiledUv).rgb;
@@ -111,6 +112,17 @@ export function createTerrainMaterial(textureLoader) {
       sFactor /= total;
 
       vec3 blendedColor = gTex * gFactor + rTex * rFactor + sTex * sFactor;
+
+      // Wetness + foam effect near shoreline
+      float shoreFade = smoothstep(4.5, 6.0, h);
+      vec3 wetColor = vec3(0.06, 0.08, 0.1);
+      vec3 baseWetBlend = mix(wetColor, blendedColor, shoreFade);
+
+      float foamFactor = 1.0 - smoothstep(4.7, 5.4, h);
+      float foamWave = 0.5 + 0.5 * sin(vUv.x * 50.0 + time * 2.0);
+      foamFactor *= foamWave;
+      vec3 foamColor = vec3(0.85, 0.9, 1.0);
+      blendedColor = mix(baseWetBlend, foamColor, foamFactor * 0.3);
 
       vec3 lightDir = normalize(lightDirection);
       float diff = max(dot(normalize(vNormal), lightDir), 0.0);
@@ -140,4 +152,4 @@ export function createTerrainMaterial(textureLoader) {
     transparent: false,
     extensions: { derivatives: true }
   });
-} 
+}

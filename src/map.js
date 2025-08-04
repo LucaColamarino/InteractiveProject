@@ -46,8 +46,11 @@ export function addWaterPlane() {
 }
 
 export function updateWater(delta) {
-  if (!water?.material?.uniforms?.time) return;
-  water.material.uniforms.time.value += delta * 1.5;
+const t = (water.material.uniforms.time.value += delta);
+if (terrainMaterial?.uniforms?.time) {
+  terrainMaterial.uniforms.time.value = t;
+}
+
 }
 
 export function updateShadowUniforms() {

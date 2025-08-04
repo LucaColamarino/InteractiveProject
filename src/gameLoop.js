@@ -7,6 +7,7 @@ import { changeForm } from './formManager.js';
 import { updateShadowUniforms, updateWater } from './map.js';
 import { updateWalkingNpcs, updateWyverns } from './npcSpawner.js';
 import { updateSunShadowCamera, sun } from './shadowManager.js';
+import { terrainMaterial } from './map.js';
 
 const clock = new THREE.Clock();
 
@@ -26,6 +27,9 @@ export function startLoop(p, c) {
   function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
+    if (terrainMaterial?.uniforms?.time) {
+      terrainMaterial.uniforms.time.value += delta;
+    }
 
     try {
       if (player) player.update(delta);
