@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { renderer, scene, camera } from './scene.js';
 import { updateCamera } from './cameraFollow.js';
-import { getInputVector, isJumpPressed, isShiftPressed, wasJumpJustPressed } from './inputManager.js';
 import { changeForm } from './formManager.js';
 import { updateShadowUniforms, updateWater } from './map.js';
 import { updateWalkingNpcs, updateWyverns, updateWerewolfNpcs } from './npcSpawner.js';
-import { updateSunShadowCamera} from './shadowManager.js';
+import { updateSunShadowCamera } from './shadowManager.js';
 import { terrainMaterial } from './map.js';
 import { getCurrentArea } from './areaManager.js';
 import { checkTransformationAltars } from './systems/pickupSystem.js';
+import { handleInput } from './inputManager.js';
+
 const clock = new THREE.Clock();
 
 let player = null;
@@ -27,12 +28,18 @@ export function startLoop(p, c) {
   function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
+
     if (terrainMaterial?.uniforms?.time) {
       terrainMaterial.uniforms.time.value += delta;
     }
 
     try {
       if (player) player.update(delta);
+
+      if (controller) {
+        handleInput(delta, controller);
+      }
+
       if (player?.model) {
         const pos = player.model.position;
         document.getElementById('coords').textContent =
@@ -48,16 +55,10 @@ export function startLoop(p, c) {
         else if (deg >= -135 && deg < -45) compassDir = 'W';
         else compassDir = 'S';
         document.getElementById('compass').textContent = `🧭 ${compassDir}`;
+
         const currentArea = getCurrentArea(pos);
         document.getElementById('zone-label').innerText = `Zona: ${currentArea}`;
-      }
 
-      if (controller) {
-        const moveVec = getInputVector();
-        if (wasJumpJustPressed()) {
-          controller.abilities.canFly ? controller.fly() : controller.jump();
-        }
-        controller.update(delta, moveVec, isShiftPressed(), isJumpPressed());
         document.getElementById('form-label').innerText = `Form: ${controller.abilities.canFly ? 'wyvern' : 'human'}`;
         document.getElementById('fly-indicator').style.opacity = controller.isFlying ? 1 : 0.3;
 
@@ -65,13 +66,13 @@ export function startLoop(p, c) {
         const current = controller.flyTimer ?? maxFly;
         const ratio = Math.max(0, Math.min(current / maxFly, 1));
         document.getElementById('stamina-fill').style.width = `${ratio * 100}%`;
-
-
       }
+
       updateWyverns(delta);
       updateWalkingNpcs(delta);
       updateWerewolfNpcs(delta);
       updateWater(delta);
+
       if (player?.model) {
         updateSunShadowCamera(player.model.position);
         updateShadowUniforms();

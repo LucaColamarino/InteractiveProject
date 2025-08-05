@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import { camera } from '../scene.js';
 import { getTerrainHeightAt } from '../map.js';
 
+let inputState = {
+  moveVec: new THREE.Vector3(),
+  isShiftPressed: false,
+  isJumpPressed: false,
+};
+
+export function setInputState(state) {
+  inputState = state;
+}
+
 export class PlayerController {
   constructor(player, abilities) {
     this.player = player;
@@ -11,14 +21,20 @@ export class PlayerController {
     this.isFlying = false;
     this.isOnGround = false;
     this.flyTimer = 0;
+
     this.smoothedDirection = new THREE.Vector3();
+    this.currentVelocity = new THREE.Vector3();
+    this.acceleration = 30;
+    this.deceleration = 20;
   }
 
-  update(delta, inputVec, isShiftPressed, isJumpPressed) {
+  update(delta) {
+    const { moveVec, isShiftPressed, isJumpPressed } = inputState;
+
     if (this.isFlying) {
-      this.handleFlight(delta, inputVec, isShiftPressed, isJumpPressed);
+      this.handleFlight(delta, moveVec, isShiftPressed, isJumpPressed);
     } else {
-      this.handleGroundMovement(delta, inputVec, isShiftPressed);
+      this.handleGroundMovement(delta, moveVec, isShiftPressed);
     }
 
     this.handleVerticalMovement(delta, isJumpPressed, isShiftPressed);
@@ -40,7 +56,35 @@ export class PlayerController {
     }
   }
 
-  handleFlight(delta) {
+  handleGroundMovement(delta, inputVec, isShiftPressed) {
+    const targetSpeed = isShiftPressed ? this.abilities.speed * 1.5 : this.abilities.speed;
+    const desiredVelocity = inputVec.clone().normalize().multiplyScalar(targetSpeed);
+    const accel = inputVec.lengthSq() > 0 ? this.acceleration : this.deceleration;
+    this.currentVelocity.lerp(desiredVelocity, accel * delta);
+
+    const moveStep = this.currentVelocity.clone().multiplyScalar(delta);
+    this.player.model.position.add(moveStep);
+
+    if (this.currentVelocity.lengthSq() > 0.001) {
+      const yaw = Math.atan2(this.currentVelocity.x, this.currentVelocity.z);
+      const currentYaw = this.player.model.rotation.y;
+      let deltaYaw = yaw - currentYaw;
+      if (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
+      if (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
+      this.player.model.rotation.y += deltaYaw * 0.15;
+    }
+
+    const speed = this.currentVelocity.length();
+    if (speed < 0.1) {
+      this.player.playAnimation('idle');
+    } else if (speed < targetSpeed * 0.6) {
+      this.player.playAnimation('walk');
+    } else {
+      this.player.playAnimation('run');
+    }
+  }
+
+  handleFlight(delta, inputVec, isShiftPressed, isJumpPressed) {
     const speed = this.abilities.flyspeed || 10;
 
     const camDir = new THREE.Vector3();
@@ -58,33 +102,6 @@ export class PlayerController {
     this.player.playAnimation('fly');
   }
 
-  handleGroundMovement(delta, inputVec, isShiftPressed) {
-    if (inputVec.lengthSq() === 0) {
-      this.player.playAnimation('idle');
-      return;
-    }
-
-    // Damping direzione per rotazione fluida
-    this.smoothedDirection.lerp(inputVec, 0.2);
-
-    // Calcolo rotazione solo su Y
-    const yaw = Math.atan2(this.smoothedDirection.x, this.smoothedDirection.z);
-    const currentYaw = this.player.model.rotation.y;
-
-    let deltaYaw = yaw - currentYaw;
-    if (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
-    if (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
-
-    this.player.model.rotation.y += deltaYaw * 0.15;
-
-    // Movimento
-    const speed = isShiftPressed ? this.abilities.speed * 1.5 : this.abilities.speed;
-    const moveDir = inputVec.clone().normalize().multiplyScalar(speed * delta);
-    this.player.model.position.add(moveDir);
-
-    this.player.playAnimation(isShiftPressed ? 'run' : 'walk');
-  }
-
   handleVerticalMovement(delta, isJumpPressed, isShiftPressed) {
     if (this.abilities.canFly && this.isFlying) {
       if (isJumpPressed) this.velocityY += 30 * delta;
@@ -95,19 +112,6 @@ export class PlayerController {
     }
 
     this.player.model.position.y += this.velocityY * delta;
-  }
-
-  applyRotation(moveDir) {
-    if (moveDir.lengthSq() === 0) return;
-
-    const yaw = Math.atan2(moveDir.x, moveDir.z);
-    const pitch = Math.atan2(-moveDir.y, Math.sqrt(moveDir.x ** 2 + moveDir.z ** 2));
-    const roll = 0;
-
-    const targetRot = new THREE.Euler(pitch, yaw, roll);
-    this.player.model.rotation.x = THREE.MathUtils.lerp(this.player.model.rotation.x, targetRot.x, 0.1);
-    this.player.model.rotation.y = THREE.MathUtils.lerp(this.player.model.rotation.y, targetRot.y, 0.1);
-    this.player.model.rotation.z = THREE.MathUtils.lerp(this.player.model.rotation.z, targetRot.z, 0.1);
   }
 
   jump() {

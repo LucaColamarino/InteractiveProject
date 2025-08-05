@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export const ENTITY_CONFIG = {
   human: {
-    modelPath: '/models/player.fbx',
+    modelPath: '/models/Ybot.fbx',
     animations: {
       idle: '/models/animations/YbotIdle.fbx',
       walk: '/models/animations/YbotWalking.fbx',
@@ -24,7 +24,7 @@ export const ENTITY_CONFIG = {
       jump: '/models/animations/YbotJumping.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
-    yOffset: 6,
+    yOffset: 0,
   },
   wyvern: {
     modelPath: '/models/wyvern.fbx',

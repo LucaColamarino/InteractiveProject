@@ -7,6 +7,7 @@ import { Player } from './core/Player.js';
 import { PlayerController } from './core/playerController.js';
 import { loadAnimations, fixAnimationLoop } from './core/AnimationLoader.js';
 import { ENTITY_CONFIG } from './entities.js';
+import { setPlayerReference} from './npcSpawner.js';
 
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
@@ -147,6 +148,7 @@ export async function changeForm(formName) {
   player.playAnimation('idle');
 
   addTransformationEffect(group.position);
+  setPlayerReference(player);
   return { player, controller };
 }
 

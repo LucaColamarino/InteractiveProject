@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 import { camera } from './scene.js';
+import { setInputState } from './core/playerController.js';
 
-const keys = {
+export const keys = {
   w: false,
   a: false,
   s: false,
   d: false,
   space: false,
   shift: false,
+  control: false,
 };
 
 let yaw = 0;
@@ -16,6 +18,7 @@ let pitch = 15;
 export function getCameraAngles() {
   return { yaw, pitch };
 }
+
 let prevSpace = false;
 export function wasJumpJustPressed() {
   const current = keys.space;
@@ -23,16 +26,19 @@ export function wasJumpJustPressed() {
   prevSpace = current;
   return justPressed;
 }
-export function setupInput() {
-document.addEventListener('keydown', (e) => {
-  const key = e.key === ' ' ? 'space' : e.key.toLowerCase();
-  if (keys.hasOwnProperty(key)) keys[key] = true;
-});
 
-document.addEventListener('keyup', (e) => {
-  const key = e.key === ' ' ? 'space' : e.key.toLowerCase();
-  if (keys.hasOwnProperty(key)) keys[key] = false;
-});
+export function setupInput() {
+  document.addEventListener('keydown', (e) => {
+    const key = e.key === ' ' ? 'space' : e.key.toLowerCase();
+    if (keys.hasOwnProperty(key)) keys[key] = true;
+    console.log(`Key down: ${key}`, keys[key]);
+  });
+
+  document.addEventListener('keyup', (e) => {
+    const key = e.key === ' ' ? 'space' : e.key.toLowerCase();
+    if (keys.hasOwnProperty(key)) keys[key] = false;
+  });
+
   document.addEventListener('mousemove', (e) => {
     yaw -= e.movementX * 0.2;
     pitch += e.movementY * 0.2;
@@ -42,16 +48,10 @@ document.addEventListener('keyup', (e) => {
   window.addEventListener('click', () => {
     document.body.requestPointerLock();
   });
-  window.addEventListener('contextmenu', e => e.preventDefault());
 
+  window.addEventListener('contextmenu', e => e.preventDefault());
 }
-export function isJumpPressed() {
-  //console.log('isJumpPressed', keys.space);
-  return keys.space;
-}
-export function isShiftPressed() {
-  return keys.shift;
-}
+
 export function getInputVector() {
   const input = new THREE.Vector3(
     (keys.a ? 1 : 0) - (keys.d ? 1 : 0),
@@ -76,4 +76,21 @@ export function getInputVector() {
   moveDir.addScaledVector(right, -input.x);
 
   return moveDir.normalize();
+}
+
+export function handleInput(delta, controller) {
+  const moveVec = getInputVector();
+  const inputState = {
+    moveVec,
+    isShiftPressed: keys.shift,
+    isJumpPressed: keys.space,
+  };
+
+  setInputState(inputState);
+
+  if (wasJumpJustPressed()) {
+    controller.abilities.canFly ? controller.fly() : controller.jump();
+  }
+
+  controller.update(delta);
 }
