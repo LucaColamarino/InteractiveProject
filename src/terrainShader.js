@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { fog } from 'three/tsl';
 
 export function createTerrainMaterial(textureLoader) {
   const grassColor = textureLoader.load('/textures/terrain/grass_color.jpg');
@@ -24,11 +23,10 @@ export function createTerrainMaterial(textureLoader) {
       lightDirection: { value: new THREE.Vector3(1, 1, 1).normalize() },
       shadowMap: { value: null },
       shadowMatrix: { value: new THREE.Matrix4() },
-      fogColor: { value: new THREE.Color(0xa8d0ff) },
+      fogColor: { value: new THREE.Color(0xbec8e0) },
       fogNear: { value: 100 },
       fogFar: { value: 600 },
-      time: { value: 0.0 },
-      fogDensty: {value: 0.04 }
+      time: { value: 0.0 }
     },
     THREE.UniformsLib.lights
   ]);
@@ -68,7 +66,7 @@ export function createTerrainMaterial(textureLoader) {
     uniform float fogNear;
     uniform float fogFar;
     uniform float time;
-    uniform float fogDensity;
+
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vWorldPosition;
@@ -97,10 +95,20 @@ export function createTerrainMaterial(textureLoader) {
     }
 
     void main() {
-      vec2 tiledUv = vUv * 140.0;
-      vec3 gTex = texture2D(grassColor, tiledUv).rgb;
-      vec3 rTex = texture2D(rockColor, tiledUv).rgb;
-      vec3 sTex = texture2D(snowColor, tiledUv).rgb;
+  vec2 baseUv = vUv;
+  vec2 macroUv = baseUv * 4.0;
+  vec2 microUv = baseUv * 40.0;
+
+
+      vec3 macroG = texture2D(grassColor, macroUv).rgb;
+      vec3 microG = texture2D(grassColor, microUv).rgb;
+      vec3 gTex = mix(macroG, microG, 0.5);
+            vec3 macroR = texture2D(rockColor, macroUv).rgb;
+      vec3 microR = texture2D(rockColor, microUv).rgb;
+      vec3 rTex = mix(macroR, microR, 0.5);
+            vec3 macroS = texture2D(snowColor, macroUv).rgb;
+      vec3 microS = texture2D(snowColor, microUv).rgb;
+      vec3 sTex = mix(macroS, microS, 0.5);
 
       float h = vWorldPosition.y;
       float gFactor = smoothstep(0.0, 15.0, h);
@@ -135,10 +143,8 @@ export function createTerrainMaterial(textureLoader) {
 
       vec3 ambient = vec3(0.3);
       finalColor *= (ambient + diff * shadow);
-      float fogCoord = vFogDepth;
-      float fogFactor = 1.0 - exp(-pow(fogCoord * fogDensity, 1.5));
-      fogFactor = clamp(fogFactor, 0.0, 1.0);
 
+      float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
       finalColor = mix(finalColor, fogColor, fogFactor);
 
       gl_FragColor = vec4(finalColor, 1.0);

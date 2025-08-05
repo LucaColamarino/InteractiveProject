@@ -18,7 +18,7 @@ const werewolves = [];
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 
-const MAX_DISTANCE = 150;
+const MAX_DISTANCE = 250;
 
 export async function spawnFlyingWyvern(position) {
   const config = ENTITY_CONFIG.wyvern;

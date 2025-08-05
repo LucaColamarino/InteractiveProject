@@ -55,8 +55,8 @@ export const abilitiesByForm = {
   wyvern: createAbilities('wyvern', {
     canFly: true,
     canJump: false,
-    flyspeed: 150,
-    speed: 15,
+    flyspeed: 30,
+    speed: 8,
     jumpForce: 10,
     gravity: -5,
     cameraOffset: new THREE.Vector3(0, 15, -20),
