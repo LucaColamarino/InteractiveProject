@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { preloadAssets,changeForm } from './formManager.js';
 import { setupInput } from './inputManager.js';
 import { startLoop } from './gameLoop.js';
-import { createHeightmapTerrain, addWaterPlane,getTerrainHeightAt } from './map.js';
+import { createHeightmapTerrain, addWaterPlane,createSky } from './map.js';
 import { spawnWaterAltar } from './objects/altar.js';
 import {spawnAreaEnemies,setPlayerReference} from './npcSpawner.js';
 let player = null;
@@ -29,13 +29,12 @@ function hideLoadingScreen() {
   const loadingDiv = document.getElementById('loading-screen');
   if (loadingDiv) loadingDiv.remove();
 }
-
-
 async function init() {
   showLoadingScreen();
   await preloadAssets();
   setupInput();
   createHeightmapTerrain();
+  createSky();
   addWaterPlane();
   spawnAreaEnemies();
   spawnWaterAltar(new THREE.Vector3(10, 6, 10), 'human');

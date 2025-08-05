@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { fog } from 'three/tsl';
 
 export function createTerrainMaterial(textureLoader) {
   const grassColor = textureLoader.load('/textures/terrain/grass_color.jpg');
@@ -26,7 +27,8 @@ export function createTerrainMaterial(textureLoader) {
       fogColor: { value: new THREE.Color(0xa8d0ff) },
       fogNear: { value: 100 },
       fogFar: { value: 600 },
-      time: { value: 0.0 }
+      time: { value: 0.0 },
+      fogDensty: {value: 0.04 }
     },
     THREE.UniformsLib.lights
   ]);
@@ -66,7 +68,7 @@ export function createTerrainMaterial(textureLoader) {
     uniform float fogNear;
     uniform float fogFar;
     uniform float time;
-
+    uniform float fogDensity;
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vWorldPosition;
@@ -133,8 +135,10 @@ export function createTerrainMaterial(textureLoader) {
 
       vec3 ambient = vec3(0.3);
       finalColor *= (ambient + diff * shadow);
+      float fogCoord = vFogDepth;
+      float fogFactor = 1.0 - exp(-pow(fogCoord * fogDensity, 1.5));
+      fogFactor = clamp(fogFactor, 0.0, 1.0);
 
-      float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
       finalColor = mix(finalColor, fogColor, fogFactor);
 
       gl_FragColor = vec4(finalColor, 1.0);

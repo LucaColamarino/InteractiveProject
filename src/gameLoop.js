@@ -9,7 +9,7 @@ import { terrainMaterial } from './map.js';
 import { getCurrentArea } from './areaManager.js';
 import { checkTransformationAltars } from './systems/pickupSystem.js';
 import { handleInput } from './inputManager.js';
-
+import { updateSunPosition } from './map.js';
 const clock = new THREE.Clock();
 
 let player = null;
@@ -28,7 +28,7 @@ export function startLoop(p, c) {
   function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
-
+    updateSunPosition();
     if (terrainMaterial?.uniforms?.time) {
       terrainMaterial.uniforms.time.value += delta;
     }
