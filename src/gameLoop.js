@@ -27,7 +27,10 @@ export function startLoop(p, c) {
 
   function animate() {
     requestAnimationFrame(animate);
-    const delta = clock.getDelta();
+    let delta = clock.getDelta();
+    console.log('Delta time:', delta.toFixed(4));
+if (delta > 0.1) delta = 0.016; // protezione
+
     updateSunPosition();
     if (terrainMaterial?.uniforms?.time) {
       terrainMaterial.uniforms.time.value += delta;

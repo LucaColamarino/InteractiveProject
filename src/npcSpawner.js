@@ -18,22 +18,34 @@ const werewolves = [];
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 
-const MAX_DISTANCE = 250;
+const MAX_DISTANCE = 150;
+
+// 🔁 Precarica materiali condivisi
+const sharedMaterials = {
+  wyvern: null,
+  werewolf: null,
+  human: null,
+};
+
+function getSharedMaterial(config) {
+  if (!sharedMaterials[config.key]) {
+    sharedMaterials[config.key] = new THREE.MeshPhongMaterial({
+      map: textureLoader.load(config.textures.diffuse),
+      normalMap: config.textures.normal ? textureLoader.load(config.textures.normal) : null,
+      shininess: 30,
+    });
+  }
+  return sharedMaterials[config.key];
+}
 
 export async function spawnFlyingWyvern(position) {
   const config = ENTITY_CONFIG.wyvern;
   const fbx = await loader.loadAsync(config.modelPath);
-
-  const diffuse = textureLoader.load(config.textures.diffuse);
-  const normal = textureLoader.load(config.textures.normal);
+  const material = getSharedMaterial({ key: 'wyvern', textures: config.textures });
 
   fbx.traverse(child => {
     if (child.isMesh || child.type === 'SkinnedMesh') {
-      child.material = new THREE.MeshPhongMaterial({
-        map: diffuse,
-        normalMap: normal,
-        shininess: 30
-      });
+      child.material = material;
       child.castShadow = true;
       child.receiveShadow = true;
       child.frustumCulled = true;
@@ -60,18 +72,18 @@ export function updateWyverns(delta) {
   for (const wyv of wyverns) {
     const dist = wyv.model.position.distanceTo(playerPos);
     wyv.model.visible = dist < MAX_DISTANCE;
-    if (dist < MAX_DISTANCE) {
-      wyv.mixer.update(delta);
-      wyv.angle += delta * 0.2;
-      const baseY = getTerrainHeightAt(wyv.model.position.x, wyv.model.position.z) + 20;
-      wyv.model.position.x += Math.cos(wyv.angle) * 0.3;
-      wyv.model.position.z += Math.sin(wyv.angle) * 0.3;
-      wyv.model.position.y = baseY + Math.sin(wyv.angle * 2) * 2;
+    if (!wyv.model.visible) continue;
 
-      const dir = new THREE.Vector3(Math.cos(wyv.angle), 0, Math.sin(wyv.angle));
-      const target = wyv.model.position.clone().add(dir);
-      wyv.model.lookAt(target);
-    }
+    wyv.mixer?.update(Math.min(delta, 0.05));
+    wyv.angle += delta * 0.2;
+    const baseY = getTerrainHeightAt(wyv.model.position.x, wyv.model.position.z) + 20;
+    wyv.model.position.x += Math.cos(wyv.angle) * 0.3;
+    wyv.model.position.z += Math.sin(wyv.angle) * 0.3;
+    wyv.model.position.y = baseY + Math.sin(wyv.angle * 2) * 2;
+
+    const dir = new THREE.Vector3(Math.cos(wyv.angle), 0, Math.sin(wyv.angle));
+    const target = wyv.model.position.clone().add(dir);
+    wyv.model.lookAt(target);
   }
 }
 
@@ -82,10 +94,8 @@ export async function spawnWalkingNpc(position) {
 
   fbx.traverse(child => {
     if (child.isMesh || child.type === 'SkinnedMesh') {
-      if (config.textures?.diffuse) {
-        const tex = textureLoader.load(config.textures.diffuse);
-        child.material = new THREE.MeshPhongMaterial({ map: tex });
-      }
+      const tex = config.textures?.diffuse ? textureLoader.load(config.textures.diffuse) : null;
+      if (tex) child.material = new THREE.MeshPhongMaterial({ map: tex });
       child.castShadow = true;
       child.receiveShadow = true;
       child.frustumCulled = true;
@@ -98,14 +108,10 @@ export async function spawnWalkingNpc(position) {
   scene.add(fbx);
 
   const { mixer, actions } = await loadAnimations(fbx, config.animations);
-
-  if (actions.walk) {
-    actions.walk.play();
-  }
+  if (actions.walk) actions.walk.play();
 
   walkers.push({ model: fbx, mixer, angle: Math.random() * Math.PI * 2 });
 }
-
 
 export function updateWalkingNpcs(delta) {
   const playerPos = playerRef?.model?.position ?? new THREE.Vector3();
@@ -113,20 +119,19 @@ export function updateWalkingNpcs(delta) {
   for (const npc of walkers) {
     const dist = npc.model.position.distanceTo(playerPos);
     npc.model.visible = dist < MAX_DISTANCE;
-    if (dist < MAX_DISTANCE) {
-      npc.angle += delta * 0.2;
-      const moveSpeed = 5.0;
-      const dir = new THREE.Vector3(Math.cos(npc.angle), 0, Math.sin(npc.angle));
-      npc.model.position.addScaledVector(dir, moveSpeed * delta);
-      const x = npc.model.position.x;
-      const z = npc.model.position.z;
-      const terrainY = getTerrainHeightAt(x, z);
-      npc.model.position.y = terrainY;
-      const target = npc.model.position.clone().add(dir);
-      npc.model.lookAt(target);
+    if (!npc.model.visible) continue;
 
-      npc.mixer?.update(delta); // ✅ anima il walker
-    }
+    npc.angle += delta * 0.2;
+    const moveSpeed = 5.0;
+    const dir = new THREE.Vector3(Math.cos(npc.angle), 0, Math.sin(npc.angle));
+    npc.model.position.addScaledVector(dir, moveSpeed * delta);
+    const x = npc.model.position.x;
+    const z = npc.model.position.z;
+    npc.model.position.y = getTerrainHeightAt(x, z);
+
+    const target = npc.model.position.clone().add(dir);
+    npc.model.lookAt(target);
+    npc.mixer?.update(Math.min(delta, 0.05));
   }
 }
 
@@ -134,12 +139,11 @@ export async function spawnWerewolfNpc(position) {
   const config = ENTITY_CONFIG.werewolf;
   const baseModel = await loader.loadAsync(config.modelPath);
   const fbx = SkeletonUtils.clone(baseModel);
-
-  const tex = textureLoader.load(config.textures.diffuse);
+  const material = getSharedMaterial({ key: 'werewolf', textures: config.textures });
 
   fbx.traverse(child => {
     if (child.isMesh || child.type === 'SkinnedMesh') {
-      child.material = new THREE.MeshPhongMaterial({ map: tex });
+      child.material = material;
       child.castShadow = true;
       child.receiveShadow = true;
       child.frustumCulled = true;
@@ -152,10 +156,7 @@ export async function spawnWerewolfNpc(position) {
   scene.add(fbx);
 
   const { mixer, actions } = await loadAnimations(fbx, config.animations);
-
-  if (actions.walk) {
-    actions.walk.play();
-  }
+  if (actions.walk) actions.walk.play();
 
   werewolves.push({ model: fbx, mixer, angle: Math.random() * Math.PI * 2 });
 }
@@ -166,20 +167,19 @@ export function updateWerewolfNpcs(delta) {
   for (const npc of werewolves) {
     const dist = npc.model.position.distanceTo(playerPos);
     npc.model.visible = dist < MAX_DISTANCE;
-    if (dist < MAX_DISTANCE) {
-      npc.angle += delta * 0.3;
-      const moveSpeed = 1.0;
-      const dir = new THREE.Vector3(Math.cos(npc.angle), 0, Math.sin(npc.angle));
-      npc.model.position.addScaledVector(dir, moveSpeed * delta);
-      const x = npc.model.position.x;
-      const z = npc.model.position.z;
-      npc.model.position.y = getTerrainHeightAt(x, z);
+    if (!npc.model.visible) continue;
 
-      const target = npc.model.position.clone().add(dir);
-      npc.model.lookAt(target);
+    npc.angle += delta * 0.3;
+    const moveSpeed = 1.0;
+    const dir = new THREE.Vector3(Math.cos(npc.angle), 0, Math.sin(npc.angle));
+    npc.model.position.addScaledVector(dir, moveSpeed * delta);
+    const x = npc.model.position.x;
+    const z = npc.model.position.z;
+    npc.model.position.y = getTerrainHeightAt(x, z);
 
-      npc.mixer?.update(delta);
-    }
+    const target = npc.model.position.clone().add(dir);
+    npc.model.lookAt(target);
+    npc.mixer?.update(Math.min(delta, 0.05));
   }
 }
 
