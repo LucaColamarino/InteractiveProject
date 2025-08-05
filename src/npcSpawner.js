@@ -18,7 +18,7 @@ const werewolves = [];
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 
-const MAX_DISTANCE = 150;
+const MAX_DISTANCE = 250;
 
 // 🔁 Precarica materiali condivisi
 const sharedMaterials = {
@@ -67,6 +67,7 @@ export async function spawnFlyingWyvern(position) {
 }
 
 export function updateWyverns(delta) {
+  const speed = 0.2;
   const playerPos = playerRef?.model?.position ?? new THREE.Vector3();
 
   for (const wyv of wyverns) {
@@ -77,9 +78,9 @@ export function updateWyverns(delta) {
     wyv.mixer?.update(Math.min(delta, 0.05));
     wyv.angle += delta * 0.2;
     const baseY = getTerrainHeightAt(wyv.model.position.x, wyv.model.position.z) + 20;
-    wyv.model.position.x += Math.cos(wyv.angle) * 0.3;
-    wyv.model.position.z += Math.sin(wyv.angle) * 0.3;
-    wyv.model.position.y = baseY + Math.sin(wyv.angle * 2) * 2;
+    wyv.model.position.x += Math.cos(wyv.angle) * speed;
+    wyv.model.position.z += Math.sin(wyv.angle) * speed;
+    wyv.model.position.y = baseY + Math.sin(wyv.angle * 2) * 4;
 
     const dir = new THREE.Vector3(Math.cos(wyv.angle), 0, Math.sin(wyv.angle));
     const target = wyv.model.position.clone().add(dir);
