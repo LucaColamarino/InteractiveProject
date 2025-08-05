@@ -2,10 +2,12 @@ import { Water } from 'three/examples/jsm/objects/Water.js';
 import * as THREE from 'three';
 import { scene } from '../scene.js';
 import { sun } from '../shadowManager.js';
-
+import { getTerrainHeightAt } from '../map.js';
 export const altars = [];
 
-export function spawnWaterAltar(position, formName = 'wyvern') {
+export function spawnWaterAltar(x,y, formName = 'wyvern') {
+  const position = new THREE.Vector3(x, getTerrainHeightAt(x, y), y);
+  console.log(`Spawning altar at ${position.x}, ${position.y}, ${position.z} for form ${formName}`);
   const altarGroup = new THREE.Group();
   altarGroup.position.copy(position);
   altarGroup.userData.formName = formName;

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { preloadAssets,changeForm } from './formManager.js';
 import { setupInput } from './inputManager.js';
 import { startLoop } from './gameLoop.js';
-import { createHeightmapTerrain, addWaterPlane,createSky } from './map.js';
+import { createHeightmapTerrain, addWaterPlane,createSky, getTerrainHeightAt } from './map.js';
 import { spawnWaterAltar } from './objects/altar.js';
 import {spawnAreaEnemies,setPlayerReference} from './npcSpawner.js';
 let player = null;
@@ -33,13 +33,13 @@ async function init() {
   showLoadingScreen();
   await preloadAssets();
   setupInput();
-  createHeightmapTerrain();
+  await createHeightmapTerrain();
   createSky();
   addWaterPlane();
   spawnAreaEnemies();
-  spawnWaterAltar(new THREE.Vector3(10, 6, 10), 'human');
-  spawnWaterAltar(new THREE.Vector3(250, 15, 20), 'wyvern');
-  spawnWaterAltar(new THREE.Vector3(-250, 7, -20), 'werewolf');
+  spawnWaterAltar(10,10, 'human');
+  spawnWaterAltar(250,20, 'wyvern');
+  spawnWaterAltar(-250,-20, 'werewolf');
 
   const result = await changeForm('human');
   player = result.player;

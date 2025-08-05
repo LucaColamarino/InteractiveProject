@@ -39,7 +39,8 @@ export const abilitiesByForm = {
   human: createAbilities('human', {
     canFly: false,
     canJump: true,
-    speed: 5,
+    //speed: 5,
+    speed: 25,
     jumpForce: 12,
     gravity: -30,
   }),

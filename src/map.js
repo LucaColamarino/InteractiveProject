@@ -16,7 +16,7 @@ let sunAngle = 0.3 * Math.PI;
 let heightData = null;
 let terrainSize = 1000;
 let terrainSegments = 256;
-let terrainScale = 60;
+let terrainScale = 120;
 
 export function setTerrainMesh(mesh) {
   terrainMesh = mesh;
@@ -70,7 +70,7 @@ export function addWaterPlane() {
   });
 
   water.rotation.x = -Math.PI / 2;
-  water.position.y = 5;
+  water.position.y = 10;
   scene.add(water);
 }
 
@@ -99,61 +99,65 @@ export function updateShadowUniforms() {
 }
 
 export async function createHeightmapTerrain() {
-  const textureLoader = new THREE.TextureLoader();
-  scene.background = new THREE.Color(0x1a1e2a);
-  scene.fog = new THREE.Fog(0x1a1e2a, 60, 250);
+  return new Promise((resolve, reject) => {
+    const textureLoader = new THREE.TextureLoader();
+    scene.background = new THREE.Color(0x1a1e2a);
+    scene.fog = new THREE.Fog(0x1a1e2a, 60, 250);
 
-  const heightMapImg = new Image();
-  heightMapImg.src = '/textures/terrain/heightmap.png';
-  heightMapImg.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = terrainSegments + 1;
-    canvas.height = terrainSegments + 1;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(heightMapImg, 0, 0, canvas.width, canvas.height);
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const heightMapImg = new Image();
+    heightMapImg.src = '/textures/terrain/heightmap.png';
+    heightMapImg.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = terrainSegments + 1;
+      canvas.height = terrainSegments + 1;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(heightMapImg, 0, 0, canvas.width, canvas.height);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
-    const geometry = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegments, terrainSegments);
-    const vertices = geometry.attributes.position;
-    heightData = new Float32Array((terrainSegments + 1) * (terrainSegments + 1));
+      const geometry = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegments, terrainSegments);
+      const vertices = geometry.attributes.position;
+      heightData = new Float32Array((terrainSegments + 1) * (terrainSegments + 1));
 
-    let maxH = -Infinity;
-    let minH = Infinity;
-    for (let i = 0; i < vertices.count; i++) {
-      const x = i % (terrainSegments + 1);
-      const y = Math.floor(i / (terrainSegments + 1));
-      const idx = (y * canvas.width + x) * 4;
-      const r = imgData[idx];
-      const g = imgData[idx + 1];
-      const b = imgData[idx + 2];
-      let height = (r + g + b) / (3 * 255);
-      height = Math.pow(height, 1.5);
-      const finalHeight = height * terrainScale;
-      vertices.setZ(i, finalHeight);
-      heightData[y * (terrainSegments + 1) + x] = finalHeight;
+      let maxH = -Infinity;
+      let minH = Infinity;
+      for (let i = 0; i < vertices.count; i++) {
+        const x = i % (terrainSegments + 1);
+        const y = Math.floor(i / (terrainSegments + 1));
+        const idx = (y * canvas.width + x) * 4;
+        const r = imgData[idx];
+        const g = imgData[idx + 1];
+        const b = imgData[idx + 2];
+        let height = (r + g + b) / (3 * 255);
+        height = Math.pow(height, 1.5);
+        const finalHeight = height * terrainScale;
+        vertices.setZ(i, finalHeight);
+        heightData[y * (terrainSegments + 1) + x] = finalHeight;
 
-      maxH = Math.max(maxH, height);
-      minH = Math.min(minH, height);
-    }
-    geometry.computeVertexNormals();
-    vertices.needsUpdate = true;
-    terrainMaterial = createTerrainMaterial(textureLoader);
-    const terrain = new THREE.Mesh(geometry, terrainMaterial);
-    terrain.rotation.x = -Math.PI / 2;
-    terrain.receiveShadow = true;
-    scene.add(terrain);
-    updateShadowUniforms();
-    setTerrainMesh(terrain);
-    console.log(`Terrain deformato correttamente. Altezza normalizzata: min ${minH.toFixed(2)}, max ${maxH.toFixed(2)}`);
-  };
+        maxH = Math.max(maxH, height);
+        minH = Math.min(minH, height);
+      }
+      geometry.computeVertexNormals();
+      vertices.needsUpdate = true;
+      terrainMaterial = createTerrainMaterial(textureLoader);
+      const terrain = new THREE.Mesh(geometry, terrainMaterial);
+      terrain.rotation.x = -Math.PI / 2;
+      terrain.receiveShadow = true;
+      scene.add(terrain);
+      updateShadowUniforms();
+      setTerrainMesh(terrain);
+      console.log(`Terrain deformato correttamente. Altezza normalizzata: min ${minH.toFixed(2)}, max ${maxH.toFixed(2)}`);
+      resolve();
+    };
 
-  heightMapImg.onerror = () => {
-    console.error('Errore nel caricamento della heightmap.');
-  };
+    heightMapImg.onerror = () => {
+      console.error('Errore nel caricamento della heightmap.');
+      reject();
+    };
 
-  createSunLight();
-  const ambientLight = new THREE.AmbientLight(0x445566, 0.4);
-  scene.add(ambientLight);
+    createSunLight();
+    const ambientLight = new THREE.AmbientLight(0x445566, 0.4);
+    scene.add(ambientLight);
+  });
 }
 
 export function createSky() {

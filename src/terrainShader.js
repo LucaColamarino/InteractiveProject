@@ -7,8 +7,21 @@ export function createTerrainMaterial(textureLoader) {
   const grassNormal = textureLoader.load('/textures/terrain/grass_normal.jpg');
   const rockNormal = textureLoader.load('/textures/terrain/rock_normal.jpg');
   const snowNormal = textureLoader.load('/textures/terrain/snow_normal.jpg');
+  const grassAO = textureLoader.load('/textures/terrain/grass_ao.jpg');
+  const rockAO = textureLoader.load('/textures/terrain/rock_ao.jpg');
+  const snowAO = textureLoader.load('/textures/terrain/snow_ao.jpg');
+  const grassRough = textureLoader.load('/textures/terrain/grass_roughness.jpg');
+  const rockRough = textureLoader.load('/textures/terrain/rock_roughness.jpg');
+  const snowRough = textureLoader.load('/textures/terrain/snow_roughness.jpg');
+  const noiseTex = textureLoader.load('/textures/terrain/noise.jpg');
 
-  [grassColor, rockColor, snowColor, grassNormal, rockNormal, snowNormal].forEach(tex => {
+  [
+    grassColor, rockColor, snowColor,
+    grassNormal, rockNormal, snowNormal,
+    grassAO, rockAO, snowAO,
+    grassRough, rockRough, snowRough,
+    noiseTex
+  ].forEach(tex => {
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   });
 
@@ -20,6 +33,13 @@ export function createTerrainMaterial(textureLoader) {
       grassNormal: { value: grassNormal },
       rockNormal: { value: rockNormal },
       snowNormal: { value: snowNormal },
+      grassAO: { value: grassAO },
+      rockAO: { value: rockAO },
+      snowAO: { value: snowAO },
+      grassRough: { value: grassRough },
+      rockRough: { value: rockRough },
+      snowRough: { value: snowRough },
+      noiseMap: { value: noiseTex },
       lightDirection: { value: new THREE.Vector3(1, 1, 1).normalize() },
       shadowMap: { value: null },
       shadowMatrix: { value: new THREE.Matrix4() },
@@ -53,19 +73,16 @@ export function createTerrainMaterial(textureLoader) {
   `;
 
   const fragmentShader = `
-    uniform sampler2D grassColor;
-    uniform sampler2D rockColor;
-    uniform sampler2D snowColor;
-    uniform sampler2D grassNormal;
-    uniform sampler2D rockNormal;
-    uniform sampler2D snowNormal;
+    uniform sampler2D grassColor, rockColor, snowColor;
+    uniform sampler2D grassNormal, rockNormal, snowNormal;
+    uniform sampler2D grassAO, rockAO, snowAO;
+    uniform sampler2D grassRough, rockRough, snowRough;
+    uniform sampler2D noiseMap;
     uniform vec3 lightDirection;
     uniform sampler2D shadowMap;
     uniform mat4 shadowMatrix;
     uniform vec3 fogColor;
-    uniform float fogNear;
-    uniform float fogFar;
-    uniform float time;
+    uniform float fogNear, fogFar, time;
 
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -78,11 +95,9 @@ export function createTerrainMaterial(textureLoader) {
     float getShadowFactor(vec4 shadowCoord) {
       vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
       if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0 || projCoords.z > 1.0) return 1.0;
-
       float bias = -0.003;
       float shadow = 0.0;
       float texelSize = 1.0 / 8192.0;
-
       for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
           vec2 offset = vec2(x, y) * texelSize;
@@ -90,59 +105,63 @@ export function createTerrainMaterial(textureLoader) {
           shadow += (projCoords.z - bias > closestDepth) ? 0.4 : 1.0;
         }
       }
-
       return shadow / 9.0;
     }
 
     void main() {
-  vec2 baseUv = vUv;
-  vec2 macroUv = baseUv * 4.0;
-  vec2 microUv = baseUv * 40.0;
+      vec2 macroUv = vUv * 4.0;
+      vec2 microUv = vUv * 80.0;
+      vec2 noiseUv = vUv * 20.0 + vec2(time * 0.05, time * 0.03);
 
+      float height = vWorldPosition.y;
+      float grassBlend = 1.0 - smoothstep(12.0, 17.0, height);
+      float rockBlend  = smoothstep(12.0, 17.0, height) * (1.0 - smoothstep(24.0, 29.0, height));
+      float snowBlend  = smoothstep(24.0, 29.0, height);
 
-      vec3 macroG = texture2D(grassColor, macroUv).rgb;
-      vec3 microG = texture2D(grassColor, microUv).rgb;
-      vec3 gTex = mix(macroG, microG, 0.5);
-            vec3 macroR = texture2D(rockColor, macroUv).rgb;
-      vec3 microR = texture2D(rockColor, microUv).rgb;
-      vec3 rTex = mix(macroR, microR, 0.5);
-            vec3 macroS = texture2D(snowColor, macroUv).rgb;
-      vec3 microS = texture2D(snowColor, microUv).rgb;
-      vec3 sTex = mix(macroS, microS, 0.5);
+      float total = grassBlend + rockBlend + snowBlend + 0.0001;
+      grassBlend /= total;
+      rockBlend  /= total;
+      snowBlend  /= total;
 
-      float h = vWorldPosition.y;
-      float gFactor = smoothstep(0.0, 15.0, h);
-      float rFactor = smoothstep(10.0, 25.0, h);
-      float sFactor = smoothstep(20.0, 60.0, h);
+      vec3 gTex = mix(texture2D(grassColor, macroUv).rgb, texture2D(grassColor, microUv).rgb, 0.5);
+      vec3 rTex = mix(texture2D(rockColor, macroUv).rgb, texture2D(rockColor, microUv).rgb, 0.5);
+      vec3 sTex = mix(texture2D(snowColor, macroUv).rgb, texture2D(snowColor, microUv).rgb, 0.5);
 
-      float total = gFactor + rFactor + sFactor + 0.0001;
-      gFactor /= total;
-      rFactor /= total;
-      sFactor /= total;
+      float noise = texture2D(noiseMap, noiseUv).r;
+      grassBlend += (noise - 0.5) * 0.1;
+      rockBlend  += (0.5 - noise) * 0.08;
 
-      float werewolfZone = smoothstep(-220.0, -180.0, vWorldPosition.x);
-      float wyvernZone = smoothstep(180.0, 220.0, vWorldPosition.x);
-      float humanZone = 1.0 - werewolfZone - wyvernZone;
+      vec3 baseColor = grassBlend * gTex + rockBlend * rTex + snowBlend * sTex;
 
-      vec3 darkSoil = vec3(0.1, 0.08, 0.06);
-      vec3 blendedWerewolf = mix(darkSoil, rTex, 0.3);
-      vec3 werewolfColor = mix(blendedWerewolf, sTex, sFactor * 0.4);
+      float gAO = texture2D(grassAO, macroUv).r;
+      float rAO = texture2D(rockAO, macroUv).r;
+      float sAO = texture2D(snowAO, macroUv).r;
+      float ao = grassBlend * gAO + rockBlend * rAO + snowBlend * sAO;
 
-      vec3 wyvernColor = mix(rTex, sTex, sFactor);
-      vec3 humanColor = gTex * gFactor + rTex * rFactor + sTex * sFactor;
+      float gRough = texture2D(grassRough, macroUv).r;
+      float rRough = texture2D(rockRough, macroUv).r;
+      float sRough = texture2D(snowRough, macroUv).r;
+      float roughness = grassBlend * gRough + rockBlend * rRough + snowBlend * sRough;
 
-      vec3 baseColor = werewolfColor * werewolfZone + wyvernColor * wyvernZone + humanColor * humanZone;
-
-      float shoreFade = smoothstep(4.5, 6.0, h);
+      float shoreFade = smoothstep(4.5, 6.0, height);
       vec3 wetColor = vec3(0.06, 0.08, 0.1);
       vec3 finalColor = mix(wetColor, baseColor, shoreFade);
 
       vec3 lightDir = normalize(lightDirection);
       float diff = max(dot(normalize(vNormal), lightDir), 0.0);
       float shadow = getShadowFactor(vShadowCoord);
-
       vec3 ambient = vec3(0.3);
+
+      diff *= (1.0 - 0.4 * roughness);
       finalColor *= (ambient + diff * shadow);
+
+      finalColor *= ao;
+
+      vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+      vec3 halfDir = normalize(viewDir + lightDir);
+      float spec = pow(max(dot(normalize(vNormal), halfDir), 0.0), 32.0);
+      spec *= 1.0 - roughness;
+      finalColor += vec3(0.2) * spec * shadow;
 
       float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
       finalColor = mix(finalColor, fogColor, fogFactor);

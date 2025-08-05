@@ -20,7 +20,7 @@ export const ENTITY_CONFIG = {
     animations: {
       idle: '/models/animations/WerewolfIdle.fbx',
       walk: '/models/animations/WerewolfWalk.fbx',
-      run: '/models/animations/WerewolfIdle.fbx',
+      run: '/models/animations/WerewolfWalk.fbx',
       jump: '/models/animations/YbotJumping.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
