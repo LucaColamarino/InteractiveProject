@@ -70,7 +70,7 @@ export function updateShadowUniforms() {
   terrainMaterial.uniforms.shadowMap.value = sun.shadow.map.texture;
 }
 
-export function createHeightmapTerrain() {
+export async function createHeightmapTerrain() {
   const textureLoader = new THREE.TextureLoader();
 
   scene.background = new THREE.Color(0x1a1e2a); // blu scuro/grigio

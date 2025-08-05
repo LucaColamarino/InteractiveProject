@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { camera } from '../scene.js';
 import { getTerrainHeightAt } from '../map.js';
 
-
 export class PlayerController {
   constructor(player, abilities) {
     this.player = player;
@@ -12,6 +11,7 @@ export class PlayerController {
     this.isFlying = false;
     this.isOnGround = false;
     this.flyTimer = 0;
+    this.smoothedDirection = new THREE.Vector3();
   }
 
   update(delta, inputVec, isShiftPressed, isJumpPressed) {
@@ -64,14 +64,23 @@ export class PlayerController {
       return;
     }
 
+    // Damping direzione per rotazione fluida
+    this.smoothedDirection.lerp(inputVec, 0.2);
+
+    // Calcolo rotazione solo su Y
+    const yaw = Math.atan2(this.smoothedDirection.x, this.smoothedDirection.z);
+    const currentYaw = this.player.model.rotation.y;
+
+    let deltaYaw = yaw - currentYaw;
+    if (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
+    if (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
+
+    this.player.model.rotation.y += deltaYaw * 0.15;
+
+    // Movimento
     const speed = isShiftPressed ? this.abilities.speed * 1.5 : this.abilities.speed;
     const moveDir = inputVec.clone().normalize().multiplyScalar(speed * delta);
     this.player.model.position.add(moveDir);
-
-    const yaw = Math.atan2(inputVec.x, inputVec.z);
-    const targetRot = new THREE.Euler(0, yaw, 0);
-    const currentRot = this.player.model.rotation;
-    currentRot.y = THREE.MathUtils.lerp(currentRot.y, targetRot.y, 0.15);
 
     this.player.playAnimation(isShiftPressed ? 'run' : 'walk');
   }

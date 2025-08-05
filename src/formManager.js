@@ -19,6 +19,7 @@ function createAbilities(formName, overrides = {}) {
   return {
     modelPath: config.modelPath,
     animationPaths: config.animations,
+    animationIndices: config.animationIndices,
     cameraOffset: overrides.cameraOffset || config.cameraOffset || new THREE.Vector3(0, 2.5, -1.5),
     rotationOffset: overrides.rotationOffset || 0,
     yOffset: overrides.yOffset ?? config.yOffset ?? 0.0,
@@ -27,6 +28,8 @@ function createAbilities(formName, overrides = {}) {
     speed: overrides.speed || 5,
     jumpForce: overrides.jumpForce || 10,
     gravity: overrides.gravity || -30,
+    flyspeed: overrides.flyspeed || 10,
+    speed: overrides.speed || 5,
     formName,
   };
 }
@@ -51,7 +54,7 @@ export const abilitiesByForm = {
   wyvern: createAbilities('wyvern', {
     canFly: true,
     canJump: false,
-    flyspeed: 50,
+    flyspeed: 150,
     speed: 15,
     jumpForce: 10,
     gravity: -5,

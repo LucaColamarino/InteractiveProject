@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { preloadAssets,changeForm } from './formManager.js';
 import { setupInput } from './inputManager.js';
 import { startLoop } from './gameLoop.js';
-import { createHeightmapTerrain, addWaterPlane } from './map.js';
-import { spawnMagicStone } from './pickupSystem.js';
+import { createHeightmapTerrain, addWaterPlane,getTerrainHeightAt } from './map.js';
+import { spawnWaterAltar } from './objects/altar.js';
 import {spawnAreaEnemies,setPlayerReference} from './npcSpawner.js';
 let player = null;
 let controller = null;
@@ -38,12 +38,9 @@ async function init() {
   createHeightmapTerrain();
   addWaterPlane();
   spawnAreaEnemies();
-  // Aree centrali
-  //spawnMagicStone(new THREE.Vector3(0, 7, 0), 'wyvern');
-  // Zona wyvern (x > 200)
-  spawnMagicStone(new THREE.Vector3(250, 15, 20), 'wyvern');
-  // Zona lupo mannaro (x < -200)
-  spawnMagicStone(new THREE.Vector3(-250, 7, -20), 'werewolf');
+  spawnWaterAltar(new THREE.Vector3(10, 6, 10), 'human');
+  spawnWaterAltar(new THREE.Vector3(250, 15, 20), 'wyvern');
+  spawnWaterAltar(new THREE.Vector3(-250, 7, -20), 'werewolf');
 
   const result = await changeForm('human');
   player = result.player;

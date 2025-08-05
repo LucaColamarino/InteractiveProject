@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { renderer, scene, camera } from './scene.js';
 import { updateCamera } from './cameraFollow.js';
 import { getInputVector, isJumpPressed, isShiftPressed, wasJumpJustPressed } from './inputManager.js';
-import { checkStonePickup } from './pickupSystem.js';
 import { changeForm } from './formManager.js';
 import { updateShadowUniforms, updateWater } from './map.js';
 import { updateWalkingNpcs, updateWyverns, updateWerewolfNpcs } from './npcSpawner.js';
-import { updateSunShadowCamera, sun } from './shadowManager.js';
+import { updateSunShadowCamera} from './shadowManager.js';
 import { terrainMaterial } from './map.js';
 import { getCurrentArea } from './areaManager.js';
+import { checkTransformationAltars } from './systems/pickupSystem.js';
 const clock = new THREE.Clock();
 
 let player = null;
@@ -78,7 +78,7 @@ export function startLoop(p, c) {
       }
 
       updateCamera(player);
-      checkStonePickup(player, handleFormChange);
+      checkTransformationAltars(player, handleFormChange);
       renderer.render(scene, camera);
     } catch (e) {
       console.error('🚨 Render crash:', e);
