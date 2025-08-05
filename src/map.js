@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { scene } from './scene.js';
+import { scene, camera } from './scene.js';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import { createTerrainMaterial } from './terrainShader.js';
 import { createSunLight } from './shadowManager.js';
@@ -76,27 +76,12 @@ export function addWaterPlane() {
 
 export function updateWater(delta) {
   const t = (water.material.uniforms.time.value += delta);
-  if (terrainMaterial?.uniforms?.time) {
-    terrainMaterial.uniforms.time.value = t;
-  }
+if (terrainMaterial?.userData?.shaderRef) {
+  terrainMaterial.userData.shaderRef.uniforms.time.value = t;
 }
 
-export function updateShadowUniforms() {
-  if (!terrainMaterial || !sun || !sun.shadow || !sun.shadow.map || !sun.shadow.map.texture) return;
-
-  const shadowMatrix = new THREE.Matrix4();
-  shadowMatrix.set(
-    0.5, 0.0, 0.0, 0.5,
-    0.0, 0.5, 0.0, 0.5,
-    0.0, 0.0, 0.5, 0.5,
-    0.0, 0.0, 0.0, 1.0
-  );
-  shadowMatrix.multiply(sun.shadow.camera.projectionMatrix);
-  shadowMatrix.multiply(sun.shadow.camera.matrixWorldInverse);
-
-  terrainMaterial.uniforms.shadowMatrix.value.copy(shadowMatrix);
-  terrainMaterial.uniforms.shadowMap.value = sun.shadow.map.texture;
 }
+
 
 export async function createHeightmapTerrain() {
   return new Promise((resolve, reject) => {
@@ -136,14 +121,33 @@ export async function createHeightmapTerrain() {
         maxH = Math.max(maxH, height);
         minH = Math.min(minH, height);
       }
+
       geometry.computeVertexNormals();
       vertices.needsUpdate = true;
+
+      // ✅ Calcola UV correttamente per la mesh
+      geometry.computeBoundingBox();
+      const bbox = geometry.boundingBox;
+      const size = new THREE.Vector3();
+      bbox.getSize(size);
+
+      const uvAttr = [];
+      for (let i = 0; i < vertices.count; i++) {
+const x = vertices.getX(i);
+const y = vertices.getY(i); // non z!
+const u = (x - bbox.min.x) / size.x;
+const v = (y - bbox.min.y) / size.y;
+uvAttr.push(u, v);
+
+      }
+      geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvAttr, 2));
+
       terrainMaterial = createTerrainMaterial(textureLoader);
       const terrain = new THREE.Mesh(geometry, terrainMaterial);
       terrain.rotation.x = -Math.PI / 2;
       terrain.receiveShadow = true;
+      terrain.castShadow = true;
       scene.add(terrain);
-      updateShadowUniforms();
       setTerrainMesh(terrain);
       console.log(`Terrain deformato correttamente. Altezza normalizzata: min ${minH.toFixed(2)}, max ${maxH.toFixed(2)}`);
       resolve();
@@ -174,13 +178,15 @@ export function createSky() {
 
 export function updateSunPosition() {
   sunAngle += 0.001;
-  const phi = THREE.MathUtils.degToRad(90 - 45 * Math.sin(sunAngle));
+  const elevation = Math.max(10, 45 * Math.sin(sunAngle));
+  const phi = THREE.MathUtils.degToRad(90 - elevation);
+
   const theta = THREE.MathUtils.degToRad(180);
   sunVector.setFromSphericalCoords(1, phi, theta);
   sky.material.uniforms['sunPosition'].value.copy(sunVector);
 
   if (sun) {
     sun.position.copy(sunVector.clone().multiplyScalar(400));
-    sun.lookAt(0, 0, 0);
+    sun.lookAt(sun.target.position);
   }
 }

@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import { renderer, scene, camera } from './scene.js';
 import { updateCamera } from './cameraFollow.js';
 import { changeForm } from './formManager.js';
-import { updateShadowUniforms, updateWater } from './map.js';
+import { updateWater } from './map.js';
 import { updateWalkingNpcs, updateWyverns, updateWerewolfNpcs } from './npcSpawner.js';
-import { updateSunShadowCamera } from './shadowManager.js';
 import { terrainMaterial } from './map.js';
 import { getCurrentArea } from './areaManager.js';
 import { checkTransformationAltars } from './systems/pickupSystem.js';
 import { handleInput } from './inputManager.js';
 import { updateSunPosition } from './map.js';
+import { sun } from './shadowManager.js';
 const clock = new THREE.Clock();
 
 let player = null;
@@ -32,8 +32,8 @@ export function startLoop(p, c) {
 if (delta > 0.1) delta = 0.016; // protezione
 
     updateSunPosition();
-    if (terrainMaterial?.uniforms?.time) {
-      terrainMaterial.uniforms.time.value += delta;
+    if (terrainMaterial?.userData?.shaderRef?.uniforms?.time) {
+      terrainMaterial.userData.shaderRef.uniforms.time.value += delta;
     }
 
     try {
@@ -75,12 +75,6 @@ if (delta > 0.1) delta = 0.016; // protezione
       updateWalkingNpcs(delta);
       updateWerewolfNpcs(delta);
       updateWater(delta);
-
-      if (player?.model) {
-        updateSunShadowCamera(player.model.position);
-        updateShadowUniforms();
-      }
-
       updateCamera(player);
       checkTransformationAltars(player, handleFormChange);
       renderer.render(scene, camera);

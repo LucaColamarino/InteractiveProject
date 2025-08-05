@@ -8,16 +8,19 @@ export function createSunLight() {
 
   sun.castShadow = true;
 
-  sun.shadow.mapSize.set(8192, 8192);
+  sun.shadow.mapSize.set(16384,16384);
   sun.shadow.radius = 2.5;
-  sun.shadow.bias = -0.0004;
+  sun.shadow.bias = -0.001;
+  sun.shadow.normalBias = 0.02;
 
+  sun.shadow.camera.top = 300;
+  sun.shadow.camera.bottom = -300;
+  sun.shadow.camera.left = -300;
+  sun.shadow.camera.right = 300;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 500;
-  sun.shadow.camera.top = 100;
-  sun.shadow.camera.bottom = -100;
-  sun.shadow.camera.left = -100;
-  sun.shadow.camera.right = 100;
+  sun.shadow.camera.far = 1000;
+  sun.shadow.camera.updateProjectionMatrix();
+
 
   sun.position.set(100, 200, -100); // luce alta e inclinata
   scene.add(sun);
@@ -31,21 +34,3 @@ export function createSunLight() {
   scene.add(ambient);
 }
 
-export function updateSunShadowCamera(playerPos) {
-  if (!sun) return;
-
-  const range = 100;
-
-  sun.shadow.camera.left = -range;
-  sun.shadow.camera.right = range;
-  sun.shadow.camera.top = range;
-  sun.shadow.camera.bottom = -range;
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 500;
-
-  sun.position.set(playerPos.x + 60, playerPos.y + 120, playerPos.z - 60);
-  sun.target.position.set(playerPos.x, playerPos.y - 40, playerPos.z); // guarda verso il basso
-  sun.target.updateMatrixWorld();
-
-  sun.shadow.camera.updateProjectionMatrix();
-}
