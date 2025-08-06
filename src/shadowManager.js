@@ -1,6 +1,30 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
 export let sun;
+export let moon;
+
+export function createMoonLight() {
+  moon = new THREE.DirectionalLight(0xaaaaff, 0.2); // tenue ma visibile
+  moon.castShadow = true;
+  moon.shadow.mapSize.set(2048, 2048); // meno risoluzione del sole
+  moon.shadow.bias = -0.0001;
+  moon.shadow.normalBias = 0.01;
+
+  moon.shadow.camera.top = 150;
+  moon.shadow.camera.bottom = -150;
+  moon.shadow.camera.left = -150;
+  moon.shadow.camera.right = 150;
+  moon.shadow.camera.near = 1;
+  moon.shadow.camera.far = 600;
+  moon.shadow.camera.updateProjectionMatrix();
+
+  scene.add(moon);
+
+  const target = new THREE.Object3D();
+  target.position.set(0, 0, 0);
+  scene.add(target);
+  moon.target = target;
+}
 
 export function createSunLight() {
   sun = new THREE.DirectionalLight(0x88bbff, 0.8);

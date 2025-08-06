@@ -2,14 +2,15 @@ import * as THREE from 'three';
 import { scene, camera } from './scene.js';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import { createTerrainMaterial } from './terrainShader.js';
-import { createSunLight } from './shadowManager.js';
-import { sun } from './shadowManager.js';
+import { createSunLight, createMoonLight } from './shadowManager.js';
+import { sun,moon } from './shadowManager.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
 let terrainMesh = null;
 export let water = null;
 export let terrainMaterial = null;
 let sky = null;
+let moonMesh = null;
 const sunVector = new THREE.Vector3();
 let sunAngle = 0.3 * Math.PI;
 
@@ -17,7 +18,7 @@ let heightData = null;
 let terrainSize = 1000;
 let terrainSegments = 256;
 let terrainScale = 120;
-
+let ambientLight = null;
 export function setTerrainMesh(mesh) {
   terrainMesh = mesh;
 }
@@ -160,7 +161,8 @@ export async function createHeightmapTerrain() {
     };
 
     createSunLight();
-    const ambientLight = new THREE.AmbientLight(0x445566, 0.4);
+    createMoonLight();
+     ambientLight = new THREE.AmbientLight(0x445566, 0.4);
     scene.add(ambientLight);
   });
 }
@@ -169,6 +171,29 @@ export function createSky() {
   sky = new Sky();
   sky.scale.setScalar(10000);
   scene.add(sky);
+  const moonTex = new THREE.TextureLoader().load('/textures/moon.jpg');
+  moonTex.wrapS = moonTex.wrapT = THREE.ClampToEdgeWrapping;
+  moonTex.anisotropy = 16;
+  const moonGeo = new THREE.SphereGeometry(1, 64, 64);
+  const moonMat = new THREE.MeshStandardMaterial({
+  map: moonTex,
+  emissive: new THREE.Color(0xccccff),
+  emissiveIntensity: 2.5,
+  roughness: 1,
+  metalness: 0,
+  toneMapped: false
+});
+
+  moonMesh = new THREE.Mesh(moonGeo, moonMat);
+  moonMesh.scale.setScalar(300); // molto più grande per essere visibile
+  moonMesh.castShadow = false;
+  moonMesh.receiveShadow = false;
+
+  scene.add(moonMesh);
+
+
+
+
 
   const skyUniforms = sky.material.uniforms;
   skyUniforms['turbidity'].value = 10;
@@ -179,15 +204,37 @@ export function createSky() {
 
 export function updateSunPosition() {
   sunAngle += 0.001;
-  const elevation = Math.max(10, 45 * Math.sin(sunAngle));
-  const phi = THREE.MathUtils.degToRad(90 - elevation);
-
+  const sunElevation = 45 * Math.sin(sunAngle);
+  const sunPhi = THREE.MathUtils.degToRad(90 - sunElevation);
   const theta = THREE.MathUtils.degToRad(180);
-  sunVector.setFromSphericalCoords(1, phi, theta);
-  sky.material.uniforms['sunPosition'].value.copy(sunVector);
 
-  if (sun) {
-    sun.position.copy(sunVector.clone().multiplyScalar(400));
-    sun.lookAt(sun.target.position);
+  // Posizione Sole
+  sunVector.setFromSphericalCoords(1, sunPhi, theta);
+  if (sky?.material?.uniforms?.sunPosition) {
+    sky.material.uniforms['sunPosition'].value.copy(sunVector);
+  }
+
+  sun?.position.copy(sunVector.clone().multiplyScalar(400));
+  sun?.lookAt(sun.target?.position);
+
+  // Posizione Luna (opposta al sole)
+  const moonVector = sunVector.clone().negate();
+  moon?.position.copy(moonVector.clone().multiplyScalar(400));
+
+  // Intensità giorno/notte
+  const dayFactor = Math.max(0, Math.sin(sunAngle));
+  sun.intensity = THREE.MathUtils.lerp(0.05, 1.0, dayFactor);
+  moon.intensity = THREE.MathUtils.lerp(0.2, 0.01, dayFactor);
+  ambientLight.intensity = THREE.MathUtils.lerp(0.1, 0.6, dayFactor);
+  // Ambient light opzionale
+  scene.fog.color.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.05, 0.6, dayFactor));
+  scene.background.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.05, 0.6, dayFactor));
+
+  // Luna visiva (mesh sfera)
+  if (moonMesh) {
+    moonMesh.position.copy(moonVector.clone().multiplyScalar(5000)); // molto più lontano
+    moonMesh.scale.setScalar(300); // visibile ma irraggiungibile
+
+    moonMesh.lookAt(scene.position);
   }
 }
