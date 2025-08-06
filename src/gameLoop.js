@@ -9,7 +9,11 @@ import { getCurrentArea } from './areaManager.js';
 import { checkTransformationAltars } from './systems/pickupSystem.js';
 import { handleInput } from './inputManager.js';
 import { updateSunPosition } from './map.js';
-import { sun } from './shadowManager.js';
+import { sun,moon } from './shadowManager.js';
+import Stats from 'stats.js';
+const stats = new Stats();
+stats.showPanel(0); // 0: fps, 1: ms, 2: memory
+document.body.appendChild(stats.dom);
 const clock = new THREE.Clock();
 
 let player = null;
@@ -26,16 +30,15 @@ export function startLoop(p, c) {
   controller = c;
 
   function animate() {
+    stats.begin();
     requestAnimationFrame(animate);
     let delta = clock.getDelta();
     console.log('Delta time:', delta.toFixed(4));
-if (delta > 0.1) delta = 0.016; // protezione
-
+    if (delta > 0.1) delta = 0.016;
     updateSunPosition();
     if (terrainMaterial?.userData?.shaderRef?.uniforms?.time) {
       terrainMaterial.userData.shaderRef.uniforms.time.value += delta;
     }
-
     try {
       if (player) player.update(delta);
 
@@ -47,7 +50,8 @@ if (delta > 0.1) delta = 0.016; // protezione
         const pos = player.model.position;
         document.getElementById('coords').textContent =
           `X: ${pos.x.toFixed(1)}, Y: ${pos.y.toFixed(1)}, Z: ${pos.z.toFixed(1)}`;
-
+        if(sun?.target) sun.target.position.copy(pos);
+        if(moon?.target) moon.target.position.copy(pos);
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         const angle = Math.atan2(dir.x, dir.z);
@@ -86,6 +90,7 @@ if (delta > 0.1) delta = 0.016; // protezione
         }
       });
     }
+    stats.end();
   }
 
   animate();
