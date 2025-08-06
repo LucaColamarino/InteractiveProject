@@ -45,6 +45,7 @@ export function createTerrainMaterial(textureLoader) {
 
        uniform sampler2D noiseMap;
        uniform float time;
+       uniform float dayFactor;
 
        varying vec3 vWorldPosition;
        varying vec2 vUv;
@@ -79,6 +80,7 @@ export function createTerrainMaterial(textureLoader) {
 
         vec3 blended = clamp(grassBlend * gTex + rockBlend * rTex + snowBlend * sTex, 0.0, 1.0);
         diffuseColor.rgb = blended;
+        diffuseColor.rgb *= dayFactor;
         float gAO = texture2D(grassAO, microUv).r;
         float rAO = texture2D(rockAO,  microUv).r;
         float sAO = texture2D(snowAO,  microUv).r;
@@ -108,6 +110,7 @@ export function createTerrainMaterial(textureLoader) {
 
     shader.uniforms.noiseMap = { value: loadTexture('/textures/terrain/noise.jpg') };
     shader.uniforms.time = { value: 0.0 };
+    shader.uniforms.dayFactor = { value: 1.0 };
 
     baseMaterial.userData.shaderRef = shader;
   };

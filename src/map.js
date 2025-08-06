@@ -222,14 +222,16 @@ export function updateSunPosition() {
   moon?.position.copy(moonVector.clone().multiplyScalar(400));
 
   // Intensità giorno/notte
-  const dayFactor = Math.max(0, Math.sin(sunAngle));
+  const dayFactor = Math.max(0.25, Math.sin(sunAngle));
   sun.intensity = THREE.MathUtils.lerp(0.05, 1.0, dayFactor);
   moon.intensity = THREE.MathUtils.lerp(0.2, 0.01, dayFactor);
   ambientLight.intensity = THREE.MathUtils.lerp(0.1, 0.6, dayFactor);
   // Ambient light opzionale
   scene.fog.color.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.05, 0.6, dayFactor));
   scene.background.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.05, 0.6, dayFactor));
-
+  if (terrainMaterial?.userData?.shaderRef?.uniforms?.dayFactor) {
+    terrainMaterial.userData.shaderRef.uniforms.dayFactor.value = dayFactor;
+  }
   // Luna visiva (mesh sfera)
   if (moonMesh) {
     moonMesh.position.copy(moonVector.clone().multiplyScalar(5000)); // molto più lontano
