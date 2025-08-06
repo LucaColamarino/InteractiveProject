@@ -133,11 +133,12 @@ export async function createHeightmapTerrain() {
 
       const uvAttr = [];
       for (let i = 0; i < vertices.count; i++) {
-const x = vertices.getX(i);
-const y = vertices.getY(i); // non z!
-const u = (x - bbox.min.x) / size.x;
-const v = (y - bbox.min.y) / size.y;
-uvAttr.push(u, v);
+      const x = vertices.getX(i);
+      const z = vertices.getY(i);
+      const u = (x + terrainSize / 2) / terrainSize;
+      const v = (z + terrainSize / 2) / terrainSize;
+
+      uvAttr.push(u, v);
 
       }
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvAttr, 2));

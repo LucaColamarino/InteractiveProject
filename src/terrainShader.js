@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 
 export function createTerrainMaterial(textureLoader) {
-  const noiseTex = textureLoader.load('/textures/terrain/noise.jpg');
-  noiseTex.wrapS = noiseTex.wrapT = THREE.RepeatWrapping;
-
+    function loadTexture(path) {
+      const tex = textureLoader.load(path);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = 8;
+      tex.minFilter = THREE.LinearMipMapLinearFilter;
+      return tex;
+    }
   const baseMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     fog: true,
@@ -36,10 +40,10 @@ export function createTerrainMaterial(textureLoader) {
        varying vec2 vUv;`
     );
 
-    shader.uniforms.grassColor = { value: textureLoader.load('/textures/terrain/grass_color.jpg') };
-    shader.uniforms.rockColor = { value: textureLoader.load('/textures/terrain/rock_color.jpg') };
-    shader.uniforms.snowColor = { value: textureLoader.load('/textures/terrain/snow_color.jpg') };
-    shader.uniforms.noiseMap = { value: noiseTex };
+    shader.uniforms.grassColor = { value: loadTexture('/textures/terrain/grass_color.jpg') };
+    shader.uniforms.rockColor  = { value: loadTexture('/textures/terrain/rock_color.jpg') };
+    shader.uniforms.snowColor  = { value: loadTexture('/textures/terrain/snow_color.jpg') };
+    shader.uniforms.noiseMap   = { value: loadTexture('/textures/terrain/noise.jpg') };
     shader.uniforms.time = { value: 0.0 };
 
     baseMaterial.userData.shaderRef = shader;
@@ -47,8 +51,8 @@ export function createTerrainMaterial(textureLoader) {
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
       `
-        vec2 macroUv = vUv * 4.0;
-        vec2 microUv = vUv * 80.0;
+        vec2 macroUv = vUv * 10.0;
+        vec2 microUv = vUv * 120.0;
         vec2 noiseUv = vUv * 20.0 + vec2(time * 0.05, time * 0.03);
         float height = vWorldPosition.y;
 
@@ -71,6 +75,9 @@ export function createTerrainMaterial(textureLoader) {
 
         vec3 blended = clamp(grassBlend * gTex + rockBlend * rTex + snowBlend * sTex, 0.0, 1.0);
         diffuseColor.rgb = blended;
+
+
+
       `
     );
   };
