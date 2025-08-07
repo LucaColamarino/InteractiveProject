@@ -40,7 +40,15 @@ async function spawnEnemy(configKey, position, type) {
 
   fbx.traverse(child => applySharedMaterial(child, config));
   fbx.scale.copy(config.scale);
-  position.y = getTerrainHeightAt(position.x, position.z) + (config.yOffset ?? 0);
+
+
+  const terrainY = getTerrainHeightAt(position.x, position.z);
+if (!isFinite(terrainY)) {
+  console.warn("❌ Wyvern spawn fuori mappa!", position);
+}
+position.y = isFinite(terrainY) ? terrainY + (config.yOffset ?? 0) : 0;
+
+  //position.y = getTerrainHeightAt(position.x, position.z) + (config.yOffset ?? 0);
   fbx.position.copy(position);
   scene.add(fbx);
   let mixer = null;
@@ -70,15 +78,23 @@ if (config.animations) {
 
   if (actions.walk) actions.walk.play();
 
-  registerEnemy({
-    type,
-    model: fbx,
-    mixer,
-    actions,
-    angle: Math.random() * Math.PI * 2,
-    speed: type === 'werewolf' ? 1.0 : 3.0,
-    alive: true,
-  });
+registerEnemy({
+  type,
+  model: fbx,
+  mixer,
+  actions,
+  angle: Math.random() * Math.PI * 2,
+  speed: type === 'werewolf' ? 1.0 : 3.0,
+  alive: true,
+  yOffset: config.yOffset || 0,
+  // Stato dinamico solo per wyverne
+  flyTime: type === 'wyvern' ? 15 + Math.random() * 10 : null,
+  walkTime: type === 'wyvern' ? 5 + Math.random() * 5 : null,
+  behaviorState: type === 'wyvern' ? 'flying' : null,
+  stateTimer: 0,
+  altitude: 10 + Math.random() * 5, // altezza base di volo
+});
+
 }
 
 export function spawnWalkingNpc(pos) {
@@ -94,13 +110,13 @@ export function spawnFlyingWyvern(pos) {
 }
 
 export function spawnAreaEnemies() {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 15; i++) {
     spawnWalkingNpc(new THREE.Vector3(Math.random() * 100 - 50, 0, Math.random() * 200 - 100));
   }
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 11; i++) {
     spawnWerewolfNpc(new THREE.Vector3(-250 + Math.random() * 100, 0, Math.random() * 100 - 50));
   }
-  for (let i = 0; i < 3; i++) {
-    spawnFlyingWyvern(new THREE.Vector3(250 + Math.random() * 100, 70, Math.random() * 100 - 50));
+  for (let i = 0; i < 6; i++) {
+    spawnFlyingWyvern(new THREE.Vector3(250 + Math.random() * 150, 70, Math.random() * 150));
   }
 }

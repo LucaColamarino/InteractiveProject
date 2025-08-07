@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { scene } from './scene.js';
+import { getTerrainHeightAt } from './map.js';
 
 const enemies = [];
 
@@ -15,7 +16,6 @@ export function getEnemies() {
 
 export function updateEnemies(delta) {
   for (const enemy of enemies) {
-    // anche se non è alive, aggiorna il mixer se sta morendo
     if (!enemy.alive) {
       if (enemy.actions?.die?.isRunning()) {
         enemy.mixer?.update(Math.min(delta, 0.05));
@@ -25,12 +25,97 @@ export function updateEnemies(delta) {
 
     enemy.mixer?.update(Math.min(delta, 0.05));
 
-    // semplice wander
-    if (enemy.angle !== undefined) {
+    if (enemy.type === 'wyvern') {
+      enemy.stateTimer += delta;
+
+      if (enemy.behaviorState === 'flying') {
+        const terrainY = getTerrainHeightAt(enemy.model.position.x, enemy.model.position.z);
+
+        // Se è in fase di atterraggio
+        if (enemy.landing) {
+          const targetY = terrainY + enemy.yOffset;
+          enemy.model.position.y = THREE.MathUtils.lerp(
+            enemy.model.position.y,
+            targetY,
+            delta * 2
+          );
+
+          // Quando è praticamente a terra, cambia stato
+          if (Math.abs(enemy.model.position.y - targetY) < 0.2) {
+            enemy.model.position.y = targetY;
+            enemy.behaviorState = 'walking';
+            enemy.landing = false;
+            enemy.stateTimer = 0;
+            enemy.actions.fly?.stop();
+            enemy.actions.walk?.play();
+          }
+        } else {
+          // Decidi se iniziare la discesa
+          if (enemy.stateTimer > enemy.flyTime + Math.random() * 10) {
+            enemy.landing = true;
+          }
+
+          const flightHeight = terrainY + enemy.altitude + Math.sin(enemy.stateTimer * 2) * 1.5;
+          enemy.model.position.y = THREE.MathUtils.lerp(
+            enemy.model.position.y,
+            flightHeight,
+            delta * 5
+          );
+        }
+
+        enemy.angle += delta * 0.5;
+        const dir = new THREE.Vector3(Math.cos(enemy.angle), 0, Math.sin(enemy.angle));
+        enemy.model.position.x += dir.x * delta * 5;
+        enemy.model.position.z += dir.z * delta * 5;
+
+        const target = enemy.model.position.clone().add(dir);
+        enemy.model.lookAt(target);
+
+        if (!enemy.actions.fly?.isRunning()) {
+          enemy.actions.walk?.stop();
+          enemy.actions.fly?.play();
+        }
+      } else if (enemy.behaviorState === 'walking') {
+        if (enemy.stateTimer > enemy.walkTime * Math.random()*10) {
+          enemy.behaviorState = 'flying';
+          enemy.stateTimer = 0;
+          enemy.altitude = 10 + Math.random() * 5;
+          enemy.actions.walk?.stop();
+          enemy.actions.fly?.play();
+        } else {
+          enemy.angle += delta * 0.2;
+          const dir = new THREE.Vector3(Math.cos(enemy.angle), 0, Math.sin(enemy.angle));
+          const moveSpeed = enemy.speed ?? 1.0;
+          enemy.model.position.addScaledVector(dir, moveSpeed * delta);
+
+          const x = enemy.model.position.x;
+          const z = enemy.model.position.z;
+          const terrainY = getTerrainHeightAt(x, z);
+          const targetY = terrainY + enemy.yOffset;
+          enemy.model.position.y = THREE.MathUtils.lerp(
+            enemy.model.position.y,
+            targetY,
+            delta * 5
+          );
+
+          const target = enemy.model.position.clone().add(dir);
+          enemy.model.lookAt(target);
+
+          if (!enemy.actions.walk?.isRunning()) {
+            enemy.actions.fly?.stop();
+            enemy.actions.walk?.play();
+          }
+        }
+      }
+    } else if (enemy.angle !== undefined) {
       enemy.angle += delta * 0.2;
       const dir = new THREE.Vector3(Math.cos(enemy.angle), 0, Math.sin(enemy.angle));
       const moveSpeed = enemy.speed ?? 1.0;
       enemy.model.position.addScaledVector(dir, moveSpeed * delta);
+
+      const x = enemy.model.position.x;
+      const z = enemy.model.position.z;
+      enemy.model.position.y = getTerrainHeightAt(x, z);
 
       const target = enemy.model.position.clone().add(dir);
       enemy.model.lookAt(target);
@@ -39,7 +124,7 @@ export function updateEnemies(delta) {
 }
 
 export function killEnemy(enemy) {
-  enemy.angle= undefined; // stop wandering
+  enemy.angle = undefined;
   if (!enemy || !enemy.alive) return;
 
   for (const action of Object.values(enemy.actions)) {
