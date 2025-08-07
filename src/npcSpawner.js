@@ -115,6 +115,7 @@ export async function spawnWalkingNpc(position) {
 }
 
 export function updateWalkingNpcs(delta) {
+  return;
   const playerPos = playerRef?.model?.position ?? new THREE.Vector3();
 
   for (const npc of walkers) {
@@ -202,4 +203,9 @@ export function spawnAreaEnemies() {
       250 + Math.random() * 100, 70, Math.random() * 100 - 50
     ));
   }
+
+  window._walkers = walkers;
+  window._werewolves = werewolves;
+  window._wyverns = wyverns;
+
 }

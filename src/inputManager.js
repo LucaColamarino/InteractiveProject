@@ -103,7 +103,7 @@ export function handleInput(delta, controller) {
   setInputState(inputState);
 
   if (wasJumpJustPressed()) {
-    controller.abilities.canFly ? controller.fly() : controller.jump();
+    controller.abilities.canFly ? controller.fly() :  controller.jump();
   }
 
   if (isLeftClickPressed() && controller.abilities.formName === 'human') {

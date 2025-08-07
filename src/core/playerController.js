@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { camera } from '../scene.js';
+import { camera,scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map.js';
 
 let inputState = {
@@ -169,7 +169,8 @@ export class PlayerController {
     if (this.isOnGround && !this.abilities.canFly) {
       this.velocityY = this.abilities.jumpForce;
       this.isOnGround = false;
-      this.player.playAnimation('jump');
+      console.log('Jumping!');
+      //this.player.playAnimation('jump');
     }
   }
 
@@ -185,31 +186,63 @@ export class PlayerController {
     }
   }
 
-attack() {
-  if (this.isAttacking || !this.player.animations.attack) return;
+  attack() {
+    if (this.isAttacking || !this.player.animations.attack) return;
 
-  this.isAttacking = true;
+    this.isAttacking = true;
 
-  const attackAction = this.player.animations.attack;
-  attackAction.reset();
-  attackAction.setLoop(THREE.LoopOnce, 1);
-  attackAction.clampWhenFinished = true; 
-  attackAction.fadeIn(0.1).play();
+    const attackAction = this.player.animations.attack;
+    attackAction.reset();
+    attackAction.setLoop(THREE.LoopOnce, 1);
+    attackAction.clampWhenFinished = true; 
+    attackAction.fadeIn(0.1).play();
+    setTimeout(() => {
+      this.checkAttackHit();
+    },300);
 
-  if (this.player.currentAction && this.player.currentAction !== attackAction) {
-    this.player.currentAction.fadeOut(0.1);
-  }
-
-  this.player.currentAction = attackAction;
-  const mixer = this.player.mixer;
-  const onFinish = (e) => {
-    if (e.action === attackAction) {
-      mixer.removeEventListener('finished', onFinish); 
-      this.isAttacking = false;
-      this.player.playAnimation('idle');
+    if (this.player.currentAction && this.player.currentAction !== attackAction) {
+      this.player.currentAction.fadeOut(0.1);
     }
-  };
-  mixer.addEventListener('finished', onFinish);
+
+    this.player.currentAction = attackAction;
+    const mixer = this.player.mixer;
+    const onFinish = (e) => {
+      if (e.action === attackAction) {
+        mixer.removeEventListener('finished', onFinish); 
+        this.isAttacking = false;
+        this.player.playAnimation('idle');
+      }
+    };
+    mixer.addEventListener('finished', onFinish);
+  }  
+
+
+
+checkAttackHit() {
+  const group = this.player.model;
+
+  const yaw = group.rotation.y;
+  const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const origin = group.position.clone().add(new THREE.Vector3(0, 1.4, 0));
+  const attackDistance = 0.9;
+  const attackRange = 0.7;
+  const attackCenter = origin.clone().add(forward.clone().multiplyScalar(attackDistance));
+
+  const attackBox = new THREE.Sphere(attackCenter, attackRange);
+  const enemies = [...window._walkers, ...window._werewolves, ...window._wyverns];
+  for (const enemy of enemies) {
+    const bbox = new THREE.Box3().setFromObject(enemy.model);
+    if (attackBox.intersectsBox(bbox)) {
+      console.log('🎯 Hit enemy via bounding box!', enemy);
+      enemy.model.traverse(child => {
+        if (child.isMesh && child.material?.color) {
+          child.material.color.set(0xff0000);
+        }
+      });
+    }
+  }
 }
+
+
 
 }
