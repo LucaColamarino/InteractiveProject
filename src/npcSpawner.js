@@ -89,7 +89,7 @@ export function updateWyverns(delta) {
 }
 
 export async function spawnWalkingNpc(position) {
-  const config = ENTITY_CONFIG.human;
+  const config = ENTITY_CONFIG.archer;
   const baseModel = await loader.loadAsync(config.modelPath);
   const fbx = SkeletonUtils.clone(baseModel);
 
@@ -123,7 +123,7 @@ export function updateWalkingNpcs(delta) {
     if (!npc.model.visible) continue;
 
     npc.angle += delta * 0.2;
-    const moveSpeed = 5.0;
+    const moveSpeed = 3.0;
     const dir = new THREE.Vector3(Math.cos(npc.angle), 0, Math.sin(npc.angle));
     npc.model.position.addScaledVector(dir, moveSpeed * delta);
     const x = npc.model.position.x;

@@ -26,34 +26,98 @@ export class PlayerController {
     this.currentVelocity = new THREE.Vector3();
     this.acceleration = 30;
     this.deceleration = 20;
+    this.isAttacking = false;
+    this.attackTimer = 0;
+
+    this.rootBone = this.player.model.getObjectByName('mixamorigHips'); // oppure 'Hips'
+    this.prevRootPos = new THREE.Vector3();
+
+
   }
 
-  update(delta) {
+update(delta) {
+  if (this.isAttacking) {
+    this.attackTimer -= delta;
+    if (this.attackTimer <= 0) {
+      this.isAttacking = false;
+
+      // Resetta posizione root bone alla fine per evitare drift
+      if (this.rootBone) {
+        this.rootBone.position.set(0, this.rootBone.position.y, 0);
+      }
+
+    } else {
+      this.player.update(delta); // aggiorna il mixer
+
+      // Applica root motion (solo asse X/Z)
+      if (this.rootBone) {
+        const localPos = this.rootBone.position.clone();
+        const deltaPos = localPos.clone().sub(this.prevRootPos);
+        const scaleFactor = 0.01;
+        console.log("scaleFactor", scaleFactor); // tipicamente 0.01
+        this.player.model.position.add(new THREE.Vector3(deltaPos.x, 0, deltaPos.z).multiplyScalar(scaleFactor));
+
+        this.prevRootPos.copy(localPos);
+
+      }
+
+      return; // blocca altri input
+    }
+  }
+
+
+  switch (this.abilities.formName) {
+    case 'human':
+      this.updateHuman(delta);
+      break;
+    case 'werewolf':
+      this.updateWerewolf(delta);
+      break;
+    case 'wyvern':
+      this.updateWyvern(delta);
+      break;
+    default:
+      this.updateDefault(delta);
+      break;
+  }
+
+  this.ensureAboveTerrain();
+}
+
+
+  updateHuman(delta) {
+    const { moveVec, isShiftPressed, isJumpPressed } = inputState;
+    this.handleGroundMovement(delta, moveVec, isShiftPressed);
+    this.handleVerticalMovement(delta, isJumpPressed, isShiftPressed);
+  }
+
+  updateWerewolf(delta) {
+    const { moveVec, isShiftPressed, isJumpPressed } = inputState;
+    this.handleGroundMovement(delta, moveVec, isShiftPressed);
+    this.handleVerticalMovement(delta, isJumpPressed, isShiftPressed);
+  }
+
+  updateWyvern(delta) {
     const { moveVec, isShiftPressed, isJumpPressed } = inputState;
 
-    if (this.isFlying) {
+    if (!this.isFlying) {
+      this.fly();
+    }
+
+    this.handleFlight(delta, moveVec, isShiftPressed, isJumpPressed);
+    this.handleVerticalMovement(delta, isJumpPressed, isShiftPressed);
+  }
+
+  updateDefault(delta) {
+    const { moveVec, isShiftPressed, isJumpPressed } = inputState;
+
+    if (this.abilities.canFly && this.isFlying) {
       this.handleFlight(delta, moveVec, isShiftPressed, isJumpPressed);
     } else {
       this.handleGroundMovement(delta, moveVec, isShiftPressed);
     }
 
     this.handleVerticalMovement(delta, isJumpPressed, isShiftPressed);
-
-    const pos = this.player.model.position;
-    const terrainY = getTerrainHeightAt(pos.x, pos.z);
-    if (pos.y < terrainY) {
-      pos.y = terrainY;
-      this.velocityY = 0;
-      this.isOnGround = true;
-
-      if (this.isFlying) {
-        this.isFlying = false;
-        const euler = new THREE.Euler().setFromQuaternion(this.player.model.quaternion);
-        euler.x = 0;
-        euler.z = 0;
-        this.player.model.quaternion.setFromEuler(euler);
-      }
-    }
   }
 
   handleGroundMovement(delta, inputVec, isShiftPressed) {
@@ -77,7 +141,7 @@ export class PlayerController {
     const speed = this.currentVelocity.length();
     if (speed < 0.1) {
       this.player.playAnimation('idle');
-    } else if (speed < targetSpeed * 0.6) {
+    } else if (!isShiftPressed) {
       this.player.playAnimation('walk');
     } else {
       this.player.playAnimation('run');
@@ -114,6 +178,24 @@ export class PlayerController {
     this.player.model.position.y += this.velocityY * delta;
   }
 
+  ensureAboveTerrain() {
+    const pos = this.player.model.position;
+    const terrainY = getTerrainHeightAt(pos.x, pos.z);
+    if (pos.y < terrainY) {
+      pos.y = terrainY;
+      this.velocityY = 0;
+      this.isOnGround = true;
+
+      if (this.isFlying) {
+        this.isFlying = false;
+        const euler = new THREE.Euler().setFromQuaternion(this.player.model.quaternion);
+        euler.x = 0;
+        euler.z = 0;
+        this.player.model.quaternion.setFromEuler(euler);
+      }
+    }
+  }
+
   jump() {
     if (this.isOnGround && !this.abilities.canFly) {
       this.velocityY = this.abilities.jumpForce;
@@ -133,4 +215,18 @@ export class PlayerController {
       this.player.playAnimation('fly');
     }
   }
+
+  attack() {
+    if (this.isAttacking || !this.player.animations.attack) return;
+
+    this.isAttacking = true;
+    this.attackTimer = this.player.animations.attack._clip.duration;
+
+    this.player.playAnimation('attack');
+
+    if (this.rootBone) {
+      this.prevRootPos.copy(this.rootBone.position); 
+    }
+  }
+
 }

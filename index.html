@@ -71,27 +71,88 @@
         margin-top: 5px;
         font-size: 16px;
       }
+      #hud {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: #e8ddff;
+  font-family: 'Uncial Antiqua', serif;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.hud-panel {
+  background: rgba(20, 10, 30, 0.5);
+  border: 2px solid rgba(120, 80, 200, 0.7);
+  border-radius: 10px;
+  padding: 12px 16px;
+  box-shadow: 0 0 12px rgba(160, 100, 255, 0.4);
+  backdrop-filter: blur(6px);
+  max-width: 250px;
+  transition: all 0.3s ease-in-out;
+}
+
+.hud-label {
+  margin-bottom: 6px;
+  font-size: 16px;
+  text-shadow: 1px 1px 2px #000;
+}
+
+.hud-bar-label {
+  margin-top: 10px;
+  margin-bottom: 2px;
+  font-size: 14px;
+  color: #bfaaff;
+}
+
+.hud-bar {
+  width: 100%;
+  height: 14px;
+  background: rgba(60, 40, 100, 0.4);
+  border: 1px solid #7755aa;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.hud-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(to right, #bb88ff, #9966ff);
+  transition: width 0.3s ease-in-out;
+  box-shadow: 0 0 8px #aa66ff;
+}
+
+.fly-indicator {
+  margin-top: 10px;
+  font-size: 14px;
+  opacity: 0.3;
+  transition: opacity 0.3s ease-in-out;
+  text-shadow: 0 0 4px #eecfff;
+}
+
     </style>
   </head>
 
   <body>
     <canvas id="three-canvas"></canvas>
+    <!-- HUD -->
+<link href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&display=swap" rel="stylesheet">
 
-    <div id="hud-container">
-      <div id="zone-label" class="hud-box">Zona: human</div>
-      <div class="hud-box">
-        <div id="form-label">Form: human</div>
-        <div id="fly-indicator">🕊️</div>
-        <div id="stamina-bar">
-          <div id="stamina-fill"></div>
-        </div>
-      </div>
+<div id="hud">
+  <div class="hud-panel">
+    <div id="coords" class="hud-label">📍 X: 0, Y: 0, Z: 0</div>
+    <div id="compass" class="hud-label">🧭 N</div>
+    <div id="zone-label" class="hud-label">🌍 Zona: Human</div>
+    <div id="form-label" class="hud-label">🧙‍♂️ Forma: Human</div>
 
-      <div class="hud-box">
-        <div id="coords">X: 0, Y: 0, Z: 0</div>
-        <div id="compass">🧭 N</div>
-      </div>
+    <div class="hud-bar-label">✨ Energia magica</div>
+    <div class="hud-bar">
+      <div id="stamina-fill" class="hud-fill"></div>
     </div>
+
+    <div id="fly-indicator" class="fly-indicator">🪽 Volo attivo</div>
+  </div>
+</div>
 
     <script type="module" src="/src/main.js"></script>
     

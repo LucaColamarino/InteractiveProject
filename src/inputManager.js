@@ -12,6 +12,7 @@ export const keys = {
   control: false,
 };
 
+let leftMousePressed = false;
 let yaw = 0;
 let pitch = 15;
 
@@ -27,6 +28,11 @@ export function wasJumpJustPressed() {
   return justPressed;
 }
 
+// ✅ Funzione per verificare se il tasto sinistro è premuto
+export function isLeftClickPressed() {
+  return leftMousePressed;
+}
+
 export function setupInput() {
   document.addEventListener('keydown', (e) => {
     const key = e.key === ' ' ? 'space' : e.key.toLowerCase();
@@ -39,6 +45,14 @@ export function setupInput() {
     if (keys.hasOwnProperty(key)) keys[key] = false;
   });
 
+  document.addEventListener('mousedown', (e) => {
+    if (e.button === 0) leftMousePressed = true;
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (e.button === 0) leftMousePressed = false;
+  });
+
   document.addEventListener('mousemove', (e) => {
     yaw -= e.movementX * 0.2;
     pitch += e.movementY * 0.2;
@@ -49,7 +63,7 @@ export function setupInput() {
     document.body.requestPointerLock();
   });
 
-  window.addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 export function getInputVector() {
@@ -90,6 +104,10 @@ export function handleInput(delta, controller) {
 
   if (wasJumpJustPressed()) {
     controller.abilities.canFly ? controller.fly() : controller.jump();
+  }
+
+  if (isLeftClickPressed() && controller.abilities.formName === 'human') {
+    controller.attack();
   }
 
   controller.update(delta);

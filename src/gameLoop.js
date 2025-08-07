@@ -33,7 +33,6 @@ export function startLoop(p, c) {
     stats.begin();
     requestAnimationFrame(animate);
     let delta = clock.getDelta();
-    console.log('Delta time:', delta.toFixed(4));
     if (delta > 0.1) delta = 0.016;
     updateSunPosition();
     if (terrainMaterial?.userData?.shaderRef?.uniforms?.time) {
