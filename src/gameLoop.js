@@ -3,7 +3,7 @@ import { renderer, scene, camera } from './scene.js';
 import { updateCamera } from './cameraFollow.js';
 import { changeForm } from './formManager.js';
 import { updateWater } from './map.js';
-import { updateWalkingNpcs, updateWyverns, updateWerewolfNpcs } from './npcSpawner.js';
+import { updateEnemies } from './npcController.js';
 import { terrainMaterial } from './map.js';
 import { getCurrentArea } from './areaManager.js';
 import { checkTransformationAltars } from './systems/pickupSystem.js';
@@ -73,10 +73,7 @@ export function startLoop(p, c) {
         const ratio = Math.max(0, Math.min(current / maxFly, 1));
         document.getElementById('stamina-fill').style.width = `${ratio * 100}%`;
       }
-
-      updateWyverns(delta);
-      updateWalkingNpcs(delta);
-      updateWerewolfNpcs(delta);
+      updateEnemies(delta);
       updateWater(delta);
       updateCamera(player);
       checkTransformationAltars(player, handleFormChange);

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { camera,scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map.js';
+import { getEnemies, killEnemy } from '../npcController.js';
+
 
 let inputState = {
   moveVec: new THREE.Vector3(),
@@ -229,17 +231,15 @@ checkAttackHit() {
   const attackCenter = origin.clone().add(forward.clone().multiplyScalar(attackDistance));
 
   const attackBox = new THREE.Sphere(attackCenter, attackRange);
-  const enemies = [...window._walkers, ...window._werewolves, ...window._wyverns];
+  const enemies = getEnemies();
+
   for (const enemy of enemies) {
     const bbox = new THREE.Box3().setFromObject(enemy.model);
-    if (attackBox.intersectsBox(bbox)) {
-      console.log('🎯 Hit enemy via bounding box!', enemy);
-      enemy.model.traverse(child => {
-        if (child.isMesh && child.material?.color) {
-          child.material.color.set(0xff0000);
-        }
-      });
-    }
+  if (attackBox.intersectsBox(bbox) && enemy.alive) {
+    console.log('🎯 Hit enemy!', enemy);
+    killEnemy(enemy);
+  }
+
   }
 }
 
