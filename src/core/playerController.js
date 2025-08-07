@@ -32,10 +32,7 @@ export class PlayerController {
   }
 
   update(delta) {
-    if (this.isAttacking) {
       this.player.update(delta);
-      return; // blocca altri input finché attacca
-    }
 
     switch (this.abilities.formName) {
       case 'human':
@@ -91,6 +88,8 @@ export class PlayerController {
   }
 
   handleGroundMovement(delta, inputVec, isShiftPressed) {
+    
+
     const targetSpeed = isShiftPressed ? this.abilities.speed * 1.5 : this.abilities.speed;
     const desiredVelocity = inputVec.clone().normalize().multiplyScalar(targetSpeed);
     const accel = inputVec.lengthSq() > 0 ? this.acceleration : this.deceleration;
@@ -107,7 +106,7 @@ export class PlayerController {
       if (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
       this.player.model.rotation.y += deltaYaw * 0.15;
     }
-
+    if (this.isAttacking) return; 
     const speed = this.currentVelocity.length();
     if (speed < 0.1) {
       this.player.playAnimation('idle');
