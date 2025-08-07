@@ -1,8 +1,8 @@
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import * as THREE from 'three';
 import { scene } from '../scene.js';
-import { sun } from '../shadowManager.js';
-import { getTerrainHeightAt } from '../map.js';
+import { sun } from '../graphics/shadowManager.js';
+import { getTerrainHeightAt } from '../map/map.js';
 export const altars = [];
 
 export function spawnWaterAltar(x,y, formName = 'wyvern') {

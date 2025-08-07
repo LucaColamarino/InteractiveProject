@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { scene } from '../scene.js';
-import { getCurrentArea } from '../areaManager.js';
+import { getCurrentArea } from '../map/areaManager.js';
 import {altars} from '../objects/altar.js';
 export function checkTransformationAltars(player, onFormChange) {
   if (!player?.model) return;

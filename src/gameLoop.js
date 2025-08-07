@@ -1,15 +1,13 @@
 import * as THREE from 'three';
 import { renderer, scene, camera } from './scene.js';
-import { updateCamera } from './cameraFollow.js';
-import { changeForm } from './formManager.js';
-import { updateWater } from './map.js';
-import { updateEnemies } from './npcController.js';
-import { terrainMaterial } from './map.js';
-import { getCurrentArea } from './areaManager.js';
+import { updateCamera } from './player/cameraFollow.js';
+import { changeForm } from './player/formManager.js';
+import { updateWater,terrainMaterial,updateSunPosition } from './map/map.js';
+import { updateEnemies } from './controllers/npcController.js';
+import { getCurrentArea } from './map/areaManager.js';
 import { checkTransformationAltars } from './systems/pickupSystem.js';
-import { handleInput } from './inputManager.js';
-import { updateSunPosition } from './map.js';
-import { sun,moon } from './shadowManager.js';
+import { handleInput } from './player/inputManager.js';
+import { sun,moon } from './graphics/shadowManager.js';
 import Stats from 'stats.js';
 const stats = new Stats();
 stats.showPanel(0); // 0: fps, 1: ms, 2: memory

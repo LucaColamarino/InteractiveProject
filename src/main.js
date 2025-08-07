@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { preloadAssets,changeForm } from './formManager.js';
-import { setupInput } from './inputManager.js';
+import { preloadAssets,changeForm } from './player/formManager.js';
+import { setupInput } from './player/inputManager.js';
 import { startLoop } from './gameLoop.js';
-import { createHeightmapTerrain, addWaterPlane,createSky, getTerrainHeightAt } from './map.js';
+import { createHeightmapTerrain, addWaterPlane,createSky, getTerrainHeightAt } from './map/map.js';
 import { spawnWaterAltar } from './objects/altar.js';
-import {spawnAreaEnemies,setPlayerReference} from './npcSpawner.js';
+import {spawnAreaEnemies,setPlayerReference} from './spawners/npcSpawner.js';
+import { populateVegetation } from './spawners/vegetationSpawner.js';
 let player = null;
 let controller = null;
 function showLoadingScreen() {
@@ -36,6 +37,7 @@ async function init() {
   await createHeightmapTerrain();
   createSky();
   addWaterPlane();
+  await populateVegetation(); 
   spawnAreaEnemies();
   spawnWaterAltar(10,10, 'human');
   spawnWaterAltar(250,20, 'wyvern');
