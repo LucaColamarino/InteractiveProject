@@ -26,64 +26,34 @@ export class PlayerController {
     this.currentVelocity = new THREE.Vector3();
     this.acceleration = 30;
     this.deceleration = 20;
+
     this.isAttacking = false;
     this.attackTimer = 0;
-
-    this.rootBone = this.player.model.getObjectByName('mixamorigHips'); // oppure 'Hips'
-    this.prevRootPos = new THREE.Vector3();
-
-
   }
 
-update(delta) {
-  if (this.isAttacking) {
-    this.attackTimer -= delta;
-    if (this.attackTimer <= 0) {
-      this.isAttacking = false;
-
-      // Resetta posizione root bone alla fine per evitare drift
-      if (this.rootBone) {
-        this.rootBone.position.set(0, this.rootBone.position.y, 0);
-      }
-
-    } else {
-      this.player.update(delta); // aggiorna il mixer
-
-      // Applica root motion (solo asse X/Z)
-      if (this.rootBone) {
-        const localPos = this.rootBone.position.clone();
-        const deltaPos = localPos.clone().sub(this.prevRootPos);
-        const scaleFactor = 0.01;
-        console.log("scaleFactor", scaleFactor); // tipicamente 0.01
-        this.player.model.position.add(new THREE.Vector3(deltaPos.x, 0, deltaPos.z).multiplyScalar(scaleFactor));
-
-        this.prevRootPos.copy(localPos);
-
-      }
-
-      return; // blocca altri input
+  update(delta) {
+    if (this.isAttacking) {
+      this.player.update(delta);
+      return; // blocca altri input finché attacca
     }
+
+    switch (this.abilities.formName) {
+      case 'human':
+        this.updateHuman(delta);
+        break;
+      case 'werewolf':
+        this.updateWerewolf(delta);
+        break;
+      case 'wyvern':
+        this.updateWyvern(delta);
+        break;
+      default:
+        this.updateDefault(delta);
+        break;
+    }
+
+    this.ensureAboveTerrain();
   }
-
-
-  switch (this.abilities.formName) {
-    case 'human':
-      this.updateHuman(delta);
-      break;
-    case 'werewolf':
-      this.updateWerewolf(delta);
-      break;
-    case 'wyvern':
-      this.updateWyvern(delta);
-      break;
-    default:
-      this.updateDefault(delta);
-      break;
-  }
-
-  this.ensureAboveTerrain();
-}
-
 
   updateHuman(delta) {
     const { moveVec, isShiftPressed, isJumpPressed } = inputState;
@@ -216,17 +186,31 @@ update(delta) {
     }
   }
 
-  attack() {
-    if (this.isAttacking || !this.player.animations.attack) return;
+attack() {
+  if (this.isAttacking || !this.player.animations.attack) return;
 
-    this.isAttacking = true;
-    this.attackTimer = this.player.animations.attack._clip.duration;
+  this.isAttacking = true;
 
-    this.player.playAnimation('attack');
+  const attackAction = this.player.animations.attack;
+  attackAction.reset();
+  attackAction.setLoop(THREE.LoopOnce, 1);
+  attackAction.clampWhenFinished = true; 
+  attackAction.fadeIn(0.1).play();
 
-    if (this.rootBone) {
-      this.prevRootPos.copy(this.rootBone.position); 
-    }
+  if (this.player.currentAction && this.player.currentAction !== attackAction) {
+    this.player.currentAction.fadeOut(0.1);
   }
+
+  this.player.currentAction = attackAction;
+  const mixer = this.player.mixer;
+  const onFinish = (e) => {
+    if (e.action === attackAction) {
+      mixer.removeEventListener('finished', onFinish); 
+      this.isAttacking = false;
+      this.player.playAnimation('idle');
+    }
+  };
+  mixer.addEventListener('finished', onFinish);
+}
 
 }

@@ -8,7 +8,7 @@ export const ENTITY_CONFIG = {
       walk: '/models/animations/YbotWalking.fbx',
       run: '/models/animations/YbotRunning.fbx',
       jump: '/models/animations/YbotJumping.fbx',
-      attack: '/models/animations/swordJumpAttack.fbx',
+      attack: '/models/animations/slash.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
   },

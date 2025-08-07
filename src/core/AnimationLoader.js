@@ -11,13 +11,21 @@ export async function loadAnimations(baseModel, animationPaths) {
     const fbx = await loader.loadAsync(path);
     const clip = fbx.animations[0];
     const action = mixer.clipAction(clip);
-    action.clampWhenFinished = true;
-    action.loop = THREE.LoopRepeat;
+
+    if (name === 'attack') {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = false;
+    } else {
+      action.loop = THREE.LoopRepeat;
+      action.clampWhenFinished = false;
+    }
+
     actions[name] = action;
   }
 
   return { mixer, actions };
 }
+
 
 
 export function fixAnimationLoop(clip, fps = 30) {
