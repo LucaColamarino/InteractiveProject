@@ -37,7 +37,6 @@ export function startLoop(p, c) {
       terrainMaterial.userData.shaderRef.uniforms.time.value += delta;
     }
     try {
-      if (player) player.update(delta);
 
       if (controller) {
         handleInput(delta, controller);

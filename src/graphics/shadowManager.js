@@ -31,7 +31,7 @@ export function createSunLight() {
 
   sun.castShadow = true;
 
-  sun.shadow.mapSize.set(16384,16384);
+  sun.shadow.mapSize.set(4096,4096);
   sun.shadow.radius = 2.5;
   sun.shadow.bias = -0.0001;
   sun.shadow.normalBias = 0.001;
