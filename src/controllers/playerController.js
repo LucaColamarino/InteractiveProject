@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { camera,scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
 import { getEnemies, killEnemy } from './npcController.js';
-
+import { hudManager } from '../ui/hudManager.js';
 
 let inputState = {
   moveVec: new THREE.Vector3(),
@@ -192,7 +192,6 @@ export class PlayerController {
     if (this.isAttacking || !this.player.animations.attack) return;
 
     this.isAttacking = true;
-
     const attackAction = this.player.animations.attack;
     attackAction.reset();
     attackAction.setLoop(THREE.LoopOnce, 1);
@@ -238,6 +237,9 @@ checkAttackHit() {
   if (attackBox.intersectsBox(bbox) && enemy.alive) {
     console.log('🎯 Hit enemy!', enemy);
     killEnemy(enemy);
+
+    hudManager.showNotification('⚔️ Enemy defeated! +50 XP');
+    break;
   }
 
   }

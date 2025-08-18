@@ -8,7 +8,6 @@ import { PlayerController } from '../controllers/playerController.js';
 import { loadAnimations, fixAnimationLoop } from '../utils/AnimationLoader.js';
 import { ENTITY_CONFIG } from '../utils/entities.js';
 import { setPlayerReference} from '../spawners/npcSpawner.js';
-
 const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 
@@ -68,7 +67,7 @@ export async function preloadAssets() {
   for (const formName in abilitiesByForm) {
     const form = abilitiesByForm[formName];
     const config = ENTITY_CONFIG[formName];
-
+    console.log(config.modelPath);
     const baseModel = await loader.loadAsync(config.modelPath);
     modelCache[formName] = baseModel;
 
@@ -116,7 +115,7 @@ export async function changeForm(formName) {
 
   const group = new THREE.Group();
   const prevPlayer = scene.children.find(obj => obj.userData?.playerModel);
-  const prevPosition = prevPlayer?.position?.clone() ?? new THREE.Vector3(0, 0, 0);
+  const prevPosition = prevPlayer?.position?.clone() ?? new THREE.Vector3(5, 0, 5);
 
   group.position.copy(prevPosition);
   fbx.position.y += abilities.yOffset;

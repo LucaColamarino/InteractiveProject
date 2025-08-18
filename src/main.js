@@ -6,6 +6,7 @@ import { createHeightmapTerrain, addWaterPlane,createSky, getTerrainHeightAt } f
 import { spawnWaterAltar } from './objects/altar.js';
 import {spawnAreaEnemies,setPlayerReference} from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
+import { spawnCampfireAt } from './objects/campfire.js';
 let player = null;
 let controller = null;
 function showLoadingScreen() {
@@ -42,7 +43,7 @@ async function init() {
   spawnWaterAltar(10,10, 'human');
   spawnWaterAltar(250,20, 'wyvern');
   spawnWaterAltar(-250,-20, 'werewolf');
-
+  spawnCampfireAt(0,0);
   const result = await changeForm('human');
   player = result.player;
   controller = result.controller;

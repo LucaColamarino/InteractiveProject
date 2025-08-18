@@ -1,0 +1,281 @@
+/* hud.css */
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden; 
+  height: 100%;
+  width: 100%;
+  font-family: 'Exo 2', sans-serif;
+}
+
+canvas {
+  display: block;      
+  position: fixed;     
+  top: 0;
+  left: 0;
+}
+
+/* === MAIN HUD CONTAINER === */
+#hud-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+/* === TOP RIGHT - MINIMAP === */
+.hud-minimap {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(20, 30, 50, 0.9), rgba(10, 15, 25, 0.95));
+  border: 3px solid rgba(100, 200, 255, 0.7);
+  border-radius: 50%;
+  box-shadow: 
+      0 0 25px rgba(100, 200, 255, 0.4),
+      inset 0 0 30px rgba(0, 0, 0, 0.5);
+  animation: slideInRight 0.8s ease-out;
+  overflow: hidden;
+}
+
+/* wrapper rettangolare per il posizionamento */
+.minimap-wrap {
+  position: fixed;
+  top: 24px; 
+  right: 24px;
+  width: 220px; 
+  height: 220px;
+}
+
+.minimap-viewport {
+  position: absolute; 
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0e1522;
+  border: 3px solid #64c8ff;
+  box-shadow: 0 0 30px rgba(100,200,255,.35) inset;
+  z-index: 0;
+}
+
+/* i badge esterni */
+.minimap-hud {
+  position: absolute;
+  right: 8px; 
+  bottom: -150px;
+  display: flex; 
+  flex-direction: column; 
+  gap: 8px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pill {
+  background: rgba(10,15,25,0.9);
+  border: 1px solid rgba(100,200,255,0.6);
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-family: 'Orbitron', monospace;
+  font-weight: 700; 
+  font-size: 12px; 
+  color: #64c8ff;
+  box-shadow: 0 0 10px rgba(100,200,255,0.3);
+  backdrop-filter: blur(6px);
+  min-width: 110px; 
+  text-align: right;
+}
+
+/* === COMPASS === */
+.compass {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 60px;
+  background: rgba(20, 30, 50, 0.9);
+  border: 2px solid rgba(100, 200, 255, 0.7);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64c8ff;
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+/* === MINIMAP GRID === */
+.minimap-grid {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: 
+      radial-gradient(circle at 30% 30%, rgba(100, 255, 100, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 70% 60%, rgba(255, 100, 100, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 50% 80%, rgba(100, 100, 255, 0.1) 0%, transparent 40%);
+  overflow: hidden;
+}
+
+.minimap-player {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: #64c8ff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(100, 200, 255, 0.8);
+  animation: pulse 2s infinite;
+}
+
+.minimap-enemy {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #ff4757;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 71, 87, 0.6);
+}
+
+/* === BOTTOM CENTER - VITALS === */
+.hud-vitals {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 30px;
+  animation: slideInBottom 1.2s ease-out;
+}
+
+.hud-label {
+  color: #e0f0ff;
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-container {
+  background: rgba(20, 20, 40, 0.8);
+  border: 1px solid rgba(100, 200, 255, 0.4);
+  border-radius: 25px;
+  height: 24px;
+  width: 200px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 25px;
+  transition: width 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+.health-bar {
+  background: linear-gradient(135deg, #ff4757, #ff6b7a);
+  box-shadow: 0 0 15px rgba(255, 71, 87, 0.6);
+}
+
+.mana-bar {
+  background: linear-gradient(135deg, #3742fa, #5352ed);
+  box-shadow: 0 0 15px rgba(55, 66, 250, 0.6);
+}
+
+.stamina-bar {
+  background: linear-gradient(135deg, #2ed573, #7bed9f);
+  box-shadow: 0 0 15px rgba(46, 213, 115, 0.6);
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  z-index: 1;
+}
+
+/* === NOTIFICATIONS === */
+.notification-area {
+  position: absolute;
+  top: 20%;
+  left: 30px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 300px;
+}
+
+.notification {
+  background: linear-gradient(135deg, rgba(20, 40, 20, 0.95), rgba(40, 60, 40, 0.9));
+  border-left: 4px solid #2ed573;
+  padding: 15px;
+  border-radius: 8px;
+  color: #e0f0ff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transform: translateX(-100%);
+  animation: slideInNotification 0.5s ease-out forwards;
+}
+
+/* === ANIMATIONS === */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInBottom {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInNotification {
+  to { transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.2); }
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 1200px) {
+  .hud-minimap { width: 160px; height: 160px; }
+  .progress-container { width: 160px; }
+}

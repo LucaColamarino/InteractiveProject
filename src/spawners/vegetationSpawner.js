@@ -76,6 +76,7 @@ async function spawnVegetation(modelPath, count, area) {
 }
 
 export async function populateVegetation() {
+  return;
   await spawnVegetation('/models/environment/bush.fbx', 30, { x: 0, z: 0, width: 400, depth: 400 });
   await spawnVegetation('/models/environment/bush.fbx', 40, { x: 0, z: 0, width: 600, depth: 600 });
 }
