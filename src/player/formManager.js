@@ -4,7 +4,7 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { scene, camera, renderer } from '../scene.js';
 import { offset } from './cameraFollow.js';
 import { Player } from './Player.js';
-import { PlayerController } from '../controllers/playerController.js';
+import {HumanFormController} from '../controllers/forms/HumanFormController.js';
 import { loadAnimations, fixAnimationLoop } from '../utils/AnimationLoader.js';
 import { ENTITY_CONFIG } from '../utils/entities.js';
 import { setPlayerReference} from '../spawners/npcSpawner.js';
@@ -29,7 +29,6 @@ function createAbilities(formName, overrides = {}) {
     jumpForce: overrides.jumpForce || 10,
     gravity: overrides.gravity || -30,
     flyspeed: overrides.flyspeed || 10,
-    speed: overrides.speed || 5,
     formName,
   };
 }
@@ -115,7 +114,7 @@ export async function changeForm(formName) {
 
   const group = new THREE.Group();
   const prevPlayer = scene.children.find(obj => obj.userData?.playerModel);
-  const prevPosition = prevPlayer?.position?.clone() ?? new THREE.Vector3(5, 0, 5);
+  const prevPosition = prevPlayer?.position?.clone() ?? new THREE.Vector3(5, 15, 5);
 
   group.position.copy(prevPosition);
   fbx.position.y += abilities.yOffset;
@@ -142,9 +141,9 @@ export async function changeForm(formName) {
     actions = result.actions;
   }
 
-  const player = new Player(group, mixer, actions);
-  const controller = new PlayerController(player, abilities);
-  player.playAnimation('idle');
+ const player = new Player(group, mixer, actions);
+ const controller = new HumanFormController(player, abilities);
+ player.anim.play('idle');
 
   addTransformationEffect(group.position);
   setPlayerReference(player);

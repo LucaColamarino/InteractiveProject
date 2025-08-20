@@ -1,14 +1,13 @@
 
 import * as THREE from 'three';
 import { camera } from '../scene.js';
-import { getCameraAngles } from './inputManager.js';
+import { getCameraAngles } from '../systems/InputSystem.js';
 
 export let offset = new THREE.Vector3(0, 3, -6);
-const smoothSpeed = 0.1;
 const targetPos = new THREE.Vector3();
 const targetLookAt = new THREE.Vector3();
 
-export function updateCamera(player) {
+export function updateCamera(player,delta=0) {
   if (!player?.model) return;
 
   const { yaw, pitch } = getCameraAngles();
@@ -22,8 +21,9 @@ export function updateCamera(player) {
     player.model.position.y + offsetY + 1.5,
     player.model.position.z + offsetZ
   );
-  targetPos.lerp(desiredPos, smoothSpeed);
-  targetLookAt.lerp(player.model.position.clone().add(new THREE.Vector3(0, 1.5, 0)), smoothSpeed);
+  const s = 1 - Math.exp(-6 * delta);
+  targetPos.lerp(desiredPos, s);
+  targetLookAt.lerp(player.model.position.clone().add(new THREE.Vector3(0, 1.5, 0)), s);
 
   camera.position.copy(targetPos);
   camera.lookAt(targetLookAt);

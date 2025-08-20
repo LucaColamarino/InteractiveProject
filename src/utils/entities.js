@@ -10,7 +10,9 @@ export const ENTITY_CONFIG = {
       jump: '/models/animations/KnightJump.fbx',
       attack: '/models/animations/KnightAttack.fbx',
       die: '/models/animations/KnightDie.fbx',
-      block: '/models/animations/KnightBlock.fbx'
+      block: '/models/animations/KnightBlock.fbx',
+      sitIdle: '/models/animations/SittingIdle.fbx',
+      standUp: '/models/animations/StandingUp.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
   },

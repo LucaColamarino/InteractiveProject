@@ -202,7 +202,7 @@ export function createSky() {
 }
 
 export function updateSunPosition() {
-  sunAngle += 0.0001;
+  sunAngle += 0.001;
   const sunElevation = 45 * Math.sin(sunAngle);
   const sunPhi = THREE.MathUtils.degToRad(90 - sunElevation);
   const theta = THREE.MathUtils.degToRad(180);

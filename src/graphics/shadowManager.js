@@ -32,21 +32,19 @@ export function createSunLight() {
   sun.castShadow = true;
 
   sun.shadow.mapSize.set(4096,4096);
-  sun.shadow.radius = 2.5;
-  sun.shadow.bias = -0.0001;
-  sun.shadow.normalBias = 0.001;
-  sun.shadow.camera.top = 300;
-  sun.shadow.camera.bottom = -300;
-  sun.shadow.camera.left = -300;
-  sun.shadow.camera.right = 300;
+  sun.shadow.radius = 2;
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.02;
+  const box = 120;
+  sun.shadow.camera.top = box;
+  sun.shadow.camera.bottom = -box;
+  sun.shadow.camera.left = -box;
+  sun.shadow.camera.right = box;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 1000;
+  sun.shadow.camera.far = 600;
   sun.shadow.camera.updateProjectionMatrix();
-
-
   sun.position.set(100, 200, -100); 
   scene.add(sun);
-
   const target = new THREE.Object3D();
   target.position.set(0, 0, 0);
   scene.add(target);

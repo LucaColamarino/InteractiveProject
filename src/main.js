@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { preloadAssets,changeForm } from './player/formManager.js';
-import { setupInput } from './player/inputManager.js';
+import { setupInput } from './systems/InputSystem.js';
 import { startLoop } from './gameLoop.js';
 import { createHeightmapTerrain, addWaterPlane,createSky, getTerrainHeightAt } from './map/map.js';
 import { spawnWaterAltar } from './objects/altar.js';
 import {spawnAreaEnemies,setPlayerReference} from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
-import { spawnCampfireAt } from './objects/campfire.js';
+import { spawnCampfireAt} from './objects/campfire.js';
+import { spawnChestAt} from './objects/chest.js';
 let player = null;
 let controller = null;
 function showLoadingScreen() {
@@ -44,6 +45,7 @@ async function init() {
   spawnWaterAltar(250,20, 'wyvern');
   spawnWaterAltar(-250,-20, 'werewolf');
   spawnCampfireAt(0,0);
+  spawnChestAt(6,6);
   const result = await changeForm('human');
   player = result.player;
   controller = result.controller;

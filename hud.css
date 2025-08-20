@@ -279,3 +279,54 @@ canvas {
   .hud-minimap { width: 160px; height: 160px; }
   .progress-container { width: 160px; }
 }
+
+
+/* === TOP CENTER - INTERACTION PROMPTS === */
+.interaction-wrap {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 10001;
+}
+
+.interaction-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 4px solid #2ed573; /* come .notification */
+  background: linear-gradient(135deg, rgba(20, 40, 20, 0.95), rgba(40, 60, 40, 0.9));
+  color: #e0f0ff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  animation: slideInPrompt 280ms ease-out;
+}
+
+.interaction-prompt[hidden] { display: none; }
+
+#interaction-key {
+  display: inline-block;
+  min-width: 28px;
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(10, 15, 25, 0.9);
+  border: 1px solid rgba(100, 200, 255, 0.6);
+  color: #64c8ff;
+  box-shadow: 0 0 10px rgba(100,200,255,0.3) inset;
+}
+
+#interaction-text {
+  font-weight: 700;
+}
+
+/* piccola animazione d’ingresso */
+@keyframes slideInPrompt {
+  from { transform: translateY(-10px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}

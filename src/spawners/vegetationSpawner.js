@@ -24,7 +24,8 @@ const leafMaterial = new THREE.MeshStandardMaterial({
   side: THREE.DoubleSide,
   depthWrite: true,
 });
-
+leafMaterial.map.colorSpace = THREE.SRGBColorSpace;
+barkMaterial.map.colorSpace = THREE.SRGBColorSpace;
 async function spawnVegetation(modelPath, count, area) {
   const baseModel = await loader.loadAsync(modelPath);
 

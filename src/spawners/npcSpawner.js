@@ -17,20 +17,22 @@ const loader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 
 function applySharedMaterial(child, config) {
-  if (child.isMesh || child.type === 'SkinnedMesh') {
+  if (child.isMesh || child.isSkinnedMesh) {
     if (config.textures?.diffuse) {
-      const mat = new THREE.MeshPhongMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         map: textureLoader.load(config.textures.diffuse),
         normalMap: config.textures.normal ? textureLoader.load(config.textures.normal) : null,
-        shininess: 30,
+        roughness: 1
       });
+      if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
       child.material = mat;
     }
+    if (child.isSkinnedMesh) child.frustumCulled = false;
     child.castShadow = true;
     child.receiveShadow = true;
-    child.frustumCulled = true;
   }
 }
+
 
 async function spawnEnemy(configKey, position, type) {
   const config = ENTITY_CONFIG[configKey];

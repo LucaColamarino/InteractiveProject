@@ -17,7 +17,8 @@ const els = {
   staminaBar: null, staminaText: null,
   formAvatar: null, formName: null, formLevel: null, transformCd: null,
   mmEnemies: null, mmTime: null, mmCoords: null,
-  notificationBar: null
+  notificationBar: null,
+  promptBox: null, promptKey: null, promptText: null,
 };
 
 export const hudManager = {
@@ -36,6 +37,9 @@ export const hudManager = {
     els.mmEnemies = document.getElementById('mm-enemies');
     els.mmTime    = document.getElementById('mm-time');
     els.mmCoords  = document.getElementById('mm-coords');
+    els.promptBox = document.getElementById('interaction-prompts');
+    els.promptKey = document.getElementById('interaction-key');
+    els.promptText = document.getElementById('interaction-text');
     console.log('[HUD] init ok');
   },
 
@@ -127,18 +131,30 @@ if (els.mmTime) {
 
 
   },
-showNotification(text) {
-  if (!els.notificationBar) return;
+  showNotification(text) {
+    if (!els.notificationBar) return;
 
-  const div = document.createElement('div');
-  div.className = 'notification';
-  div.textContent = text;
+    const div = document.createElement('div');
+    div.className = 'notification';
+    div.textContent = text;
 
-  els.notificationBar.appendChild(div);
+    els.notificationBar.appendChild(div);
 
-  // Auto-rimuovi dopo 4 secondi
-  setTimeout(() => {
-    div.remove();
-  }, 4000);
-}
+    // Auto-rimuovi dopo 4 secondi
+    setTimeout(() => {
+      div.remove();
+    }, 4000);
+  },
+  showPrompt(key = 'E', text = 'Interact') {
+  if (!els.promptBox) return;
+  if (els.promptKey)  els.promptKey.textContent = key.toUpperCase();
+  if (els.promptText) els.promptText.textContent = text;
+  els.promptBox.hidden = false;
+},
+
+hidePrompt() {
+  if (!els.promptBox) return;
+  els.promptBox.hidden = true;
+},
+
 };

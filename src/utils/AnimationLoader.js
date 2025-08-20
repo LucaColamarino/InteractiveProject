@@ -11,8 +11,11 @@ export async function loadAnimations(baseModel, animationPaths) {
     const fbx = await loader.loadAsync(path);
     const clip = fbx.animations[0];
     const action = mixer.clipAction(clip);
-
-    if (name === 'attack') {
+// quando crei l'action
+    if (name === 'standUp') {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+    }else if (name === 'attack') {
       action.setLoop(THREE.LoopOnce, 1);
       action.clampWhenFinished = false;
     } else {
