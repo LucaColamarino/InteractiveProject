@@ -142,7 +142,6 @@ export class Campfire {
       if (!child.isMesh) return;
       child.castShadow = true;
       child.receiveShadow = true;
-      console.log(Array.isArray(child));
       if (Array.isArray(child.material)) {
         const mats = child.material.slice();
         const { campfire, rock } = this.materialIndices;

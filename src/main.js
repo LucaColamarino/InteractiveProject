@@ -41,12 +41,9 @@ async function init() {
   setupInput();
   await createHeightmapTerrain();
   createSky();
-  //addWaterPlane();
+  addWaterPlane();
   await populateVegetation(); 
   spawnAreaEnemies();
-  //spawnWaterAltar(10,10, 'human');
-  //spawnWaterAltar(250,20, 'wyvern');
-  //spawnWaterAltar(-250,-20, 'werewolf');
   spawnCampfireAt(0,0);
   spawntorchAt(30,15);
   spawntorchAt(17,-20);
@@ -58,9 +55,10 @@ async function init() {
   player = result.player;
   controller = result.controller;
   hideLoadingScreen();
-  startLoop(player, controller);
   
-setPlayerReference(player);
+  startLoop(player, controller);
+  setPlayerReference(player);
+
 }
 
 init();

@@ -61,10 +61,6 @@ canvas {
   z-index: 3;
 }
 
-/* Nasconde il vecchio puntino se non lo vuoi */
-.minimap-player{
-  display: none;
-}
 
 
 /* wrapper rettangolare per il posizionamento */
@@ -353,4 +349,19 @@ canvas {
 @keyframes slideInPrompt {
   from { transform: translateY(-10px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
+}
+
+
+/* === XP BAR === */
+.xp-bar {
+  background: linear-gradient(135deg, #f1c40f, #f39c12);
+  box-shadow: 0 0 15px rgba(241, 196, 15, 0.6);
+}
+@keyframes levelFlash {
+  0% { box-shadow: 0 0 0 rgba(241,196,15,0.0); }
+  40% { box-shadow: 0 0 25px rgba(241,196,15,0.9); }
+  100% { box-shadow: 0 0 0 rgba(241,196,15,0.0); }
+}
+.xp-bar.levelup {
+  animation: levelFlash 600ms ease-out;
 }

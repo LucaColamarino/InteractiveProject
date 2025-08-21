@@ -17,6 +17,8 @@ import { updateChests } from './objects/chest.js';
 import { updateEnvironment } from './spawners/vegetationSpawner.js';
 import { updatetorchs } from './objects/torch.js';
 import { updateFires } from './particles/FireParticleSystem.js';
+import { LevelSystem } from './systems/LevelSystem.js';
+
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
@@ -26,6 +28,63 @@ export let player = null;
 let controller = null;
 let animSys = null;
 
+// === XP SYSTEM (single source of truth) ===
+const STORAGE_KEY = 'player_xp';
+export let xp = null;
+
+function loadXP() {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+  xp = new LevelSystem({ startingLevel: 1, startingXP: 0 });
+  xp.load(saved);
+}
+
+function saveXP() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(xp.toJSON()));
+}
+
+function renderXPHud() {
+  const pill = document.getElementById('mm-level');
+  const bar = document.getElementById('xp-bar');
+  const text = document.getElementById('xp-text');
+
+  if (pill) pill.textContent = `🧬 LVL ${xp.level}`;
+  if (bar)  bar.style.width = `${Math.round(xp.progress * 100)}%`;
+  if (text) text.textContent = `${xp.xp} / ${xp.xpToNextLevel}`;
+}
+
+function toastLevelUp(newLevel) {
+  const area = document.getElementById('notifications');
+  if (!area) return;
+  const div = document.createElement('div');
+  div.className = 'notification';
+  div.textContent = `🎉 Level Up! Sei al livello ${newLevel}`;
+  area.appendChild(div);
+  setTimeout(() => div.remove(), 4000);
+
+  const xpEl = document.getElementById('xp-bar');
+  if (xpEl) {
+    xpEl.classList.add('levelup');
+    setTimeout(() => xpEl.classList.remove('levelup'), 650);
+  }
+}
+
+function initXP() {
+  loadXP();
+  renderXPHud();
+
+  // API globale per assegnare XP da qualsiasi punto (enemy kill, quest, ecc.)
+  window.giveXP = function(amount = 10) {
+    const before = xp.level;
+    const leveled = xp.addXP(Math.max(0, amount|0)); // safe int >= 0
+    saveXP();
+    renderXPHud();
+    if (leveled && xp.level > before) toastLevelUp(xp.level);
+  };
+
+  // Se in futuro emetti eventi:
+  // ActionBus.on('enemy:defeated', ({ xp: gain = 20 } = {}) => window.giveXP(gain));
+}
+
 async function handleFormChange(formName) {
   const result = await changeForm(formName);
   player = result.player;
@@ -34,14 +93,21 @@ async function handleFormChange(formName) {
 }
 
 export function startLoop(p, c) {
+  console.log('[GameLoop] Starting main loop...');
   player = p;
   controller = c;
   animSys = new AnimationSystem(player.anim, player.state);
+
+  // Init HUD & XP
   hudManager.init();
+  initXP();
+
+  // Input bindings
   ActionBus.on('jump_or_fly', ()=> controller?.jumpOrFly());
   ActionBus.on('attack_primary', ()=> controller?.attack('attack'));
   ActionBus.on('interact', ()=> { if (player) checkTransformationAltars(player, handleFormChange); });
   ActionBus.on('sit_toggle', ()=> controller?.sitToggle());
+
   function animate() {
     stats.begin();
     requestAnimationFrame(animate);
@@ -49,31 +115,24 @@ export function startLoop(p, c) {
     let delta = clock.getDelta();
     delta = Math.min(delta, 0.05);
 
-
     updateSunPosition();
     if (terrainMaterial?.userData?.shaderRef?.uniforms?.time) {
       terrainMaterial.userData.shaderRef.uniforms.time.value += delta;
     }
 
     try {
-      // Input movimento/azioni base
+      // Input + player
       if (controller) {
-      const camAngles = pumpActions(controller);
-      controller.update(delta);
-      if (player) player.update(delta);
-      animSys.update();
+        pumpActions(controller);
+        controller.update(delta);
+        if (player) player.update(delta);
+        animSys.update();
       }
 
       if (player?.model) {
         const pos = player.model.position;
         if (sun?.target) sun.target.position.copy(pos);
         if (moon?.target) moon.target.position.copy(pos);
-
-        // (direzione camera eventualmente usata per bussola/HUD)
-        const dir = new THREE.Vector3();
-        camera.getWorldDirection(dir);
-        // const angle = Math.atan2(dir.x, dir.z);
-        // const deg = THREE.MathUtils.radToDeg(angle);
       }
 
       updateEnemies(delta);
@@ -82,9 +141,9 @@ export function startLoop(p, c) {
       updateFires(delta);
       updateChests(delta);
       updatetorchs(delta);
-      updateCamera(player,delta); 
+      updateCamera(player, delta); 
       updateEnvironment();
-      interactionManager.update(player,delta);
+      interactionManager.update(player, delta);
       hudManager.update(player, controller, camera, getEnemies());
       renderer.render(scene, camera);
     } catch (e) {
@@ -101,3 +160,6 @@ export function startLoop(p, c) {
 
   animate();
 }
+
+// Esempio di uso:
+// window.giveXP(25);

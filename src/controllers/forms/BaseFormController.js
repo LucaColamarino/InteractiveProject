@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { getTerrainHeightAt } from '../../map/map.js';
 import { getEnemies, killEnemy } from '../npcController.js';
 import { hudManager } from '../../ui/hudManager.js';
+import { xp } from '../../gameLoop.js';
 
 // ---- Parametri spada: SORGENTE UNICA ----
 const SWORD_ARC = {
@@ -221,6 +222,7 @@ export class BaseFormController {
       if (_inSwordArc(playerObj, enemy.model)) {
         this._attackState.enemiesHit.add(key);
         killEnemy(enemy);
+        window.giveXP(25);
         hudManager.showNotification("Enemy Killed!");
       }
     }
