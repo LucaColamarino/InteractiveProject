@@ -75,6 +75,7 @@ export function addWaterPlane() {
 }
 
 export function updateWater(delta) {
+  if(!water) return;
   const t = (water.material.uniforms.time.value += delta);
 if (terrainMaterial?.userData?.shaderRef) {
   terrainMaterial.userData.shaderRef.uniforms.time.value = t;
@@ -220,17 +221,20 @@ export function updateSunPosition() {
   const moonVector = sunVector.clone().negate();
   moon?.position.copy(moonVector.clone().multiplyScalar(400));
 
-  // Intensità giorno/notte
-  const dayFactor = Math.max(0.25, Math.sin(sunAngle));
-  sun.intensity = THREE.MathUtils.lerp(0.05, 1.0, dayFactor);
-  moon.intensity = THREE.MathUtils.lerp(0.2, 0.01, dayFactor);
-  ambientLight.intensity = THREE.MathUtils.lerp(0.1, 0.6, dayFactor);
-  // Ambient light opzionale
-  scene.fog.color.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.05, 0.6, dayFactor));
-  scene.background.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.05, 0.6, dayFactor));
-  if (terrainMaterial?.userData?.shaderRef?.uniforms?.dayFactor) {
-    terrainMaterial.userData.shaderRef.uniforms.dayFactor.value = dayFactor;
-  }
+  // Intensità giorno/notte (0 = notte piena, 1 = giorno pieno)
+  const daylightRaw = (Math.sin(sunAngle) + 1) * 0.5;   // mappa [-1..1] -> [0..1]
+  const daylight    = THREE.MathUtils.smoothstep(daylightRaw, 0.08, 0.92);
+  sun.intensity  = THREE.MathUtils.lerp(0.0, 1.0,  daylight);
+  moon.intensity = THREE.MathUtils.lerp(0.35, 0.02, daylight);
+  // ambient globale (più buio di notte)
+  ambientLight.intensity = THREE.MathUtils.lerp(0.03, 0.60, daylight);
+  // fog/background
+  scene.fog.color.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.02, 0.60, daylight));
+  scene.background.setHSL(0.6, 0.6, THREE.MathUtils.lerp(0.02, 0.60, daylight));
+
+if (terrainMaterial?.userData?.shaderRef?.uniforms?.dayFactor) {
+  terrainMaterial.userData.shaderRef.uniforms.dayFactor.value = daylight;
+}
   // Luna visiva (mesh sfera)
   if (moonMesh) {
     moonMesh.position.copy(moonVector.clone().multiplyScalar(5000)); // molto più lontano

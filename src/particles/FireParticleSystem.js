@@ -3,13 +3,38 @@ import * as THREE from 'three';
 import { scene, renderer, camera } from '../scene.js';
 
 const _fires = [];
+let FIRE_SHADOW_BUDGET = 6;
+const _tmpCam = new THREE.Vector3();
 
+export function setFireShadowBudget(n){ 
+  FIRE_SHADOW_BUDGET = Math.max(0, n|0); 
+  _rebalanceFireShadows();
+}
+function _rebalanceFireShadows(){
+  camera.getWorldPosition(_tmpCam);
+  const arr = _fires
+    .filter(f => f.lightCore) // solo quelli con light
+    .map(f => ({f, d2: f.origin.distanceToSquared(_tmpCam)}))
+    .sort((a,b)=>a.d2-b.d2);
+
+  arr.forEach((o, i) => {
+    const shouldCast = i < FIRE_SHADOW_BUDGET && o.f._wantsShadows;
+    if (o.f.lightCore.castShadow !== shouldCast) {
+      o.f.lightCore.castShadow = shouldCast;
+      if (shouldCast) {
+        const s = o.f.lightCore.shadow;
+        s.mapSize.width = 1024; s.mapSize.height = 1024;
+        s.camera.near = 0.1; s.camera.far = Math.max(10, o.f._lightingRange || 9);
+      }
+    }
+  });
+}
 /** Texture radiale morbida con gradiente migliorato */
 function makeSoftCircleTexture(size = 128) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
-  
+
   // Gradiente radiale più complesso per texture più realistica
   const g = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
   g.addColorStop(0.0, 'rgba(255,255,255,1)');
@@ -17,10 +42,10 @@ function makeSoftCircleTexture(size = 128) {
   g.addColorStop(0.5, 'rgba(255,255,255,0.7)');
   g.addColorStop(0.8, 'rgba(255,255,255,0.3)');
   g.addColorStop(1.0, 'rgba(255,255,255,0)');
-  
+
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
-  
+
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearMipMapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
@@ -74,14 +99,14 @@ const VERT = /* glsl */`
 
     // Movimento più complesso con turbolenza
     float t = uTime * 0.8 + aPhase * 6.2831853;
-    
+
     // Vortici multipli a scale diverse
     vec3 swirl1 = vec3(
       sin(t * 1.7 + aStart.x * 4.0) * 0.08,
       sin(t * 2.1 + aStart.y * 3.5) * 0.03,
       cos(t * 1.3 + aStart.z * 4.0) * 0.08
     );
-    
+
     vec3 swirl2 = vec3(
       sin(t * 3.2 + aNoise.x * 8.0) * 0.04,
       0.0,
@@ -90,7 +115,7 @@ const VERT = /* glsl */`
 
     // Effetto vento
     vec3 wind = uWindDir * uWindStrength * age01 * age01;
-    
+
     // Turbolenza basata su noise
     vec3 turbulence = vec3(
       aNoise.x * sin(t * 4.0 + aPhase * 10.0),
@@ -103,23 +128,23 @@ const VERT = /* glsl */`
     pos += (swirl1 + swirl2) * age01 * 1.8;
     pos += wind;
     pos += turbulence;
-    
+
     // Movimento verticale con accelerazione naturale
     float verticalBoost = age01 * 0.9 + pow(age01, 1.5) * 0.7;
     pos.y += verticalBoost;
 
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mv;
-    
+
     // Calcolo prospettiva per ridimensionamento naturale con la distanza
     float dist = length(mv.xyz);
     float perspective = uViewportH / (2.0 * tan(uFovY * 0.5)) / dist;
     perspective = clamp(perspective, uMinScale, uMaxScale);
-    
+
     // Fattore di distanza meno aggressivo ma ancora efficace
-    float distanceFactor = 10.0 / (1.0 + dist * dist * 0.04); // Dimezzato il fattore
+    float distanceFactor = 10.0 / (1.0 + dist * dist * 0.04);
     distanceFactor = smoothstep(0.0, 1.0, distanceFactor);
-    
+
     vDistScale = perspective * distanceFactor;
     vNoise = aNoise.xy;
 
@@ -127,7 +152,7 @@ const VERT = /* glsl */`
     float sizeVariation = 0.7 + aSize * 0.6;
     float sizeAnim = 1.0 + sin(t * 5.0 + aPhase * 15.0) * 0.15;
     float ageFactor = (1.0 - pow(age01, 0.6)) * (0.8 + 0.4 * sin(t * 2.0 + aPhase * 8.0));
-    
+
     float finalSize = uSize * sizeVariation * sizeAnim * ageFactor * perspective;
     gl_PointSize = finalSize * uPixelRatio;
   }
@@ -135,10 +160,10 @@ const VERT = /* glsl */`
 
 const FRAG = /* glsl */`
   precision mediump float;
-  
+
   uniform sampler2D uTexture;
   uniform mediump float uTime;
-  
+
   varying float vAge01;
   varying float vTemp;
   varying float vDistScale;
@@ -174,23 +199,23 @@ const FRAG = /* glsl */`
 
     // Variazione di temperatura individuale
     fire = mix(fire, cCore, vTemp * 0.3 * (1.0 - vAge01));
-    
+
     // Fumo finale
     vec3 col = mix(fire, cSmoke, smoothstep(0.85, 1.0, vAge01));
 
     // Variazioni di intensità basate su noise
     float noiseIntensity = 0.5 + 0.5 * sin(vNoise.x * 20.0 + uTime * 3.0);
     noiseIntensity *= 0.5 + 0.5 * sin(vNoise.y * 15.0 + uTime * 4.0);
-    
+
     // Alpha con fade graduato per buon equilibrio
     float baseAlpha = falloff * (1.0 - pow(vAge01, 0.8));
     float flicker = 0.85 + 0.15 * noiseIntensity;
-    
+
     // Fade meno estremo ma ancora efficace contro la "palla"
     float distanceFade = vDistScale;
     distanceFade = pow(distanceFade, 2.0); // Tra lineare e cubico
     distanceFade = smoothstep(0.1, 0.8, distanceFade); // Range più permissivo
-    
+
     float alpha = baseAlpha * flicker * distanceFade;
 
     // Le fiamme giovani sono più visibili da distanza media
@@ -199,7 +224,7 @@ const FRAG = /* glsl */`
     }
 
     if (alpha < 0.01) discard;
-    
+
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -217,8 +242,22 @@ export class FireParticleSystem {
     const windStrength = opts.windStrength ?? 0.08;
     const turbulence = opts.turbulence ?? 0.06;
 
+    // Nuove opzioni di illuminazione
+    const lightingStrength = opts.lightingStrength ?? 1.0; // 0..2
+    const lightingRange    = opts.lightingRange ?? 9;      // raggio in metri
+    const enableShadows = opts.enableShadows ?? true;
+    this._wantsShadows = enableShadows;
+    this._lightingRange = lightingRange;
+
+    const shadowJitter = opts.shadowJitter ?? 1.0; // 0 = nessun movimento
+    const shadowBias    = opts.shadowBias    ?? -0.00008;
+    const shadowNormalBias = opts.shadowNormalBias ?? 0.01;
+    const useHemiBounce = opts.useHemiBounce ?? false;
+    this.hemi = null;
+    this._shadowJitter = shadowJitter;
     this.origin = pos.clone();
     this.windDirection = new THREE.Vector3(0.3, 0, 0.1).normalize();
+    this._lightingStrength = lightingStrength;
 
     // Texture migliorata
     this.texture = makeSoftCircleTexture(256); // Risoluzione maggiore
@@ -237,7 +276,7 @@ export class FireParticleSystem {
       // Distribuzione più naturale con bias al centro
       const ang = Math.random() * Math.PI * 2;
       const r = Math.pow(Math.random(), 0.6) * radius; // Bias verso il centro
-      
+
       aStart[i*3+0] = pos.x + Math.cos(ang) * r;
       aStart[i*3+1] = pos.y + Math.random() * 0.08; // Variazione altezza iniziale
       aStart[i*3+2] = pos.z + Math.sin(ang) * r;
@@ -253,7 +292,7 @@ export class FireParticleSystem {
       aPhase[i] = Math.random();
       aSize[i]  = 0.3 + Math.random() * 0.7; // Variazione dimensioni
       aTemp[i]  = Math.random(); // Temperatura casuale
-      
+
       // Valori di noise precalcolati
       aNoise[i*3+0] = (Math.random() - 0.5) * 2.0;
       aNoise[i*3+1] = (Math.random() - 0.5) * 2.0;
@@ -270,7 +309,7 @@ export class FireParticleSystem {
     geo.setAttribute('aSize',    new THREE.BufferAttribute(aSize,  1));
     geo.setAttribute('aTemp',    new THREE.BufferAttribute(aTemp,  1));
     geo.setAttribute('aNoise',   new THREE.BufferAttribute(aNoise, 3));
-    
+
     geo.computeBoundingSphere();
     if (geo.boundingSphere) {
       geo.boundingSphere.radius = Math.max(3.0, geo.boundingSphere.radius + 2.5);
@@ -306,25 +345,48 @@ export class FireParticleSystem {
     this.points.renderOrder = 100; // Renderizza dopo oggetti solidi
     scene.add(this.points);
 
-    // Sistema di luci migliorato con ombre
-    this.mainLight = new THREE.PointLight(0xffa040, 1.4, 8, 2.0);
-    this.mainLight.position.copy(this.origin).add(new THREE.Vector3(0, 1.0, 0));
-    this.mainLight.castShadow = true;
-    
-    // Configurazione ombre per la luce principale
-    this.mainLight.shadow.mapSize.width = 1024;
-    this.mainLight.shadow.mapSize.height = 1024;
-    this.mainLight.shadow.camera.near = 0.1;
-    this.mainLight.shadow.camera.far = 10;
-    this.mainLight.shadow.bias = -0.0001;
-    
-    scene.add(this.mainLight);
+    // ──────────────────────────────
+    // RIG DI LUCI PER IL FUOCO
+    // ──────────────────────────────
 
-    // Luce secondaria senza ombre (per fill light)
-    this.ambientGlow = new THREE.PointLight(0xff6020, 0.6, 4, 2.5);
-    this.ambientGlow.position.copy(this.origin).add(new THREE.Vector3(0, 0.5, 0));
-    this.ambientGlow.castShadow = false;
-    scene.add(this.ambientGlow);
+// 1) luce core...
+this.lightCore = new THREE.PointLight(0xFF9A3C, 60 * lightingStrength, lightingRange * 0.55, 2.0);
+this.lightCore.position.copy(this.origin).add(new THREE.Vector3(0, 0.7, 0));
+
+// PARTI SEMPRE SPENTO per evitare overflow texture units nel frame di spawn
+this.lightCore.castShadow = false;
+
+// salva le preferenze per il rebalance
+this._wantsShadows = enableShadows;
+if (enableShadows) {
+  const s = this.lightCore.shadow;
+  s.mapSize.width = 1024; s.mapSize.height = 1024;
+  s.camera.near = 0.1;
+  s.camera.far = Math.max(10, lightingRange);
+  s.bias = shadowBias;
+  s.normalBias = shadowNormalBias;
+}
+scene.add(this.lightCore);
+
+
+    // 2) luce colonna (più alta, media, no ombre)
+    this.lightColumn = new THREE.PointLight(0xFF7A2A, 28 * lightingStrength, lightingRange * 0.9, 2.0);
+    this.lightColumn.position.copy(this.origin).add(new THREE.Vector3(0, 1.6, 0));
+    this.lightColumn.castShadow = false;
+    scene.add(this.lightColumn);
+
+    // 3) alone largo (morbido, largo, no ombre: “riempie” l’ambiente)
+    this.lightHalo = new THREE.PointLight(0xFF5A20, 14 * lightingStrength, lightingRange * 1.35, 1.8);
+    this.lightHalo.position.copy(this.origin).add(new THREE.Vector3(0, 1.0, 0));
+    this.lightHalo.castShadow = false;
+    scene.add(this.lightHalo);
+
+    // 4) bounce globale caldo/freddo (hemisphere light)
+    if (useHemiBounce) {
+      this.hemi = new THREE.HemisphereLight(0xFFB97A, 0x150a05, 0.18 * lightingStrength);
+      this.hemi.position.copy(this.origin).add(new THREE.Vector3(0, 3.0, 0));
+      scene.add(this.hemi);
+    }
 
     // References per gli attributi
     this._ageAttr   = geo.getAttribute('aAge');
@@ -338,12 +400,10 @@ export class FireParticleSystem {
     // Timing per aggiornamenti ottimizzati
     this._lastSpawnTime = 0;
     this._spawnInterval = 0.02; // Spawn ogni 20ms per continuità
+    _rebalanceFireShadows();
   }
 
   update(dt) {
-    const currentTime = this.uniforms.uTime.value;
-    
-    // Aggiorna età e gestisce respawn
     const age   = this._ageAttr.array;
     const life  = this._lifeAttr.array;
     const posA  = this._startAttr.array;
@@ -357,12 +417,12 @@ export class FireParticleSystem {
 
     for (let i = 0; i < N; i++) {
       age[i] += dt;
-      
+
       if (age[i] > life[i]) {
         // Respawn con posizione più naturale
         const ang = Math.random() * Math.PI * 2;
         const r = Math.pow(Math.random(), 0.7) * 0.32; // Bias verso centro
-        
+
         posA[i*3+0] = this.origin.x + Math.cos(ang) * r;
         posA[i*3+1] = this.origin.y + Math.random() * 0.08;
         posA[i*3+2] = this.origin.z + Math.sin(ang) * r;
@@ -370,41 +430,40 @@ export class FireParticleSystem {
         // Velocità con più realismo
         const centerBias = 1.0 - (r / 0.32); // Particelle centrali vanno più in alto
         const sideStr = 0.15 * (0.5 + Math.random() * 0.5);
-        
+
         velA[i*3+0] = (Math.random() - 0.5) * sideStr;
         velA[i*3+1] = (0.8 + Math.random() * 0.6) * (0.7 + centerBias * 0.5);
         velA[i*3+2] = (Math.random() - 0.5) * sideStr;
 
-        life[i] = 0.8 + Math.random() * 0.8;
-        age[i]  = 0.0;
+        life[i]  = 0.8 + Math.random() * 0.8;
+        age[i]   = 0.0;
         sizeA[i] = 0.4 + Math.random() * 0.6;
         tempA[i] = 0.7 + Math.random() * 0.3; // Temperature più calde al respawn
-        
+
         // Nuovi valori di noise
         noiseA[i*3+0] = (Math.random() - 0.5) * 2.0;
         noiseA[i*3+1] = (Math.random() - 0.5) * 2.0;
         noiseA[i*3+2] = (Math.random() - 0.5) * 2.0;
-        
+
         needsUpdate = true;
       }
     }
 
     if (needsUpdate) {
-      this._ageAttr.needsUpdate = true;
       this._lifeAttr.needsUpdate = true;
       this._startAttr.needsUpdate = true;
       this._velAttr.needsUpdate = true;
       this._sizeAttr.needsUpdate = true;
       this._tempAttr.needsUpdate = true;
       this._noiseAttr.needsUpdate = true;
-    } else {
-      this._ageAttr.needsUpdate = true; // Age si aggiorna sempre
     }
+    // Age si aggiorna sempre
+    this._ageAttr.needsUpdate = true;
 
-    // Aggiorna uniforms
+    // Aggiorna uniforms temporali
     this.uniforms.uTime.value += dt;
     const t = this.uniforms.uTime.value;
-    
+
     // Aggiorna direzione vento con variazione naturale
     const windAngle = Math.sin(t * 0.3) * 0.5;
     this.windDirection.set(
@@ -414,28 +473,59 @@ export class FireParticleSystem {
     ).normalize();
     this.uniforms.uWindDir.value.copy(this.windDirection);
 
-    // Luci con flicker più naturale e complesso
-    const mainFlicker = 1.0 + 
-      Math.sin(t * 12.7) * 0.08 + 
-      Math.sin(t * 23.3) * 0.06 + 
-      Math.sin(t * 47.1) * 0.04;
-    
-    this.mainLight.intensity = 1.3 * mainFlicker;
-    this.mainLight.position.set(
-      this.origin.x + Math.sin(t * 1.5) * 0.03,
-      this.origin.y + 1.0 + Math.sin(t * 2.2) * 0.04,
-      this.origin.z + Math.cos(t * 1.8) * 0.03
-    );
+    // ──────────────────────────────
+    // Aggiornamento rig luci (flicker e posizione)
+    // ──────────────────────────────
 
-    const ambientFlicker = 1.0 + 
-      Math.sin(t * 8.9 + 1.5) * 0.06 + 
-      Math.sin(t * 19.7 + 2.3) * 0.04;
-    
-    this.ambientGlow.intensity = 0.5 * ambientFlicker;
-    this.ambientGlow.position.set(
-      this.origin.x + Math.sin(t * 2.1 + 1.0) * 0.02,
-      this.origin.y + 0.5 + Math.sin(t * 3.3 + 0.5) * 0.03,
-      this.origin.z + Math.cos(t * 2.5 + 1.5) * 0.02
+    // intensità base in funzione di piccole variazioni lente
+    const base = 1.0 + Math.sin(t * 1.1) * 0.04;
+
+    // flicker multi-banda coerente
+    const f1 = 1.0 + Math.sin(t * 12.7) * 0.10;
+    const f2 = 1.0 + Math.sin(t * 23.3 + 1.3) * 0.08;
+    const f3 = 1.0 + Math.sin(t * 47.1 + 0.7) * 0.05;
+    const flicker = base * f1 * f2 * f3;
+
+    // Deriva di colore per realismo
+    const coreHot = new THREE.Color(0xFFD9AA);
+    const coreCool = new THREE.Color(0xFF8A3C);
+    const mixCore = (Math.sin(t * 0.8) * 0.5 + 0.5) * 0.6; // 0..0.6
+    this.lightCore.color.copy(coreHot).lerp(coreCool, mixCore);
+
+    const colA = new THREE.Color(0xFF8A3C);
+    const colB = new THREE.Color(0xFF6A22);
+    const mixCol = (Math.sin(t * 0.6 + 0.9) * 0.5 + 0.5) * 0.7;
+    this.lightColumn.color.copy(colA).lerp(colB, mixCol);
+
+    const haloA = new THREE.Color(0xFF6A22);
+    const haloB = new THREE.Color(0xE6451A);
+    const mixHalo = (Math.sin(t * 0.5 + 1.7) * 0.5 + 0.5) * 0.5;
+    this.lightHalo.color.copy(haloA).lerp(haloB, mixHalo);
+
+    // intensità aggiornate (proporzionali allo “strength” globale)
+    const k = this._lightingStrength;
+    this.lightCore.intensity   = 60 * k * flicker;
+    this.lightColumn.intensity = 28 * k * (0.9 + (flicker - 1.0) * 0.6);
+    this.lightHalo.intensity   = 14 * k * (0.85 + (flicker - 1.0) * 0.5);
+    if (this.hemi) {
+      this.hemi.intensity = 0.18 * k * (0.9 + (f1 - 1.0) * 0.4);
+      this.hemi.position.set(this.origin.x, this.origin.y + 3.0, this.origin.z);
+    }
+
+    // leggere oscillazioni di posizione
+    const j = this._shadowJitter; // 0..1
+    this.lightCore.position.set(
+      this.origin.x + Math.sin(t * 2.1) * 0.03 * j,
+      this.origin.y + 0.7 + Math.sin(t * 3.3) * 0.04 * j,
+      this.origin.z + Math.cos(t * 2.5) * 0.03 * j
+    );
+    this.lightColumn.position.set(
+      this.origin.x + Math.sin(t * 1.3) * 0.02,
+      this.origin.y + 1.6 + Math.sin(t * 2.1) * 0.03,
+      this.origin.z + Math.cos(t * 1.7) * 0.02
+    );
+    this.lightHalo.position.set(
+      this.origin.x, this.origin.y + 1.0, this.origin.z
     );
 
     // Aggiorna parametri camera
@@ -444,9 +534,8 @@ export class FireParticleSystem {
 
   // Metodi per controllo dinamico
   setIntensity(intensity) {
-    this.uniforms.uSize.value = 42.0 * intensity;
-    this.mainLight.intensity = 1.3 * intensity;
-    this.ambientGlow.intensity = 0.5 * intensity;
+    this.uniforms.uSize.value = 42.0 * intensity; // particelle
+    this._lightingStrength = intensity;           // luci
   }
 
   setWindStrength(strength) {
@@ -462,40 +551,46 @@ export class FireParticleSystem {
     this.uniforms.uWindDir.value.copy(this.windDirection);
   }
 
-  setPosition(v3) { 
+  setPosition(v3) {
     this.origin.copy(v3);
-    this.mainLight.position.copy(v3).add(new THREE.Vector3(0, 1.0, 0));
-    this.ambientGlow.position.copy(v3).add(new THREE.Vector3(0, 0.5, 0));
+    this.lightCore.position.copy(v3).add(new THREE.Vector3(0, 0.7, 0));
+    this.lightColumn.position.copy(v3).add(new THREE.Vector3(0, 1.6, 0));
+    this.lightHalo.position.copy(v3).add(new THREE.Vector3(0, 1.0, 0));
+    if (this.hemi) this.hemi.position.copy(v3).add(new THREE.Vector3(0, 3.0, 0));
+
   }
 
   dispose() {
     scene.remove(this.points);
-    scene.remove(this.mainLight);
-    scene.remove(this.ambientGlow);
+    scene.remove(this.lightCore, this.lightColumn, this.lightHalo);
+    if (this.hemi) scene.remove(this.hemi);
     this.points.geometry.dispose();
     this.points.material.dispose();
     if (this.texture) this.texture.dispose();
   }
 }
 
-// Helpers migliorati
+// Helpers
 export function spawnFire(pos, options = {}) {
   const fx = new FireParticleSystem(pos, options);
   _fires.push(fx);
+  _rebalanceFireShadows();
   return fx;
 }
 
-export function updateFires(dt) { 
-  for (let i = 0; i < _fires.length; i++) {
-    _fires[i].update(dt);
-  }
+
+let _rebalanceTimer = 0;
+export function updateFires(dt){
+  for (let i = 0; i < _fires.length; i++) _fires[i].update(dt);
+  _rebalanceTimer += dt;
+  if (_rebalanceTimer > 0.5) { _rebalanceFireShadows(); _rebalanceTimer = 0; }
 }
 
-export function clearFires() { 
-  while(_fires.length) { 
-    const f = _fires.pop(); 
-    f.dispose(); 
-  } 
+export function clearFires() {
+  while (_fires.length) {
+    const f = _fires.pop();
+    f.dispose();
+  }
 }
 
 // Funzione per controllare globalmente l'intensità del vento
@@ -513,13 +608,13 @@ export function setGlobalTurbulence(turbulence) {
   });
 }
 
-// Event listener migliorato per il resize
+// Event listener per il resize
 window.addEventListener('resize', () => {
   const v2 = new THREE.Vector2();
   renderer.getSize(v2);
   const pixelRatio = Math.min(2, renderer.getPixelRatio?.() ?? 1);
   const fovY = THREE.MathUtils.degToRad(camera.fov);
-  
+
   _fires.forEach(f => {
     f.uniforms.uViewportH.value = v2.y;
     f.uniforms.uPixelRatio.value = pixelRatio;

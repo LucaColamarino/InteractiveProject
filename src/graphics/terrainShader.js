@@ -12,6 +12,7 @@ export function createTerrainMaterial(textureLoader) {
   const baseMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     fog: true,
+    side: THREE.FrontSide,
   });
 
   baseMaterial.onBeforeCompile = (shader) => {

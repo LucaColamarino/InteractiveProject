@@ -99,8 +99,8 @@ function updateRadar(player, enemies, camera) {
     const dz = ez - pz;   // +dz = Nord
 
     // mondo -> pixel radar (N su = -dz)
-    let xPix =  (dx / radar.range) * maxRadius;   // destra +
-    let yPix =  (-dz / radar.range) * maxRadius;  // alto  +
+    let xPix =  (-dx / radar.range) * maxRadius;   // destra +
+    let yPix =  (-dz / radar.range) * maxRadius;   // alto  +
 
     // clamp al bordo del radar
     const len = Math.hypot(xPix, yPix);

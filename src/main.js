@@ -8,6 +8,8 @@ import {spawnAreaEnemies,setPlayerReference} from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
 import { spawnCampfireAt} from './objects/campfire.js';
 import { spawnChestAt} from './objects/chest.js';
+import { spawntorchAt } from './objects/torch.js';
+import { setFireShadowBudget } from './particles/FireParticleSystem.js';
 let player = null;
 let controller = null;
 function showLoadingScreen() {
@@ -33,18 +35,24 @@ function hideLoadingScreen() {
   if (loadingDiv) loadingDiv.remove();
 }
 async function init() {
+  setFireShadowBudget(3);
   showLoadingScreen();
   await preloadAssets();
   setupInput();
   await createHeightmapTerrain();
   createSky();
-  addWaterPlane();
+  //addWaterPlane();
   await populateVegetation(); 
   spawnAreaEnemies();
   //spawnWaterAltar(10,10, 'human');
   //spawnWaterAltar(250,20, 'wyvern');
   //spawnWaterAltar(-250,-20, 'werewolf');
   spawnCampfireAt(0,0);
+  spawntorchAt(30,15);
+  spawntorchAt(17,-20);
+  spawntorchAt(-20,-15);
+  spawntorchAt(3,13);
+  spawntorchAt(5,2);
   spawnChestAt(6,6);
   const result = await changeForm('human');
   player = result.player;

@@ -13,8 +13,8 @@ export class SmallRockSpawner {
     },
     rotationoffset= 0,
     yoffset = -0.1,
-    baseScale = 0.01,
-    randomScaleRange = [0.4, 1.2],
+    baseScale = 0.008, // scala base della roccia
+    randomScaleRange = [0.2, 0.6],
     alphaTest = 0.5,                  // (non usato qui, ma lo lascio se vorrai aggiungere cutout)
     anisotropy = 8,
     castShadow = true,

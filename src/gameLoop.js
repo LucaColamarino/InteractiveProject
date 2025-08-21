@@ -15,6 +15,8 @@ import { ActionBus } from './core/ActionBus.js';
 import { interactionManager } from './systems/interactionManager.js';
 import { updateChests } from './objects/chest.js';
 import { updateEnvironment } from './spawners/vegetationSpawner.js';
+import { updatetorchs } from './objects/torch.js';
+import { updateFires } from './particles/FireParticleSystem.js';
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
@@ -77,7 +79,9 @@ export function startLoop(p, c) {
       updateEnemies(delta);
       updateWater(delta);
       updateCampfires(delta);
+      updateFires(delta);
       updateChests(delta);
+      updatetorchs(delta);
       updateCamera(player,delta); 
       updateEnvironment();
       interactionManager.update(player,delta);

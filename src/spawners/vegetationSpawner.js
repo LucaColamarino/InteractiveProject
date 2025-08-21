@@ -46,7 +46,7 @@ async function spawnTrees() {
   updateThrottleMs: 16
 });
 
-  const area = { x: 0, z: 0, width: 500, depth: 500 };
+  const area = { x: 0, z: 0, width: 250, depth: 250 };
   await trees.spawn('/models/environment/TREE.fbx',200 , area); //200
 }
 
@@ -62,7 +62,7 @@ async function spawnSmallRocks() {
 });
 
   const area = { x: 0, z: 0, width: 500, depth: 500 };
-  await trees.spawn('/models/environment/smallrock.fbx',1000 , area); //200
+  await trees.spawn('/models/environment/smallrock.fbx',4000 , area); //200
 }
 
 

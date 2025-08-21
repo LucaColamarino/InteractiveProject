@@ -19,7 +19,9 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // da 2 -> 1.5
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.physicallyCorrectLights = true;
+renderer.toneMappingExposure = 1.1; // prova 1.1–1.3 se vuoi più glow
+
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
