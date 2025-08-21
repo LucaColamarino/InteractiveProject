@@ -42,6 +42,30 @@ canvas {
   animation: slideInRight 0.8s ease-out;
   overflow: hidden;
 }
+/* Freccia centrale della minimappa (North-Up) */
+.minimap-heading{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 22px;
+  background: #fff;
+  opacity: 0.95;
+  /* punta: triangolo con “codino” per dare l’idea di freccia */
+  clip-path: polygon(50% 0, 85% 100%, 50% 76%, 15% 100%);
+  border-radius: 1px;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+  transform: translate(-50%, -60%) rotate(0deg);
+  transform-origin: 50% 80%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Nasconde il vecchio puntino se non lo vuoi */
+.minimap-player{
+  display: none;
+}
+
 
 /* wrapper rettangolare per il posizionamento */
 .minimap-wrap {
@@ -96,8 +120,8 @@ canvas {
   top: 15px;
   left: 50%;
   transform: translateX(-50%);
-  width: 60px;
-  height: 60px;
+  width: 30px;
+  height: 30px;
   background: rgba(20, 30, 50, 0.9);
   border: 2px solid rgba(100, 200, 255, 0.7);
   border-radius: 50%;

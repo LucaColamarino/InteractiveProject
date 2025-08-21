@@ -1,45 +1,162 @@
-// hudManager.js
+// /src/ui/hudManager.js – Minimap North-Up con freccia heading
 import * as THREE from 'three';
-import { getCurrentArea }from '../map/areaManager.js'
 
-function $(id) {
-  return /** @type {HTMLElement|null} */ (document.getElementById(id));
-}
+function $(id) { return /** @type {HTMLElement|null} */(document.getElementById(id)); }
 
 const els = {
-  coords: null,
-  compass: null,
-  zone: null,
-  gameTime: null,
-  enemiesNearby: null,
-  healthBar: null, healthText: null,
-  manaBar: null, manaText: null,
-  staminaBar: null, staminaText: null,
-  formAvatar: null, formName: null, formLevel: null, transformCd: null,
   mmEnemies: null, mmTime: null, mmCoords: null,
-  notificationBar: null,
-  promptBox: null, promptKey: null, promptText: null,
+  minimapGrid: null, minimapPlayer: null, compassEl: null,
+  notificationBar: null, promptBox: null, promptKey: null, promptText: null,
 };
+
+const radar = {
+  range: 150,                // raggio mondo rappresentato dal bordo del radar
+  dotMap: new Map(),         // enemyObj -> DOM dot (iterabile per cleanup)
+  headingEl: null,           // freccia che indica la direzione del giocatore
+  northBadge: null,          // etichetta "N" in alto
+  inited: false,
+};
+
+function toCardinal(deg) {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW','N'];
+  return dirs[Math.round(((-deg % 360)+360)%360 / 45)];
+}
+
+function initMinimap() {
+  els.minimapGrid   = document.querySelector('.minimap-grid') || document.querySelector('#minimap-grid');
+  els.minimapPlayer = document.querySelector('.minimap-player') || document.querySelector('#minimap-player');
+  els.compassEl     = document.getElementById('compass-dir') || document.querySelector('.minimap-wrap .compass');
+  if (els.compassEl) els.compassEl.textContent = 'N'; // fisso
+
+  if (!els.minimapGrid) {
+    console.warn('[HUD] Nessuna .minimap-grid trovata. Radar disattivo.');
+    return;
+  }
+
+  // pulisci marker demo hardcoded
+  els.minimapGrid.querySelectorAll('.minimap-enemy').forEach(n => n.remove());
+  // freccia dichiarata in HTML/CSS
+  radar.headingEl = document.querySelector('.minimap-heading');
+  if (!radar.headingEl) {
+    console.warn('[HUD] .minimap-heading mancante: la freccia non ruoterà.');
+  }
+
+  if (els.compassEl) els.compassEl.textContent = 'N';
+  radar.inited = true;
+  console.log('[HUD] Minimap pronta (North-Up + Heading)');
+}
+
+function upsertEnemyDot(enemy) {
+  let dot = radar.dotMap.get(enemy);
+  if (!dot) {
+    dot = document.createElement('div');
+    dot.className = 'minimap-enemy';
+    Object.assign(dot.style, {
+      position: 'absolute',
+      width: '6px',
+      height: '6px',
+      borderRadius: '50%',
+      background: 'rgba(255,64,64,0.95)',
+      boxShadow: '0 0 4px rgba(0,0,0,0.6)',
+      transform: 'translate(-50%, -50%)',
+      zIndex: '1',
+      pointerEvents: 'none',
+    });
+    els.minimapGrid.appendChild(dot);
+    radar.dotMap.set(enemy, dot);
+  }
+  return dot;
+}
+
+function updateRadar(player, enemies, camera) {
+  if (!radar.inited || !els.minimapGrid || !player?.model || !camera) return;
+
+  const rect = els.minimapGrid.getBoundingClientRect();
+  const w = rect.width  || 120;
+  const h = rect.height || 120;
+  const halfW = w * 0.5, halfH = h * 0.5;
+  const maxRadius = Math.min(halfW, halfH);
+
+  // Yaw della camera: 0° = Nord (Z+). Serve per ruotare la freccia del player.
+  const viewDir = new THREE.Vector3();
+  camera.getWorldDirection(viewDir);
+  const yaw = Math.atan2(viewDir.x, viewDir.z);
+  const deg = THREE.MathUtils.radToDeg(yaw);
+
+  const px = player.model.position.x;
+  const pz = player.model.position.z;
+
+  const stillThere = new Set();
+
+  // --- ENEMY DOTS (mappa North-Up: N = top, E = destra) ---
+  for (const enemy of (enemies || [])) {
+    if (!enemy?.alive || !enemy?.model) continue;
+    const ex = enemy.model.position.x;
+    const ez = enemy.model.position.z;
+
+    // delta in mondo
+    const dx = ex - px;   // +dx = Est
+    const dz = ez - pz;   // +dz = Nord
+
+    // mondo -> pixel radar (N su = -dz)
+    let xPix =  (dx / radar.range) * maxRadius;   // destra +
+    let yPix =  (-dz / radar.range) * maxRadius;  // alto  +
+
+    // clamp al bordo del radar
+    const len = Math.hypot(xPix, yPix);
+    if (len > maxRadius) {
+      const k = maxRadius / len;
+      xPix *= k; yPix *= k;
+    }
+
+    // posiziona nel DOM (origine centro 50/50)
+    const leftPct = 50 + (xPix / w) * 100;
+    const topPct  = 50 + (yPix / h) * 100;
+
+    const dot = upsertEnemyDot(enemy);
+    dot.style.left = `${leftPct}%`;
+    dot.style.top  = `${topPct}%`;
+
+    // leggero fade con distanza (solo estetica)
+    const fade = Math.max(0.35, 1 - (len / maxRadius) * 0.6);
+    dot.style.opacity = `${fade}`;
+
+    stillThere.add(dot);
+  }
+
+  // cleanup dots orfani
+  for (const [enemy, dot] of radar.dotMap.entries()) {
+    if (!stillThere.has(dot)) {
+      dot.remove();
+      radar.dotMap.delete(enemy);
+    }
+  }
+
+  // --- HEADING ARROW (freccia del player) ---
+  if (radar.headingEl) {
+    // freccia punta sempre dove guarda la camera; base centrata
+    radar.headingEl.style.transform = `translate(-50%, -100%) rotate(${-deg}deg)`;
+  }
+
+
+}
 
 export const hudManager = {
   init() {
+    // prompt/notify
     els.notificationBar = $('notifications');
-    els.coords = $('coords');                 // "X: ..., Y: ..., Z: ..."
-    els.compass = $('compass-dir');           // "N / E / S / W"
-    els.zone = $('zone-name');                // "Human Territory"
-    els.gameTime = $('game-time');            // "Dawn • 06:42"
-    els.enemiesNearby = $('enemies-nearby');  // "3 enemies nearby"
-    els.healthBar = $('health-bar');  els.healthText = $('health-text');
-    els.manaBar   = $('mana-bar');    els.manaText   = $('mana-text');
-    els.staminaBar= $('stamina-bar'); els.staminaText= $('stamina-text');
-    els.formAvatar = $('form-avatar'); els.formName = $('form-name');
-    els.formLevel  = $('form-level');  els.transformCd = $('transform-cooldown');
-    els.mmEnemies = document.getElementById('mm-enemies');
-    els.mmTime    = document.getElementById('mm-time');
-    els.mmCoords  = document.getElementById('mm-coords');
-    els.promptBox = document.getElementById('interaction-prompts');
-    els.promptKey = document.getElementById('interaction-key');
-    els.promptText = document.getElementById('interaction-text');
+    els.promptBox = $('interaction-prompts');
+    els.promptKey = $('interaction-key');
+    els.promptText = $('interaction-text');
+
+    // minimap pills
+    els.mmEnemies = $('mm-enemies');
+    els.mmTime    = $('mm-time');
+    els.mmCoords  = $('mm-coords');
+
+    initMinimap();
+    radar.range = 150; // zoom della minimappa (più basso = più zoom)
+
     console.log('[HUD] init ok');
   },
 
@@ -50,111 +167,49 @@ export const hudManager = {
    * @param {Array=} enemies
    */
   update(player, controller, camera, enemies = []) {
-if (els.mmCoords && player?.model) {
-  const p = player.model.position;
-  els.mmCoords.textContent = `📍 ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(0)}`;
-}
-    if (els.mmEnemies && player?.model) {
-  const pos = player.model.position;
-  const near = enemies.filter(e => e?.model?.position?.distanceTo?.(pos) < 80).length;
-  els.mmEnemies.textContent = `🎯 ${near}`;
-}
-if (els.mmTime) {
-  const now = performance.now() / 1000;
-  const minutes = Math.floor(now % 60).toString().padStart(2, '0');
-  const hours = (6 + Math.floor((now / 10) % 18)).toString().padStart(2, '0');
-  els.mmTime.textContent = `⏰ ${hours}:${minutes}`;
-}
-    // Compass
-    if (els.compass && camera) {
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      const deg = THREE.MathUtils.radToDeg(Math.atan2(dir.x, dir.z));
-      let compassDir = 'N';
-      if (deg >= -45 && deg < 45) compassDir = 'N';
-      else if (deg >= 45 && deg < 135) compassDir = 'E';
-      else if (deg >= -135 && deg < -45) compassDir = 'W';
-      else compassDir = 'S';
-      els.compass.textContent = compassDir;
+    // coordinate
+    if (els.mmCoords && player?.model) {
+      const p = player.model.position;
+      els.mmCoords.textContent = `📍 ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(0)}`;
     }
 
-    // Zone
-    if (els.zone && player?.model) {
-      els.zone.textContent = getCurrentArea(player.model.position);
-    }
-
-    // Enemies nearby (entro 80m)
-    if (els.enemiesNearby && player?.model && enemies?.length) {
+    // nemici entro 80u
+    if (els.mmEnemies && player?.model && enemies?.length) {
       const pos = player.model.position;
       const near = enemies.filter(e => e?.model?.position?.distanceTo?.(pos) < 80).length;
-      els.enemiesNearby.textContent = `${near} enemies nearby`;
+      els.mmEnemies.textContent = `🎯 ${near}`;
     }
 
-    // Game time (mostra solo un orologio fittizio, opzionale)
-    if (els.gameTime) {
+    // “orologio” fittizio
+    if (els.mmTime) {
       const now = performance.now() / 1000;
       const minutes = Math.floor(now % 60).toString().padStart(2, '0');
-      const hours = (6 + Math.floor((now / 10) % 18)).toString().padStart(2, '0'); // 06..23
-      els.gameTime.textContent = `Time • ${hours}:${minutes}`;
+      const hours = (6 + Math.floor((now / 10) % 18)).toString().padStart(2, '0');
+      els.mmTime.textContent = `⏰ ${hours}:${minutes}`;
     }
 
-    // Form info
-    if (els.formName && controller?.abilities?.formName) {
-      els.formName.textContent = controller.abilities.formName.toUpperCase();
-    }
-    if (els.formAvatar && controller?.abilities?.formName) {
-      // Emoji rapide per distinguere
-      const map = { human: '🧙‍♂️', werewolf: '🐺', wyvern: '🐉' };
-      els.formAvatar.textContent = map[controller.abilities.formName] ?? '✨';
-    }
-    if (els.formLevel) {
-      // se non hai livelli reali, mantieni un placeholder
-      els.formLevel.textContent = 'Level 5';
-    }
-    if (els.transformCd) {
-      // se non hai cooldown reale, placeholder
-      els.transformCd.textContent = 'Ready';
-    }
-
-    // Vitals (se non hai valori reali, lascia gli attuali)
-    // Puoi collegare qui i tuoi valori reali: controller.health/mana/stamina ecc.
-    // Esempio di wiring (sostituisci con i tuoi campi se esistono):
-    /*
-    const hp = controller?.stats?.hp ?? 850; const hpMax = controller?.stats?.hpMax ?? 1000;
-    if (els.healthBar) els.healthBar.style.width = `${(hp / hpMax) * 100}%`;
-    if (els.healthText) els.healthText.textContent = `${hp} / ${hpMax}`;
-
-    const mp = controller?.stats?.mp ?? 300; const mpMax = controller?.stats?.mpMax ?? 500;
-    if (els.manaBar) els.manaBar.style.width = `${(mp / mpMax) * 100}%`;
-    if (els.manaText) els.manaText.textContent = `${mp} / ${mpMax}`;
-    */
-
-
+    // radar
+    updateRadar(player, enemies, camera);
   },
+
   showNotification(text) {
     if (!els.notificationBar) return;
-
     const div = document.createElement('div');
     div.className = 'notification';
     div.textContent = text;
-
     els.notificationBar.appendChild(div);
-
-    // Auto-rimuovi dopo 4 secondi
-    setTimeout(() => {
-      div.remove();
-    }, 4000);
+    setTimeout(() => div.remove(), 4000);
   },
+
   showPrompt(key = 'E', text = 'Interact') {
-  if (!els.promptBox) return;
-  if (els.promptKey)  els.promptKey.textContent = key.toUpperCase();
-  if (els.promptText) els.promptText.textContent = text;
-  els.promptBox.hidden = false;
-},
+    if (!els.promptBox) return;
+    if (els.promptKey)  els.promptKey.textContent = key.toUpperCase();
+    if (els.promptText) els.promptText.textContent = text;
+    els.promptBox.hidden = false;
+  },
 
-hidePrompt() {
-  if (!els.promptBox) return;
-  els.promptBox.hidden = true;
-},
-
+  hidePrompt() {
+    if (!els.promptBox) return;
+    els.promptBox.hidden = true;
+  },
 };

@@ -81,8 +81,8 @@ export function startLoop(p, c) {
       updateCamera(player,delta); 
       updateEnvironment();
       interactionManager.update(player,delta);
-      renderer.render(scene, camera);
       hudManager.update(player, controller, camera, getEnemies());
+      renderer.render(scene, camera);
     } catch (e) {
       console.error('🚨 Render crash:', e);
       scene.traverse(obj => {

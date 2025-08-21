@@ -37,7 +37,7 @@ export class TreeSpawner {
     cellSize = 120,
     updateThrottleMs = 16, // ~60fps per gli aggiornamenti LOD
     useSpatialHashing = true,
-    enableOcclusion = false,
+    enableOcclusion = true,
     maxVisibleInstances = 5000,
     // Configurazione ombre per LOD
     shadowLODSettings = {
