@@ -14,6 +14,7 @@ import { AnimationSystem } from './systems/AnimationSystem.js';
 import { ActionBus } from './core/ActionBus.js';
 import { interactionManager } from './systems/interactionManager.js';
 import { updateChests } from './objects/chest.js';
+import { updateEnvironment } from './spawners/vegetationSpawner.js';
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
@@ -78,9 +79,8 @@ export function startLoop(p, c) {
       updateCampfires(delta);
       updateChests(delta);
       updateCamera(player,delta); 
-      interactionManager.update(player,delta);         
-      checkTransformationAltars(player, handleFormChange);
-
+      updateEnvironment();
+      interactionManager.update(player,delta);
       renderer.render(scene, camera);
       hudManager.update(player, controller, camera, getEnemies());
     } catch (e) {

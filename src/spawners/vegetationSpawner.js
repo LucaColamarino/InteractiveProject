@@ -1,83 +1,75 @@
-import * as THREE from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { scene } from '../scene.js';
-import { getTerrainHeightAt } from '../map/map.js';
+// vegetationSpawner.js
+import { BushSpawner } from "../objects/bush";
+import { TreeSpawner } from "../objects/tree.js";
+import { SmallRockSpawner } from "../objects/rock.js";
+import { scene, camera } from "../scene.js";
+import { getTerrainHeightAt } from "../map/map.js";
 
-const loader = new FBXLoader();
-const vegetation = [];
-
-const textureLoader = new THREE.TextureLoader();
-
-// Precarica materiali
-const barkMaterial = new THREE.MeshStandardMaterial({
-  map: textureLoader.load('/textures/Bark.jpeg'),
-  normalMap: textureLoader.load('/textures/Bark_Normal.jpeg'),
-  roughness: 1,
-});
-
-const leafMaterial = new THREE.MeshStandardMaterial({
-  map: textureLoader.load('/textures/Leaf.jpeg'),
-  normalMap: textureLoader.load('/textures/Leaf_Normal.jpeg'),
-  alphaMap: textureLoader.load('/textures/Leaf_Opacity.jpeg'),
-  transparent: true,
-  alphaTest: 0.5,
-  side: THREE.DoubleSide,
-  depthWrite: true,
-});
-leafMaterial.map.colorSpace = THREE.SRGBColorSpace;
-barkMaterial.map.colorSpace = THREE.SRGBColorSpace;
-async function spawnVegetation(modelPath, count, area) {
-  const baseModel = await loader.loadAsync(modelPath);
-
-  for (let i = 0; i < count; i++) {
-    const clone = baseModel.clone();
-    const pos = new THREE.Vector3(
-      area.x + Math.random() * area.width - area.width / 2,
-      0,
-      area.z + Math.random() * area.depth - area.depth / 2
-    );
-    pos.y = getTerrainHeightAt(pos.x, pos.z);
-
-    clone.position.copy(pos);
-    clone.scale.setScalar((0.8 + Math.random() * 0.4) * 0.1);
-    clone.setRotationFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
-
-
-
-    clone.traverse(child => {
-  if (child.isMesh) {
-    // Se ha più materiali, sostituisci l’intero array
-    if (Array.isArray(child.material)) {
-      const newMaterials = [];
-
-      for (let i = 0; i < child.material.length; i++) {
-        const matName = child.material[i].name.toLowerCase();
-        if (matName.includes('leaf')) {
-          newMaterials.push(leafMaterial);
-        } else {
-          newMaterials.push(barkMaterial);
-        }
-      }
-
-      child.material = newMaterials;
-    } else {
-      // Se ha un solo materiale, fallback a leaf
-      child.material = leafMaterial;
-    }
-
-    child.castShadow = true;
-    child.receiveShadow = true;
-  }
-});
-
-
-    scene.add(clone);
-    vegetation.push(clone);
-  }
-}
+let bushes = null;
+let trees  = null;
 
 export async function populateVegetation() {
-  return;
-  await spawnVegetation('/models/environment/bush.fbx', 30, { x: 0, z: 0, width: 400, depth: 400 });
-  await spawnVegetation('/models/environment/bush.fbx', 40, { x: 0, z: 0, width: 600, depth: 600 });
+  await Promise.all([spawnSmallRocks(),spawnBushes(),spawnTrees()]);
+
 }
+
+export function updateEnvironment() {
+  if(trees)trees.updateLODSpatial(camera);
+  if(bushes)bushes.updateLODSpatial(camera);
+
+
+
+}
+
+async function spawnBushes() {
+ bushes = new BushSpawner({
+  scene,
+  getTerrainHeightAt,
+  lodDistances: [30, 70, 130, 200], // 4 livelli
+  lodHysteresis: 15,
+  maxVisibleInstances: 500,
+  useSpatialHashing: true,
+  updateThrottleMs: 16
+});
+  const area = { x: 0, z: 0, width: 500, depth: 500 };
+  await bushes.spawn('/models/environment/bush.fbx', 400, area); //400
+}
+
+async function spawnTrees() {
+ trees = new TreeSpawner({
+  scene,
+  getTerrainHeightAt,
+  lodDistances: [60, 140, 260, 400], // 4 livelli
+  lodHysteresis: 15,
+  maxVisibleInstances: 5000,
+  useSpatialHashing: true,
+  updateThrottleMs: 16
+});
+
+  const area = { x: 0, z: 0, width: 500, depth: 500 };
+  await trees.spawn('/models/environment/TREE.fbx',200 , area); //200
+}
+
+async function spawnSmallRocks() {
+ trees = new SmallRockSpawner({
+  scene,
+  getTerrainHeightAt,
+  lodDistances: [60, 140, 260, 400], // 4 livelli
+  lodHysteresis: 15,
+  maxVisibleInstances: 5000,
+  useSpatialHashing: true,
+  updateThrottleMs: 16
+});
+
+  const area = { x: 0, z: 0, width: 500, depth: 500 };
+  await trees.spawn('/models/environment/smallrock.fbx',1000 , area); //200
+}
+
+
+
+
+// Inizializzazione con parametri ottimizzati
+
+// Nel loop di rendering - usa spatial update per performance migliori
+
+

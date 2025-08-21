@@ -6,7 +6,7 @@ export let moon;
 export function createMoonLight() {
   moon = new THREE.DirectionalLight(0xaaaaff, 0.2); // tenue ma visibile
   moon.castShadow = true;
-  moon.shadow.mapSize.set(2048, 2048); // meno risoluzione del sole
+  moon.shadow.mapSize.set(1024, 1024); // meno risoluzione del sole
   moon.shadow.bias = -0.0001;
   moon.shadow.normalBias = 0.01;
 
@@ -31,7 +31,7 @@ export function createSunLight() {
 
   sun.castShadow = true;
 
-  sun.shadow.mapSize.set(4096,4096);
+  sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.radius = 2;
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.02;

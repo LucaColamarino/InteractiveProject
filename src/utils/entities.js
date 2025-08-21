@@ -44,7 +44,7 @@ export const ENTITY_CONFIG = {
     yOffset: 0,
   },
   wyvern: {
-    modelPath: '/models/knight.fbx',
+    modelPath: '/models/wyvern.fbx',
     textures: {
       diffuse: '/textures/wyvern/wyvern_diffuse.png',
       normal: '/textures/wyvern/wyvern_normal.png'

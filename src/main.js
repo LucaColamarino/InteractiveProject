@@ -41,9 +41,9 @@ async function init() {
   addWaterPlane();
   await populateVegetation(); 
   spawnAreaEnemies();
-  spawnWaterAltar(10,10, 'human');
-  spawnWaterAltar(250,20, 'wyvern');
-  spawnWaterAltar(-250,-20, 'werewolf');
+  //spawnWaterAltar(10,10, 'human');
+  //spawnWaterAltar(250,20, 'wyvern');
+  //spawnWaterAltar(-250,-20, 'werewolf');
   spawnCampfireAt(0,0);
   spawnChestAt(6,6);
   const result = await changeForm('human');

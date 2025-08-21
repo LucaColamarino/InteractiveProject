@@ -87,7 +87,7 @@ export async function createHeightmapTerrain() {
   return new Promise((resolve, reject) => {
     const textureLoader = new THREE.TextureLoader();
     scene.background = new THREE.Color(0x1a1e2a);
-    scene.fog = new THREE.Fog(0x1a1e2a, 60, 250);
+    scene.fog = new THREE.Fog(0x1a1e2a, 50, 200); // da 60–250
 
     const heightMapImg = new Image();
     heightMapImg.src = '/textures/terrain/heightmap.png';

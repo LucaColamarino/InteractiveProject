@@ -111,9 +111,9 @@ export function spawnFlyingWyvern(pos) {
 }
 
 export function spawnAreaEnemies() {
-  const num_archers=1;
-  const num_werewolves=1;
-  const num_wyvern=0;
+  const num_archers=10;
+  const num_werewolves=10;
+  const num_wyvern=2;
   for (let i = 0; i < num_archers; i++) {
     spawnWalkingNpc(new THREE.Vector3(Math.random() * 100 - 50, 0, Math.random() * 200 - 100));
   }
