@@ -1,0 +1,83 @@
+/* mainMenu.css */
+#main-menu {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  pointer-events: auto;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+#main-menu .mm-backdrop {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(6px) brightness(0.7);
+  background: rgba(0,0,0,0.3);
+}
+
+#main-menu .mm-card {
+  position: relative;
+  width: min(520px, 92vw);
+  background: rgba(20,20,24,0.92);
+  color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  padding: 24px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.mm-title {
+  margin: 0 0 10px 0;
+  font-size: 28px;
+  letter-spacing: 0.5px;
+}
+
+.mm-subtitle {
+  margin: 6px 0 10px 0;
+  font-size: 18px;
+  color: #cfd3ff;
+}
+
+.mm-section { margin-top: 14px; }
+
+.mm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.mm-row span { opacity: 0.9; }
+
+.mm-btn {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform .06s ease, background .15s ease;
+}
+.mm-btn:hover { background: rgba(255,255,255,0.12); }
+.mm-btn:active { transform: translateY(1px); }
+
+.mm-primary {
+  background: linear-gradient(180deg, #6aa3ff, #3e66ff);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.mm-danger {
+  background: linear-gradient(180deg, #ff6a6a, #e83a3a);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.mm-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #bdbdbd;
+  opacity: 0.9;
+}
