@@ -7,6 +7,8 @@ import { getTerrainHeightAt } from '../map/map.js';
 import { spawnFire } from '../particles/FireParticleSystem.js';
 import { interactionManager } from '../systems/interactionManager.js';
 import { hudManager } from '../ui/hudManager.js';
+import { gameManager } from '../gameManager.js';
+import { setCameraFocus, clearCameraFocus} from '../player/cameraFollow.js';
 
 const loader = new FBXLoader();
 const texLoader = new THREE.TextureLoader();
@@ -230,20 +232,28 @@ export async function spawnCampfireAt(x, z, opts = {}) {
       return out.copy(p);
     },
     canInteract: (_player) => true,
-    getPrompt: (player) => {
-      const sitting = player?.isSitting?.();
+    getPrompt: (controller) => {
+      const sitting = controller.isSitting;
+      console.log("sitting?", sitting);
       return { key: 'E', text: sitting ? 'Stand up' : 'Sit by the fire' };
     },
-    onInteract: (player) => {
+    onInteract: (controller) => {
+      let player = controller.player;
       if (!player) return;
-      if (player.isSitting?.()) {
-        player.standUpFromSit?.();
+      if (controller.isSitting) {
+        gameManager.controller?.sitToggle();
         hudManager.showNotification?.('You stand up.');
+        clearCameraFocus();
       } else {
-        player.sitDownThenIdle?.();
+        gameManager.controller?.sitToggle();
         hudManager.showNotification?.('You sit by the fire.');
+        // --- fai guardare il player verso il falò ---
+        const campfirePos = cf.model?.position ?? cf.position;
+        setCameraFocus(campfirePos, { height: 0.8, stiffness: 8 }); // <-- guarda il falò
+        // prendi il modello del player
       }
     }
+
   });
 
   campfires.push(cf);

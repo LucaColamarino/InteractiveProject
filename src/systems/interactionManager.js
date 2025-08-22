@@ -1,6 +1,7 @@
 // systems/interactionManager.js
 import * as THREE from 'three';
 import { hudManager } from '../ui/hudManager.js';
+import { gameManager } from '../gameManager.js';
 
 const _registry = new Set();
 /** config */
@@ -20,7 +21,9 @@ export const interactionManager = {
   unregister(interactable) { _registry.delete(interactable); },
 
   /** Aggiorna focus + HUD. Call ogni frame dal gameLoop. */
-  update(player, dt) {
+  update() {
+    const controller = gameManager.controller;
+    const player = controller?.player;
     if (!player?.model) { _clearFocus(); return; }
     const playerPos = player.model.position;
 
@@ -40,28 +43,28 @@ export const interactionManager = {
     if (best !== _focused) {
       _focused = best;
       if (_focused) {
-        const { key = 'E', text = 'Interact' } = _focused.getPrompt?.(player) ?? {};
+        const { key = 'E', text = 'Interact' } = _focused.getPrompt?.(controller) ?? {};
         hudManager.showPrompt(key, text);
       } else {
         _clearFocus();
       }
     } else if (_focused) {
       // refresh testo (es. “Sit / Stand” che cambia con stato)
-      const { key = 'E', text = 'Interact' } = _focused.getPrompt?.(player) ?? {};
+      const { key = 'E', text = 'Interact' } = _focused.getPrompt?.(controller) ?? {};
       hudManager.showPrompt(key, text);
     }
   },
 
   /** Chiamare quando l’utente preme il tasto di interact */
-  tryInteract(player) {
+  tryInteract(controller) {
     console.log("try interact");
     const now = performance.now() / 1000;
     if (now - _lastInteractAt < COOLDOWN_SEC) return false;
     if (!_focused) return false;
-    if (!(_focused.canInteract?.(player) ?? true)) return false;
+    if (!(_focused.canInteract?.(controller) ?? true)) return false;
 
     _lastInteractAt = now;
-    _focused.onInteract?.(player);
+    _focused.onInteract?.(controller);
     return true;
   },
 

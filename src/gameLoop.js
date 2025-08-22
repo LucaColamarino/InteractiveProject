@@ -135,7 +135,7 @@ export function startLoop(p, c) {
       updatetorchs(delta);
       updateCamera(player, delta); 
       updateEnvironment();
-      interactionManager.update(player, delta);
+      interactionManager.update();
       hudManager.update(player, controller, camera, getEnemies());
       renderer.render(scene, camera);
     } catch (e) {

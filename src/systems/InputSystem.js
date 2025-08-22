@@ -30,6 +30,7 @@ function _recomputeMoveVec() {
   const right   = new THREE.Vector3(Math.cos(yawRad), 0, -Math.sin(yawRad));
 
   _moveVec.set(0, 0, 0);
+  if(gameManager.controller?.isSitting) return; // se sei seduto non ti muovi
   if (_pressW) _moveVec.sub(forward);
   if (_pressS) _moveVec.add(forward);
   if (_pressD) _moveVec.add(right);
@@ -42,26 +43,20 @@ function _onKeyDown(e) {
     case 'KeyA': _pressA = true; break;
     case 'KeyS': _pressS = true; break;
     case 'KeyD': _pressD = true; break;
-
     case 'ShiftLeft':
     case 'ShiftRight':
       _isShift = true;
       break;
-
     case 'Space':
       _isJump = true;
       _controller?.jumpOrFly()
       break;
-
     case 'KeyE':
-      interactionManager.tryInteract(gameManager.player);
-      break;
-
-    case 'KeyC':
-      _controller?.sitToggle()
+      interactionManager.tryInteract(gameManager.controller);
       break;
 
     case 'Digit1':
+      console.log('Attack');
       _controller?.attack('attack')
       break;
     case 'Escape':
@@ -102,16 +97,12 @@ function _onMouseDown(e) {
     return;
   }
 
-  if (e.button === 2) { // tasto destro → orbita senza lock
-    _isOrbiting = true;
-    _lastMouseX = e.clientX;
-    _lastMouseY = e.clientY;
-  } else if (e.button === 0) { // sinistro
+  if (e.button === 0) { // sinistro
     if (_suppressNextAttack) {
       _suppressNextAttack = false;
       return;
     }
-    ActionBus.emit('attack_primary');
+    _controller?.attack('attack')
   }
 }
 
@@ -219,6 +210,12 @@ export function pumpActions(controller) {
 export function getCameraAngles() {
   return { yaw: _yaw, pitch: _pitch };
 }
+export function setCameraAngles({ yaw = _yaw, pitch = _pitch } = {}) {
+  _yaw = yaw;
+  _pitch = pitch;
+}
+
+
 
 export function isPointerLocked() {
   return _pointerLocked;

@@ -161,9 +161,7 @@ export class BaseFormController {
 
   sitToggle() {
     this.isSitting = !this.isSitting;
-    if (!this.isSitting && !this.isFlying) {
-      // alzarsi → torni a idle, l'AnimationSystem gestirà
-    }
+    console.log(`[FormController] isSitting = ${this.isSitting}`);
   }
 
   // === Attacco con FINESTRE DI IMPATTO CONTINUE ===
