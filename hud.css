@@ -1,11 +1,13 @@
-/* hud.css */
+/* hud.css - Sistema HUD Coerente e Moderno */
+
 html, body {
   margin: 0;
   padding: 0;
   overflow: hidden; 
   height: 100%;
   width: 100%;
-  font-family: 'Exo 2', sans-serif;
+  font-family: var(--font-primary);
+  background: #000;
 }
 
 canvas {
@@ -23,91 +25,149 @@ canvas {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 10000;
+  z-index: var(--z-hud);
+}
+
+/* === TOP CENTER - INTERACTION PROMPTS === */
+.interaction-wrap {
+  position: absolute;
+  top: var(--space-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: calc(var(--z-hud) + 1);
+}
+
+.interaction-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--accent-green);
+  background: linear-gradient(135deg, 
+    rgba(20, 40, 20, 0.95), 
+    rgba(30, 50, 30, 0.9)
+  );
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md), 0 0 20px rgba(46, 213, 115, 0.2);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+  
+  animation: slideInPrompt var(--timing-normal) var(--ease-out-quart);
+  position: relative;
+  overflow: hidden;
+}
+
+.interaction-prompt::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(46, 213, 115, 0.1), transparent);
+  animation: shimmerPrompt 2s infinite;
+}
+
+.interaction-prompt[hidden] { display: none; }
+
+#interaction-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--surface-dark);
+  border: 1px solid var(--primary-blue);
+  color: var(--primary-blue);
+  box-shadow: var(--glow-inset);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+}
+
+#interaction-text {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
 }
 
 /* === TOP RIGHT - MINIMAP === */
-.hud-minimap {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 200px;
-  height: 200px;
-  background: radial-gradient(circle, rgba(20, 30, 50, 0.9), rgba(10, 15, 25, 0.95));
-  border: 3px solid rgba(100, 200, 255, 0.7);
-  border-radius: 50%;
-  box-shadow: 
-      0 0 25px rgba(100, 200, 255, 0.4),
-      inset 0 0 30px rgba(0, 0, 0, 0.5);
-  animation: slideInRight 0.8s ease-out;
-  overflow: hidden;
-}
-/* Freccia centrale della minimappa (North-Up) */
-.minimap-heading{
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 14px;
-  height: 22px;
-  background: #fff;
-  opacity: 0.95;
-  /* punta: triangolo con “codino” per dare l’idea di freccia */
-  clip-path: polygon(50% 0, 85% 100%, 50% 76%, 15% 100%);
-  border-radius: 1px;
-  filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
-  transform: translate(-50%, -60%) rotate(0deg);
-  transform-origin: 50% 80%;
-  pointer-events: none;
-  z-index: 3;
-}
-
-
-
-/* wrapper rettangolare per il posizionamento */
 .minimap-wrap {
   position: fixed;
-  top: 24px; 
-  right: 24px;
+  top: var(--space-xl); 
+  right: var(--space-xl);
   width: 220px; 
   height: 220px;
+  animation: slideInRight var(--timing-slow) var(--ease-out-quart);
+}
+
+.hud-minimap {
+  position: absolute;
+  inset: 0;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(
+    circle, 
+    var(--surface-medium) 0%, 
+    var(--surface-dark) 100%
+  );
+  border: 3px solid var(--primary-blue);
+  border-radius: var(--radius-full);
+  box-shadow: 
+    var(--shadow-lg),
+    var(--glow-strong),
+    inset 0 0 30px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  position: relative;
 }
 
 .minimap-viewport {
-  position: absolute; 
-  inset: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #0e1522;
-  border: 3px solid #64c8ff;
-  box-shadow: 0 0 30px rgba(100,200,255,.35) inset;
-  z-index: 0;
+  background-image: var(--hex-pattern);
+  background-blend-mode: overlay;
 }
 
-/* i badge esterni */
+/* Pills esterni alla minimap */
 .minimap-hud {
   position: absolute;
-  right: 8px; 
+  right: var(--space-sm); 
   bottom: -150px;
   display: flex; 
   flex-direction: column; 
-  gap: 8px;
+  gap: var(--space-sm);
   pointer-events: none;
   z-index: 1;
 }
 
 .pill {
-  background: rgba(10,15,25,0.9);
-  border: 1px solid rgba(100,200,255,0.6);
-  border-radius: 12px;
-  padding: 6px 10px;
-  font-family: 'Orbitron', monospace;
-  font-weight: 700; 
-  font-size: 12px; 
-  color: #64c8ff;
-  box-shadow: 0 0 10px rgba(100,200,255,0.3);
-  backdrop-filter: blur(6px);
+  background: var(--surface-dark);
+  border: 1px solid rgba(100, 200, 255, 0.4);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold); 
+  font-size: var(--font-size-sm); 
+  color: var(--primary-blue);
+  box-shadow: var(--glow-subtle);
+  backdrop-filter: blur(8px);
   min-width: 110px; 
   text-align: right;
+  
+  transition: all var(--timing-fast) ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.pill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--dna-gradient);
+  opacity: 0.1;
 }
 
 /* === COMPASS === */
@@ -116,18 +176,20 @@ canvas {
   top: 15px;
   left: 50%;
   transform: translateX(-50%);
-  width: 30px;
-  height: 30px;
-  background: rgba(20, 30, 50, 0.9);
-  border: 2px solid rgba(100, 200, 255, 0.7);
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  background: var(--surface-medium);
+  border: 2px solid var(--primary-blue);
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64c8ff;
-  font-family: 'Orbitron', monospace;
-  font-weight: 700;
-  font-size: 18px;
+  color: var(--primary-blue);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  box-shadow: var(--glow-subtle);
+  backdrop-filter: blur(6px);
 }
 
 /* === MINIMAP GRID === */
@@ -138,12 +200,30 @@ canvas {
   transform: translate(-50%, -50%);
   width: 180px;
   height: 180px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: 
-      radial-gradient(circle at 30% 30%, rgba(100, 255, 100, 0.1) 0%, transparent 40%),
-      radial-gradient(circle at 70% 60%, rgba(255, 100, 100, 0.1) 0%, transparent 40%),
-      radial-gradient(circle at 50% 80%, rgba(100, 100, 255, 0.1) 0%, transparent 40%);
+    radial-gradient(circle at 30% 30%, rgba(100, 255, 100, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 70% 60%, rgba(255, 100, 100, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(100, 100, 255, 0.08) 0%, transparent 40%);
   overflow: hidden;
+}
+
+/* Freccia centrale della minimappa (North-Up) */
+.minimap-heading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 24px;
+  background: linear-gradient(180deg, var(--primary-blue-light), var(--primary-blue));
+  clip-path: polygon(50% 0%, 85% 100%, 50% 76%, 15% 100%);
+  border-radius: 2px;
+  filter: drop-shadow(0 0 4px rgba(100, 200, 255, 0.6));
+  transform: translate(-50%, -60%);
+  transform-origin: 50% 80%;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: var(--glow-subtle);
 }
 
 .minimap-player {
@@ -151,59 +231,64 @@ canvas {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
-  background: #64c8ff;
-  border-radius: 50%;
-  box-shadow: 0 0 10px rgba(100, 200, 255, 0.8);
+  width: 10px;
+  height: 10px;
+  background: var(--primary-blue);
+  border-radius: var(--radius-full);
+  box-shadow: var(--glow-normal);
   animation: pulse 2s infinite;
 }
 
 .minimap-enemy {
   position: absolute;
-  width: 4px;
-  height: 4px;
-  background: #ff4757;
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(255, 71, 87, 0.6);
+  width: 5px;
+  height: 5px;
+  background: var(--danger-red);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 8px rgba(255, 71, 87, 0.6);
+  animation: enemyPulse 1.5s infinite ease-in-out;
 }
 
 /* === BOTTOM CENTER - VITALS === */
 .hud-vitals {
   position: absolute;
-  bottom: 20px;
+  bottom: var(--space-xl);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 30px;
-  animation: slideInBottom 1.2s ease-out;
+  gap: var(--space-xxl);
+  animation: slideInBottom var(--timing-very-slow) var(--ease-out-quart);
 }
 
 .hud-label {
-  color: #e0f0ff;
-  font-size: 14px;
-  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-sm);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
+  font-family: var(--font-primary);
 }
 
 .progress-container {
-  background: rgba(20, 20, 40, 0.8);
-  border: 1px solid rgba(100, 200, 255, 0.4);
+  background: var(--surface-dark);
+  border: 1px solid rgba(100, 200, 255, 0.3);
   border-radius: 25px;
-  height: 24px;
-  width: 200px;
+  height: var(--progress-height);
+  width: var(--progress-width);
   overflow: hidden;
   position: relative;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-inset);
+  backdrop-filter: blur(4px);
 }
 
 .progress-bar {
   height: 100%;
   border-radius: 25px;
-  transition: width 0.3s ease, box-shadow 0.3s ease;
+  transition: width var(--timing-normal) var(--ease-out-quart), 
+              box-shadow var(--timing-normal) ease;
   position: relative;
   overflow: hidden;
 }
@@ -215,23 +300,61 @@ canvas {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: shimmer 2s infinite;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.25), 
+    transparent
+  );
+  animation: shimmer 3s infinite;
+}
+
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--dna-gradient);
+  opacity: 0.1;
+  animation: dnaFlow 4s linear infinite;
 }
 
 .health-bar {
-  background: linear-gradient(135deg, #ff4757, #ff6b7a);
-  box-shadow: 0 0 15px rgba(255, 71, 87, 0.6);
+  background: linear-gradient(135deg, var(--danger-red), var(--danger-red-light));
+  box-shadow: 0 0 15px rgba(255, 71, 87, 0.4);
+}
+
+.health-bar:hover {
+  box-shadow: 0 0 25px rgba(255, 71, 87, 0.6);
 }
 
 .mana-bar {
-  background: linear-gradient(135deg, #3742fa, #5352ed);
-  box-shadow: 0 0 15px rgba(55, 66, 250, 0.6);
+  background: linear-gradient(135deg, var(--mana-blue), var(--mana-blue-light));
+  box-shadow: 0 0 15px rgba(55, 66, 250, 0.4);
+}
+
+.mana-bar:hover {
+  box-shadow: 0 0 25px rgba(55, 66, 250, 0.6);
 }
 
 .stamina-bar {
-  background: linear-gradient(135deg, #2ed573, #7bed9f);
-  box-shadow: 0 0 15px rgba(46, 213, 115, 0.6);
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-green-light));
+  box-shadow: 0 0 15px rgba(46, 213, 115, 0.4);
+}
+
+.stamina-bar:hover {
+  box-shadow: 0 0 25px rgba(46, 213, 115, 0.6);
+}
+
+.xp-bar {
+  background: linear-gradient(135deg, var(--warning-orange-light), var(--warning-orange));
+  box-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
+}
+
+.xp-bar:hover {
+  box-shadow: 0 0 25px rgba(241, 196, 15, 0.6);
+}
+
+.xp-bar.levelup {
+  animation: levelFlash var(--timing-slow) ease-out;
 }
 
 .progress-text {
@@ -239,54 +362,130 @@ canvas {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: white;
-  font-weight: 600;
-  font-size: 12px;
+  color: var(--text-inverse);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-display);
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-  z-index: 1;
+  z-index: 2;
+  letter-spacing: 0.5px;
 }
 
 /* === NOTIFICATIONS === */
 .notification-area {
   position: absolute;
-  top: 20%;
-  left: 30px;
+  top: 25%;
+  left: var(--space-xxl);
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-width: 300px;
+  gap: var(--space-md);
+  max-width: 320px;
+  z-index: calc(var(--z-hud) + 1);
 }
 
 .notification {
-  background: linear-gradient(135deg, rgba(20, 40, 20, 0.95), rgba(40, 60, 40, 0.9));
-  border-left: 4px solid #2ed573;
-  padding: 15px;
-  border-radius: 8px;
-  color: #e0f0ff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, 
+    rgba(20, 40, 20, 0.95), 
+    rgba(30, 50, 30, 0.9)
+  );
+  border-left: 4px solid var(--accent-green);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md), 0 0 20px rgba(46, 213, 115, 0.2);
+  backdrop-filter: blur(10px);
+  
+  font-family: var(--font-primary);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-md);
+  
   transform: translateX(-100%);
-  animation: slideInNotification 0.5s ease-out forwards;
+  animation: slideInNotification var(--timing-normal) var(--ease-out-quart) forwards;
+  
+  position: relative;
+  overflow: hidden;
 }
 
-/* === ANIMATIONS === */
+.notification::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--hex-pattern);
+  opacity: 0.05;
+}
+
+.notification::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(46, 213, 115, 0.1), transparent);
+  animation: shimmerNotification 2s infinite;
+}
+
+/* === ANIMAZIONI === */
 @keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { 
+    transform: translateX(100%); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateX(0); 
+    opacity: 1; 
+  }
 }
 
 @keyframes slideInBottom {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { 
+    transform: translate(-50%, 100%); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translate(-50%, 0); 
+    opacity: 1; 
+  }
 }
 
 @keyframes slideInNotification {
-  to { transform: translateX(0); }
+  to { 
+    transform: translateX(0); 
+  }
+}
+
+@keyframes slideInPrompt {
+  from { 
+    transform: translate(-50%, -10px); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translate(-50%, 0); 
+    opacity: 1; 
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50% { transform: translate(-50%, -50%) scale(1.2); }
+  0%, 100% { 
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: var(--glow-normal);
+  }
+  50% { 
+    transform: translate(-50%, -50%) scale(1.3);
+    box-shadow: var(--glow-strong);
+  }
+}
+
+@keyframes enemyPulse {
+  0%, 100% { 
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }
 
 @keyframes shimmer {
@@ -294,74 +493,129 @@ canvas {
   100% { left: 100%; }
 }
 
+@keyframes shimmerPrompt {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  51% { left: -100%; }
+  100% { left: -100%; }
+}
+
+@keyframes shimmerNotification {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+@keyframes dnaFlow {
+  0% { background-position: 0 0; }
+  100% { background-position: 20px 20px; }
+}
+
+@keyframes levelFlash {
+  0% { 
+    box-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 35px rgba(241, 196, 15, 0.8);
+    transform: scale(1.05);
+  }
+  100% { 
+    box-shadow: 0 0 15px rgba(241, 196, 15, 0.4);
+    transform: scale(1);
+  }
+}
+
 /* === RESPONSIVE === */
 @media (max-width: 1200px) {
-  .hud-minimap { width: 160px; height: 160px; }
-  .progress-container { width: 160px; }
+  .hud-minimap { 
+    width: 160px; 
+    height: 160px; 
+  }
+  
+  .minimap-wrap {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .progress-container { 
+    width: var(--progress-width-sm); 
+  }
+  
+  .hud-vitals {
+    gap: var(--space-lg);
+  }
+  
+  .notification-area {
+    max-width: 280px;
+    left: var(--space-lg);
+  }
 }
 
-
-/* === TOP CENTER - INTERACTION PROMPTS === */
-.interaction-wrap {
-  position: absolute;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  pointer-events: none;
-  z-index: 10001;
+@media (max-width: 768px) {
+  .hud-vitals {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+  }
+  
+  .minimap-wrap {
+    top: var(--space-lg);
+    right: var(--space-lg);
+    width: 140px;
+    height: 140px;
+  }
+  
+  .hud-minimap {
+    width: 140px;
+    height: 140px;
+  }
+  
+  .pill {
+    font-size: var(--font-size-xs);
+    padding: var(--space-xs) var(--space-sm);
+    min-width: 80px;
+  }
+  
+  .interaction-wrap {
+    top: var(--space-lg);
+  }
+  
+  .notification-area {
+    left: var(--space-md);
+    max-width: calc(100vw - var(--space-xl));
+  }
 }
 
-.interaction-prompt {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  border-left: 4px solid #2ed573; /* come .notification */
-  background: linear-gradient(135deg, rgba(20, 40, 20, 0.95), rgba(40, 60, 40, 0.9));
-  color: #e0f0ff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  font-family: 'Orbitron', monospace;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  animation: slideInPrompt 280ms ease-out;
+/* === HOVER EFFECTS === */
+.progress-container:hover .progress-bar {
+  filter: brightness(1.1);
 }
 
-.interaction-prompt[hidden] { display: none; }
-
-#interaction-key {
-  display: inline-block;
-  min-width: 28px;
-  text-align: center;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: rgba(10, 15, 25, 0.9);
-  border: 1px solid rgba(100, 200, 255, 0.6);
-  color: #64c8ff;
-  box-shadow: 0 0 10px rgba(100,200,255,0.3) inset;
+.pill:hover {
+  border-color: var(--primary-blue);
+  box-shadow: var(--glow-normal);
+  transform: translateY(-1px);
 }
 
-#interaction-text {
-  font-weight: 700;
+/* === FOCUS ACCESSIBILITY === */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
 }
 
-/* piccola animazione d’ingresso */
-@keyframes slideInPrompt {
-  from { transform: translateY(-10px); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-
-
-/* === XP BAR === */
-.xp-bar {
-  background: linear-gradient(135deg, #f1c40f, #f39c12);
-  box-shadow: 0 0 15px rgba(241, 196, 15, 0.6);
-}
-@keyframes levelFlash {
-  0% { box-shadow: 0 0 0 rgba(241,196,15,0.0); }
-  40% { box-shadow: 0 0 25px rgba(241,196,15,0.9); }
-  100% { box-shadow: 0 0 0 rgba(241,196,15,0.0); }
-}
-.xp-bar.levelup {
-  animation: levelFlash 600ms ease-out;
+/* === HIGH CONTRAST MODE === */
+@media (prefers-contrast: high) {
+  .progress-container {
+    border-width: 2px;
+  }
+  
+  .pill {
+    border-width: 2px;
+  }
+  
+  .notification {
+    border-left-width: 6px;
+  }
 }
