@@ -68,6 +68,7 @@ export async function preloadAssets() {
     const config = ENTITY_CONFIG[formName];
     console.log(config.modelPath);
     const baseModel = await loader.loadAsync(config.modelPath);
+
     modelCache[formName] = baseModel;
 
     const clone = SkeletonUtils.clone(baseModel);
@@ -142,12 +143,33 @@ export async function changeForm(formName) {
   }
 
  const player = new Player(group, mixer, actions);
+if (formName === 'human') {
+  player.model.equipmentMeshes = buildEquipmentMap(player.model);
+}
  const controller = new HumanFormController(player, abilities);
  player.anim.play('idle');
 
   addTransformationEffect(group.position);
   setPlayerReference(player);
   return { player, controller };
+}
+
+function getAllByPrefix(root, prefix) {
+  const out = [];
+  const p = prefix.toLowerCase();
+  root.traverse(o => {
+    if (o.name && o.name.toLowerCase().startsWith(p)) out.push(o);
+  });
+  return out;
+}
+
+function buildEquipmentMap(root) {
+  return {
+    helmet: getAllByPrefix(root, "helmet"), // es. ["helmet"]
+    shield: getAllByPrefix(root, "shield"), // es. ["shield"]
+    sword:  getAllByPrefix(root, "sword"),  // es. ["sword"]
+    wand:   getAllByPrefix(root, "wand"),   // es. ["wand","wand1","wand2","wand3"]
+  };
 }
 
 export function addTransformationEffect(position) {

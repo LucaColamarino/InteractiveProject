@@ -9,9 +9,13 @@ import { spawnCampfireAt } from './objects/campfire.js';
 import { spawnChestAt } from './objects/chest.js';
 import { spawntorchAt } from './objects/torch.js';
 import { setFireShadowBudget } from './particles/FireParticleSystem.js';
+import { InventorySystem } from './systems/inventorySystem.js';
 import { MainMenu } from './ui/mainMenu.js';
 import {gameManager } from './gameManager.js';
 import {updateLoadingProgress, hideLoadingScreen, showLoadingScreen,suspendLoadingScreen} from './loading.js';
+import {SpawnItems} from './spawners/itemsSpawner.js';
+import { PickableManager } from './pickableManager.js';
+import { scene } from './scene.js';
 import './ui/mainMenu.css';
 
 
@@ -47,6 +51,21 @@ function applyMenuSettings(s) {
 // =====================
 async function init() {
   try {
+    
+
+    const inventory = new InventorySystem();
+    window.inventory = inventory;
+    gameManager.inventory = inventory;
+    gameManager.pickableManager = new PickableManager({
+      scene,
+      inventory,                       // così i pickup finiscono in inventario
+      onPickup: (payload) => {
+        console.log('[Pickup]', payload);
+        // es. UI: hudManager.showToast(`Hai raccolto: ${payload.name}`);
+      },
+      usePointLight: true,
+      interactKey: 'KeyE',             // premi E per pickup manuale (se autoPickup=false)
+    });
     console.log('[Main] Inizializzazione del gioco...');
     // Step 1: Impostazioni (5%)
     updateLoadingProgress(5, 'Configurazione impostazioni...');
@@ -75,6 +94,8 @@ async function init() {
     // Step 6: Vegetation (70%)
     updateLoadingProgress(70, 'Popolamento vegetazione...');
     await populateVegetation();
+
+    await SpawnItems();
     
     // Step 7: NPCs (80%)
     updateLoadingProgress(80, 'Spawn nemici...');
@@ -90,14 +111,18 @@ async function init() {
     spawntorchAt(3, 13);
     spawntorchAt(5, 2);
     spawnChestAt(6, 6);
+    
     // spawnWaterAltar(); // se lo vuoi attivo
 
     // Step 9: Player creation (95%)
     updateLoadingProgress(95, 'Inizializzazione giocatore...');
     const result = await changeForm('human');
+    console.log(result.player.model.equipmentMeshes);
+
     gameManager.player = result.player;
     gameManager.controller = result.controller;
     setPlayerReference(gameManager.player);
+    gameManager.inventory.updateEquipmentVisibility();
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // Step 10: Final setup (100%)

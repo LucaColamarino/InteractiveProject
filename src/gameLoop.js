@@ -17,7 +17,6 @@ import { updatetorchs } from './objects/torch.js';
 import { updateFires } from './particles/FireParticleSystem.js';
 import { LevelSystem } from './systems/LevelSystem.js';
 import { gameManager } from './gameManager.js';
-
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
@@ -100,7 +99,6 @@ export function startLoop(p, c) {
   // Init HUD & XP
   hudManager.init();
   initXP();
-
   function animate() {
     stats.begin();
     requestAnimationFrame(animate);
@@ -135,6 +133,7 @@ export function startLoop(p, c) {
       updatetorchs(delta);
       updateCamera(player, delta); 
       updateEnvironment();
+      gameManager.pickableManager?.update(delta, player?.model?.position);
       interactionManager.update();
       hudManager.update(player, controller, camera, getEnemies());
       renderer.render(scene, camera);

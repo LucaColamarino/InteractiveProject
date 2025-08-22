@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export const ENTITY_CONFIG = {
   human: {
-    modelPath: '/models/knight.fbx',
+    modelPath: '/models/knightwand.fbx',
     animations: {
       idle: '/models/animations/KnightIdle.fbx',
       walk: '/models/animations/KnightWalk.fbx',

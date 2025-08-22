@@ -10,7 +10,9 @@ export let gameManager = null;
    sun=null;
    moon=null;
    menu = null;
-}
+   inventory = null;
+   pickableManager = null;
+  }
 export function createGameManager() {
   
   if (!gameManager) {
