@@ -1,345 +1,111 @@
 <!DOCTYPE html>
+
 <html lang="it">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Metamorphosis - Evolve Beyond</title>
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Design System -->
-    <link rel="stylesheet" href="./ui/design-system.css">
-    <!-- HUD Styles -->
-    <link rel="stylesheet" href="./hud.css">
-    <!-- Main Menu Styles -->
-    <link rel="stylesheet" href="./ui/mainMenu.css">
-    
-    <!-- Meta tags per PWA/Gaming -->
-    <meta name="theme-color" content="#64c8ff">
-    <meta name="description" content="Un'esperienza di evoluzione biologica immersiva in 3D">
-    
-    <!-- Performance hints -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" as="style">
-    
-    <style>
-        /* Critical CSS inline per performance */
-        html, body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #000;
-            font-family: 'Exo 2', system-ui, sans-serif;
-        }
-        
-        #loading-screen {
-            position: fixed;
-            inset: 0;
-            background: linear-gradient(135deg, #0a0f19, #1e3c72);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 99999;
-            transition: opacity 0.5s ease;
-        }
-        
-        #loading-screen.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        .loading-logo {
-            font-family: 'Orbitron', monospace;
-            font-size: 3rem;
-            font-weight: 900;
-            background: linear-gradient(135deg, #64c8ff, #87d4ff);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 2rem;
-            text-shadow: 0 0 30px rgba(100, 200, 255, 0.3);
-            animation: titleGlow 2s ease-in-out infinite alternate;
-        }
-        
-        @keyframes titleGlow {
-            from { text-shadow: 0 0 20px rgba(100, 200, 255, 0.3); }
-            to { text-shadow: 0 0 40px rgba(100, 200, 255, 0.6); }
-        }
-        
-        .loading-bar {
-            width: 300px;
-            height: 6px;
-            background: rgba(100, 200, 255, 0.2);
-            border-radius: 3px;
-            overflow: hidden;
-            border: 1px solid rgba(100, 200, 255, 0.3);
-        }
-        
-        .loading-progress {
-            height: 100%;
-            background: linear-gradient(90deg, #64c8ff, #87d4ff, #64c8ff);
-            background-size: 200% 100%;
-            width: 0%;
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px rgba(100, 200, 255, 0.6);
-            animation: shimmer 2s linear infinite;
-        }
-        
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-        
-        .loading-message {
-            color: #64c8ff;
-            margin-top: 1.5rem;
-            font-family: 'Orbitron', monospace;
-            font-size: 0.9rem;
-            opacity: 0.8;
-            text-align: center;
-            min-height: 1.2rem;
-        }
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Metamorphosis - Evolve Beyond</title>
+<!-- Fonts -->
 
-        /* Demo styles per il canvas */
-        #three-canvas {
-            width: 100vw;
-            height: 100vh;
-            background: linear-gradient(135deg, #001122, #003366);
-        }
+<!-- Design System -->
 
-        /* HUD overlay styles */
-        #hud-overlay {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 1000;
-        }
+<!-- HUD Styles -->
 
-        .interaction-wrap {
-            position: absolute;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
+<!-- Main Menu Styles -->
 
-        .interaction-prompt {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(0, 20, 40, 0.9);
-            border: 1px solid rgba(100, 200, 255, 0.3);
-            border-left: 3px solid #64c8ff;
-            border-radius: 6px;
-            padding: 8px 12px;
-            color: white;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 14px;
-            backdrop-filter: blur(10px);
-        }
+<!-- Meta tags per PWA/Gaming -->
+<meta content="#64c8ff" name="theme-color"/>
+<meta content="Un'esperienza di evoluzione biologica immersiva in 3D" name="description"/>
+<!-- Performance hints -->
+<link as="style" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&amp;family=Exo+2:wght@300;400;600;700&amp;display=swap" rel="preload"/>
 
-        .minimap-wrap {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-        }
-
-        .hud-minimap {
-            width: 180px;
-            height: 180px;
-            background: rgba(0, 20, 40, 0.85);
-            border: 2px solid rgba(100, 200, 255, 0.4);
-            border-radius: 50%;
-            position: relative;
-            backdrop-filter: blur(15px);
-            margin-bottom: 10px;
-        }
-
-        .minimap-hud {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .pill {
-            background: rgba(0, 20, 40, 0.9);
-            border: 1px solid rgba(100, 200, 255, 0.3);
-            border-radius: 15px;
-            padding: 4px 8px;
-            color: #64c8ff;
-            font-family: 'Orbitron', monospace;
-            font-size: 11px;
-            text-align: center;
-            backdrop-filter: blur(10px);
-        }
-
-        .hud-vitals {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 20px;
-        }
-
-        .progress-container {
-            width: 150px;
-            height: 20px;
-            background: rgba(0, 20, 40, 0.8);
-            border: 1px solid rgba(100, 200, 255, 0.3);
-            border-radius: 10px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .progress-bar {
-            height: 100%;
-            border-radius: 10px;
-            position: relative;
-            transition: width 0.3s ease;
-        }
-
-        .health-bar { background: linear-gradient(90deg, #ff4757, #ff6b7a); }
-        .mana-bar { background: linear-gradient(90deg, #3742fa, #5352ed); }
-        .stamina-bar { background: linear-gradient(90deg, #ffa502, #ffb340); }
-        .xp-bar { background: linear-gradient(90deg, #2ed573, #7bed9f); }
-
-        .progress-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-family: 'Orbitron', monospace;
-            font-size: 10px;
-            color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-        }
-
-        .hud-label {
-            color: #64c8ff;
-            font-family: 'Orbitron', monospace;
-            font-size: 12px;
-            margin-bottom: 4px;
-        }
-
-        .notification-area {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            max-width: 300px;
-        }
-
-        .notification {
-            background: rgba(0, 20, 40, 0.95);
-            border: 1px solid rgba(100, 200, 255, 0.3);
-            border-left: 3px solid #64c8ff;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 8px;
-            color: white;
-            font-family: 'Exo 2', sans-serif;
-            font-size: 14px;
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-    </style>
-</head>
+<link href="./src/ui/design-system.css" rel="stylesheet"/><link href="./hud.css" rel="stylesheet"/><link href="./src/ui/mainMenu.css" rel="stylesheet"/></head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loading-screen">
-        <div class="loading-logo">METAMORPHOSIS</div>
-        <div class="loading-bar">
-            <div class="loading-progress" id="loading-progress"></div>
-        </div>
-        <p class="loading-message" id="loading-message">
+<!-- Loading Screen -->
+<div id="loading-screen">
+<div class="loading-logo">METAMORPHOSIS</div>
+<div class="loading-bar">
+<div class="loading-progress" id="loading-progress"></div>
+</div>
+<p class="loading-message" id="loading-message">
             Inizializzazione della simulazione biologica...
         </p>
-    </div>
-
-    <!-- Canvas 3D -->
-    <canvas id="three-canvas"></canvas>
-    
-    <!-- HUD Overlay -->
-    <div id="hud-overlay">
-        <!-- TOP CENTER - INTERACTION PROMPTS -->
-        <div class="interaction-wrap">
-            <div id="interaction-prompts" class="interaction-prompt" hidden>
-                <span id="interaction-key" aria-label="Tasto di interazione">E</span>
-                <span id="interaction-text">Interagisci</span>
-            </div>
-        </div>
-
-        <!-- TOP RIGHT - MINIMAP & INFO -->
-        <div class="minimap-wrap">
-            <div class="hud-minimap minimap-viewport" role="img" aria-label="Minimappa del mondo">
-                <div class="compass" aria-label="Bussola">N</div>
-                <div class="minimap-grid">
-                    <div class="minimap-heading" aria-hidden="true"></div>
-                </div>
-            </div>
-
-            <!-- Pills informative -->
-            <div class="minimap-hud">
-                <div class="pill" id="mm-enemies" aria-label="Nemici nelle vicinanze">🎯 0</div>
+</div>
+<!-- Canvas 3D -->
+<canvas id="three-canvas"></canvas>
+<!-- HUD Overlay -->
+<div id="hud-overlay">
+<!-- TOP CENTER - INTERACTION PROMPTS -->
+<div class="interaction-wrap">
+<div class="interaction-prompt" hidden="" id="interaction-prompts">
+<span aria-label="Tasto di interazione" id="interaction-key">E</span>
+<span id="interaction-text">Interagisci</span>
+</div>
+</div>
+<!-- TOP RIGHT - MINIMAP & INFO -->
+<div class="minimap-wrap">
+<div class="hud-minimap minimap-viewport" role="img">
+<div class="minimap-grid">
+<div aria-hidden="true" class="minimap-heading"></div>
+</div>
+</div>
+<!-- Pills informative -->
+<div class="minimap-hud">
+<div aria-label="Nemici nelle vicinanze" class="pill" id="mm-enemies">🎯 0</div>
+<!-- Tempo di gioco, Coordinate, Livello 
                 <div class="pill" id="mm-time" aria-label="Tempo di gioco">⏰ --:--</div>
-                <div class="pill" id="mm-coords" aria-label="Coordinate giocatore">📍 0,0,0</div>
-                <div class="pill" id="mm-level" aria-label="Livello del giocatore">🧬 LVL 1</div>
-            </div>
-        </div>
-
-        <!-- BOTTOM CENTER - VITALS -->
-        <div class="hud-vitals" role="region" aria-label="Statistiche vitali">
-            <!-- Health -->
-            <div>
-                <div class="hud-label">❤️ Salute</div>
-                <div class="progress-container" role="progressbar" aria-label="Salute" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar health-bar" id="health-bar" style="width: 85%;">
-                        <div class="progress-text" id="health-text">850 / 1000</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Mana -->
-            <div>
-                <div class="hud-label">💙 Mana</div>
-                <div class="progress-container" role="progressbar" aria-label="Mana" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar mana-bar" id="mana-bar" style="width: 60%;">
-                        <div class="progress-text" id="mana-text">300 / 500</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Stamina -->
-            <div>
-                <div class="hud-label">⚡ Stamina</div>
-                <div class="progress-container" role="progressbar" aria-label="Stamina" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar stamina-bar" id="stamina-bar" style="width: 40%;">
-                        <div class="progress-text" id="stamina-text">40 / 100</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Experience -->
-            <div>
-                <div class="hud-label">🧬 Esperienza</div>
-                <div class="progress-container" role="progressbar" aria-label="Esperienza" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar xp-bar" id="xp-bar" style="width: 0%;">
-                        <div class="progress-text" id="xp-text">0 / 100</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- NOTIFICATIONS -->
-        <div class="notification-area" id="notifications" role="log" aria-live="polite" aria-label="Notifiche di gioco">
-            <!-- Le notifiche vengono aggiunte dinamicamente -->
-        </div>
-    </div>
-
-    <!-- Scripts -->
-    <script>
+                <div class="pill" id="mm-coords" aria-label="Coordinate giocatore">📍 0,0,0</div> 
+                
+                -->
+<div aria-label="Livello del giocatore" class="pill" id="mm-level">🧬 LVL 1</div>
+</div>
+</div>
+<!-- BOTTOM CENTER - VITALS -->
+<div aria-label="Statistiche vitali" class="hud-vitals" role="region">
+<!-- Health -->
+<div>
+<div class="hud-label">❤️ Salute</div>
+<div aria-label="Salute" aria-valuemax="100" aria-valuemin="0" aria-valuenow="85" class="progress-container" role="progressbar">
+<div class="progress-bar health-bar" id="health-bar" style="width: 85%;">
+<div class="progress-text" id="health-text">850 / 1000</div>
+</div>
+</div>
+</div>
+<!-- Mana -->
+<div>
+<div class="hud-label">💙 Mana</div>
+<div aria-label="Mana" aria-valuemax="100" aria-valuemin="0" aria-valuenow="60" class="progress-container" role="progressbar">
+<div class="progress-bar mana-bar" id="mana-bar" style="width: 60%;">
+<div class="progress-text" id="mana-text">300 / 500</div>
+</div>
+</div>
+</div>
+<!-- Stamina -->
+<div>
+<div class="hud-label">⚡ Stamina</div>
+<div aria-label="Stamina" aria-valuemax="100" aria-valuemin="0" aria-valuenow="40" class="progress-container" role="progressbar">
+<div class="progress-bar stamina-bar" id="stamina-bar" style="width: 40%;">
+<div class="progress-text" id="stamina-text">40 / 100</div>
+</div>
+</div>
+</div>
+<!-- Experience -->
+<div>
+<div class="hud-label">🧬 Esperienza</div>
+<div aria-label="Esperienza" aria-valuemax="100" aria-valuemin="0" aria-valuenow="0" class="progress-container" role="progressbar">
+<div class="progress-bar xp-bar" id="xp-bar" style="width: 0%;">
+<div class="progress-text" id="xp-text">0 / 100</div>
+</div>
+</div>
+</div>
+</div>
+<!-- NOTIFICATIONS -->
+<div aria-label="Notifiche di gioco" aria-live="polite" class="notification-area" id="notifications" role="log">
+<!-- Le notifiche vengono aggiunte dinamicamente -->
+</div>
+</div>
+<!-- Scripts -->
+<script>
         // SISTEMA DI LOADING CORRETTO - Versione Fissa
         console.log('[Loading] Inizializzazione sistema di caricamento...');
         
@@ -470,6 +236,6 @@
             }
 
     </script>
-<script type="module" src="./src/main.js"></script>
+<script src="./src/main.js" type="module"></script>
 </body>
 </html>

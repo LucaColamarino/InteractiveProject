@@ -63,14 +63,7 @@ const mathUtils = {
   toRadians: (degrees) => degrees * Math.PI / 180,
   
   toDegrees: (radians) => radians * 180 / Math.PI,
-  
-  // Converti direzione cardinale
-  getCardinalDirection: (degrees) => {
-    const normalized = ((degrees % 360) + 360) % 360;
-    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    const index = Math.round(normalized / 45) % 8;
-    return directions[index];
-  }
+
 };
 
 // Sistema animazioni avanzate
@@ -255,7 +248,7 @@ function updateRadarSystem(player, enemies, camera) {
     
     // Converti a coordinate radar (North-Up)
     // +X = Est (destra), +Z = Nord (su)
-    const radarX = (deltaX / radar.range) * maxRadius;
+    const radarX = (-deltaX / radar.range) * maxRadius;
     const radarY = (-deltaZ / radar.range) * maxRadius; // -Z perché schermo Y cresce verso il basso
     
     // Clamp al bordo circolare
@@ -312,17 +305,9 @@ function updateRadarSystem(player, enemies, camera) {
   // --- AGGIORNA FRECCIA DIREZIONE ---
   if (radar.headingArrow) {
     radar.headingArrow.style.transform = `translate(-50%, -60%) rotate(${-yawDegrees}deg)`;
-    radar.headingArrow.setAttribute('aria-label', `Direzione: ${mathUtils.getCardinalDirection(yawDegrees)}`);
   }
   
-  // --- AGGIORNA BUSSOLA ---
-  if (elements.compass) {
-    const cardinalDirection = mathUtils.getCardinalDirection(yawDegrees);
-    if (elements.compass.textContent !== cardinalDirection) {
-      elements.compass.textContent = cardinalDirection;
-      animations.pulseElement(elements.compass, 1.1, 300);
-    }
-  }
+
 }
 
 // Sistema notifiche avanzato
