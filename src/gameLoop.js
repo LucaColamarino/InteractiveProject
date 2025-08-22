@@ -4,29 +4,25 @@ import { updateCamera } from './player/cameraFollow.js';
 import { changeForm } from './player/formManager.js';
 import { updateWater, terrainMaterial, updateSunPosition } from './map/map.js';
 import { updateEnemies, getEnemies } from './controllers/npcController.js';
-import { checkTransformationAltars } from './systems/pickupSystem.js';
 import { sun, moon } from './graphics/shadowManager.js';
 import Stats from 'stats.js';
 import { hudManager } from './ui/hudManager.js';
 import { updateCampfires } from './objects/campfire.js';
 import { setupInput, pumpActions } from './systems/InputSystem.js';
 import { AnimationSystem } from './systems/AnimationSystem.js';
-import { ActionBus } from './core/ActionBus.js';
 import { interactionManager } from './systems/interactionManager.js';
 import { updateChests } from './objects/chest.js';
 import { updateEnvironment } from './spawners/vegetationSpawner.js';
 import { updatetorchs } from './objects/torch.js';
 import { updateFires } from './particles/FireParticleSystem.js';
 import { LevelSystem } from './systems/LevelSystem.js';
+import { gameManager } from './gameManager.js';
 
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 const clock = new THREE.Clock();
 
-export let player = null;
-let controller = null;
-let animSys = null;
 
 // === XP SYSTEM (single source of truth) ===
 const STORAGE_KEY = 'player_xp';
@@ -87,26 +83,23 @@ function initXP() {
 
 async function handleFormChange(formName) {
   const result = await changeForm(formName);
-  player = result.player;
-  controller = result.controller;
-  animSys = new AnimationSystem(player.anim, player.state);
+  gameManager.player = result.player;
+  gameManager.controller = result.controller;
+  animSys = new AnimationSystem(result.player.anim, result.player.state);
 }
 
 export function startLoop(p, c) {
   console.log('[GameLoop] Starting main loop...');
-  player = p;
-  controller = c;
-  animSys = new AnimationSystem(player.anim, player.state);
+  gameManager.player = p;
+  gameManager.controller = c;
+  gameManager.animSys = new AnimationSystem(gameManager.player.anim, gameManager.player.state);
 
+  const controller = gameManager.controller;
+  const player = gameManager.player;
+  const animSys = gameManager.animSys;
   // Init HUD & XP
   hudManager.init();
   initXP();
-
-  // Input bindings
-  ActionBus.on('jump_or_fly', ()=> controller?.jumpOrFly());
-  ActionBus.on('attack_primary', ()=> controller?.attack('attack'));
-  ActionBus.on('interact', ()=> { if (player) checkTransformationAltars(player, handleFormChange); });
-  ActionBus.on('sit_toggle', ()=> controller?.sitToggle());
 
   function animate() {
     stats.begin();
@@ -121,7 +114,6 @@ export function startLoop(p, c) {
     }
 
     try {
-      // Input + player
       if (controller) {
         pumpActions(controller);
         controller.update(delta);

@@ -108,6 +108,7 @@ export class MainMenu {
 
   // Show/hide overlay
   show(v) {
+    console.log(`[MainMenu] ${v ? 'Showing' : 'Hiding'} main menu`);
     this.root.style.display = v ? 'grid' : 'none';
     // Toggle Resume button after first Play
     this.btnResume.style.display = v && this._hasPlayed ? 'inline-block' : 'none';

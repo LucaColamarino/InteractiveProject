@@ -3,25 +3,18 @@ import { preloadAssets, changeForm } from './player/formManager.js';
 import { setupInput } from './systems/InputSystem.js';
 import { startLoop } from './gameLoop.js';
 import { createHeightmapTerrain, addWaterPlane, createSky } from './map/map.js';
-import { spawnWaterAltar } from './objects/altar.js';
 import { spawnAreaEnemies, setPlayerReference } from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
 import { spawnCampfireAt } from './objects/campfire.js';
 import { spawnChestAt } from './objects/chest.js';
 import { spawntorchAt } from './objects/torch.js';
 import { setFireShadowBudget } from './particles/FireParticleSystem.js';
-
-// === MENU ===
 import { MainMenu } from './ui/mainMenu.js';
+import {gameManager } from './gameManager.js';
+import {updateLoadingProgress, hideLoadingScreen, showLoadingScreen,suspendLoadingScreen} from './loading.js';
 import './ui/mainMenu.css';
 
-// =====================
-// Stato globale semplice
-// =====================
-let player = null;
-let controller = null;
-let running = false; // gioco partito
-let paused = false;  // in pausa?
+
 
 // Impostazioni condivise con il menu.
 const settings = (window.__gameSettings = {
@@ -31,45 +24,6 @@ const settings = (window.__gameSettings = {
   volume: 0.7,
 });
 
-// =====================
-// UI Loading - USA IL SISTEMA GIÀ PRESENTE IN INDEX.HTML
-// =====================
-function updateLoadingProgress(percent, message = '') {
-  // Usa le funzioni globali esposte da index.html
-  if (window.gameUI && typeof window.gameUI.updateLoadingProgress === 'function') {
-    window.gameUI.updateLoadingProgress(percent,message);
-  }
-  
-  // Aggiorna anche il messaggio se presente
-  const loadingScreen = document.getElementById('loading-screen');
-  if (loadingScreen && message) {
-    let messageEl = loadingScreen.querySelector('.loading-message');
-    if (!messageEl) {
-      messageEl = document.createElement('p');
-      messageEl.className = 'loading-message';
-      messageEl.style.cssText = 'color: #64c8ff; margin-top: 1rem; font-family: "Orbitron", monospace;';
-      loadingScreen.appendChild(messageEl);
-    }
-    messageEl.textContent = message;
-  }
-}
-
-function hideLoadingScreen() {
-  // Usa la funzione globale esposta da index.html
-  if (window.gameUI && typeof window.gameUI.hideLoadingScreen === 'function') {
-    window.gameUI.hideLoadingScreen();
-    return;
-  }
-  
-  // Fallback se le funzioni globali non sono disponibili
-  const loadingScreen = document.getElementById('loading-screen');
-  if (loadingScreen) {
-    loadingScreen.classList.add('hidden');
-    setTimeout(() => {
-      loadingScreen.style.display = 'none';
-    }, 500);
-  }
-}
 
 // =====================
 // Applicazione impostazioni del menu
@@ -94,7 +48,6 @@ function applyMenuSettings(s) {
 async function init() {
   try {
     console.log('[Main] Inizializzazione del gioco...');
-    
     // Step 1: Impostazioni (5%)
     updateLoadingProgress(5, 'Configurazione impostazioni...');
     applyMenuSettings(settings);
@@ -142,9 +95,9 @@ async function init() {
     // Step 9: Player creation (95%)
     updateLoadingProgress(95, 'Inizializzazione giocatore...');
     const result = await changeForm('human');
-    player = result.player;
-    controller = result.controller;
-    setPlayerReference(player);
+    gameManager.player = result.player;
+    gameManager.controller = result.controller;
+    setPlayerReference(gameManager.player);
     await new Promise(resolve => setTimeout(resolve, 200));
 
     // Step 10: Final setup (100%)
@@ -155,9 +108,9 @@ async function init() {
     hideLoadingScreen();
 
     // Avvia loop
-    running = true;
-    paused = false;
-    startLoop(player, controller);
+    gameManager.running = true;
+    gameManager.paused = false;
+    startLoop(gameManager.player, gameManager.controller);
 
     // Notifica che il gioco è pronto
     window.dispatchEvent(new Event('game:started'));
@@ -204,61 +157,39 @@ async function init() {
 // =====================
 // MENU: istanziazione
 // =====================
-const menu = new MainMenu({
+gameManager.menu = new MainMenu({
   onPlay: () => {
     console.log('[Main] Avvio del gioco richiesto');
-    window.gameUI?.updateLoadingProgress?.(0, 'Preparazione...');
-    window.gameUI?.showLoadingScreen?.();
-    if (!running) {
+    updateLoadingProgress?.(0, 'Preparazione...');
+    showLoadingScreen?.();
+    if (!gameManager.running) {
       init();
     } else {
-      paused = false;
+      gameManager.paused = false;
       window.dispatchEvent(new Event('game:resume'));
     }
   },
   onResume: () => {
     console.log('[Main] Resume del gioco');
-    paused = false;
+    gameManager.paused = false;
     window.dispatchEvent(new Event('game:resume'));
   },
   onQuit: () => {
     console.log('[Main] Quit richiesto - ritorno al menu');
-    paused = false;
-    running = false;
+    gameManager.paused = false;
+    gameManager.running = false;
     window.dispatchEvent(new Event('game:quit'));
   },
   getSettings: () => ({ ...settings }),
   applySettings: applyMenuSettings,
 });
-window.gameUI?.suspendLoadingScreen?.();
-// =====================
-// ESC per Pausa/Resume
-// =====================
-window.addEventListener('keydown', (e) => {
-  const isLoadingHidden = document.getElementById('loading-screen')?.style.display === 'none';
-if (e.code === 'Escape' && running && isLoadingHidden) {
-  // ...
-
-
-    paused = !paused;
-    if (paused) {
-      menu.openPause();
-      document.exitPointerLock?.();
-      window.dispatchEvent(new Event('game:pause'));
-    } else {
-      menu.show(false);
-      document.querySelector('canvas')?.requestPointerLock?.();
-      window.dispatchEvent(new Event('game:resume'));
-    }
-  }
-});
+const menu = gameManager.menu;
+suspendLoadingScreen?.();
 
 // =====================
 // Ridimensionamento
 // =====================
-window.addEventListener('resize', () => {
-  window.dispatchEvent(new Event('game:resize'));
-});
+
 
 // =====================
 // Debug: esponi funzioni globali per il debugging
@@ -270,7 +201,7 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
     hideMenu: () => menu.show(false),
     getSettings: () => ({ ...settings }),
     restartGame: () => {
-      running = false;
+      gameManager.running = false;
       paused = false;
       init();
     }

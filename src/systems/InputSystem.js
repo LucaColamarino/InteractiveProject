@@ -1,8 +1,7 @@
 // systems/InputSystem.js
 import * as THREE from 'three';
-import { ActionBus } from '../core/ActionBus.js';
 import { interactionManager } from './interactionManager.js';
-import { player } from '../gameLoop.js';
+import { gameManager } from '../gameManager.js';
 
 let _controller = null;
 let _isSetup = false;
@@ -51,26 +50,22 @@ function _onKeyDown(e) {
 
     case 'Space':
       _isJump = true;
-      ActionBus.emit('jump_or_fly');
+      _controller?.jumpOrFly()
       break;
 
     case 'KeyE':
-      console.log("pressed E");
-      interactionManager.tryInteract(player);
-      ActionBus.emit('interact');
+      interactionManager.tryInteract(gameManager.player);
       break;
 
     case 'KeyC':
-      ActionBus.emit('sit_toggle');
+      _controller?.sitToggle()
       break;
 
     case 'Digit1':
-      ActionBus.emit('attack_primary');
+      _controller?.attack('attack')
       break;
-
-    // Opzionale: tasto "L" per richiedere lock esplicitamente
-    case 'KeyL':
-      _requestPointerLock();
+    case 'Escape':
+      escape();
       break;
   }
   _recomputeMoveVec();
@@ -183,7 +178,6 @@ function _onPointerLockError() {
 export function setupInput() {
   if (_isSetup) return;
   _isSetup = true;
-
   window.addEventListener('keydown', _onKeyDown);
   window.addEventListener('keyup', _onKeyUp);
   window.addEventListener('mousedown', _onMouseDown);
@@ -191,8 +185,12 @@ export function setupInput() {
   window.addEventListener('mousemove', _onMouseMove);
   window.addEventListener('contextmenu', _onContextMenu);
 
+
   document.addEventListener('pointerlockchange', _onPointerLockChange);
   document.addEventListener('pointerlockerror', _onPointerLockError);
+  window.addEventListener('resize', () => {
+  window.dispatchEvent(new Event('game:resize'));
+  });
 
   // Tooltip minimo opzionale:
   const c = _canvasEl();
@@ -207,7 +205,7 @@ export function setupInput() {
  * Ritorna gli angoli camera per chi li usa (cameraFollow).
  */
 export function pumpActions(controller) {
-  _controller = controller || _controller;
+  _controller = gameManager.controller;
   if (_controller?.setInputState) {
     _controller.setInputState({
       moveVec: _moveVec,
@@ -224,4 +222,19 @@ export function getCameraAngles() {
 
 export function isPointerLocked() {
   return _pointerLocked;
+}
+
+function escape() {
+    if (gameManager.running) {
+      gameManager.paused = !gameManager.paused;
+      if (gameManager.paused) {
+        gameManager.menu.openPause();
+        document.exitPointerLock?.();
+        window.dispatchEvent(new Event('game:pause'));
+      } else {
+        gameManager.menu.show(false);
+        document.querySelector('canvas')?.requestPointerLock?.();
+        window.dispatchEvent(new Event('game:resume'));
+      }
+    }
 }
