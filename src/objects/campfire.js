@@ -217,6 +217,24 @@ export class Campfire {
 // -----------------------------------------
 // Helper: spawn / update / dispose in batch
 // -----------------------------------------
+
+function computeSitPosition(campfirePos, playerPos, radius = 1.2) {
+  // Direzione dal falò verso il player (se è troppo vicino/centrato, usa una direzione di default)
+  const dir = new THREE.Vector3().subVectors(playerPos, campfirePos);
+  if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
+  dir.normalize();
+
+  // Punto sul “cerchio” attorno al falò
+  const target = new THREE.Vector3().copy(campfirePos).add(dir.multiplyScalar(radius));
+
+  // Allinea alla quota del terreno
+  target.y = getTerrainHeightAt(target.x, target.z);
+
+  // Leggero rialzo per evitare compenetrazioni
+  target.y += 0.02;
+  return target;
+}
+
 export async function spawnCampfireAt(x, z, opts = {}) {
   const terrainY = getTerrainHeightAt(x, z);
   const pos = new THREE.Vector3(x, terrainY, z);
@@ -234,25 +252,40 @@ export async function spawnCampfireAt(x, z, opts = {}) {
     canInteract: (_player) => true,
     getPrompt: (controller) => {
       const sitting = controller.isSitting;
-      console.log("sitting?", sitting);
       return { key: 'E', text: sitting ? 'Stand up' : 'Sit by the fire' };
     },
     onInteract: (controller) => {
-      let player = controller.player;
+      const player = controller.player;
       if (!player) return;
+
+      const campfirePos = cf.model?.position ?? cf.position;
+
       if (controller.isSitting) {
+        // Ti alzi
         gameManager.controller?.sitToggle();
         hudManager.showNotification?.('You stand up.');
         clearCameraFocus();
       } else {
+        // Ti siedi
         gameManager.controller?.sitToggle();
         hudManager.showNotification?.('You sit by the fire.');
-        // --- fai guardare il player verso il falò ---
-        const campfirePos = cf.model?.position ?? cf.position;
-        setCameraFocus(campfirePos, { height: 0.8, stiffness: 8 }); // <-- guarda il falò
-        // prendi il modello del player
+
+        // 1) Sposta il player a distanza sicura dal falò (raggio configurabile)
+        const safeRadius = 2.0; // ~1.2–1.5m è confortevole
+        const targetPos = computeSitPosition(campfirePos, player.model.position, safeRadius);
+        player.model.position.copy(targetPos);
+
+        // 2) Ruota il player verso il falò (solo yaw)
+        const dir = new THREE.Vector3().subVectors(campfirePos, player.model.position);
+        const yaw = Math.atan2(dir.x, dir.z); // rad
+        player.model.rotation.y = yaw;
+
+        // 3) Focus camera sul falò
+        setCameraFocus(campfirePos, { height: 0.8, stiffness: 8 });
       }
     }
+
+
 
   });
 

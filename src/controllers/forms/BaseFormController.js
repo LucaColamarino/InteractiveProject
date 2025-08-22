@@ -161,7 +161,6 @@ export class BaseFormController {
 
   sitToggle() {
     this.isSitting = !this.isSitting;
-    console.log(`[FormController] isSitting = ${this.isSitting}`);
   }
 
   // === Attacco con FINESTRE DI IMPATTO CONTINUE ===

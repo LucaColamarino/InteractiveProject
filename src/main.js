@@ -220,12 +220,5 @@ window.addEventListener('error', (e) => {
   }
 });
 
-window.addEventListener('unhandledrejection', (e) => {
-  console.error('[Main] Unhandled promise rejection:', e.reason);
-  // Se siamo ancora in loading, nascondilo in caso di errore critico
-  if (document.getElementById('loading-screen')?.style.display !== 'none') {
-    hideLoadingScreen();
-  }
-});
 
 console.log('[Main] Sistema principale caricato, in attesa del menu...');

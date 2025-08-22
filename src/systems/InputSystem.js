@@ -56,7 +56,6 @@ function _onKeyDown(e) {
       break;
 
     case 'Digit1':
-      console.log('Attack');
       _controller?.attack('attack')
       break;
     case 'Escape':

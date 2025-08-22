@@ -56,13 +56,6 @@ window.addEventListener('error', (e) => {
     }
 });
 
-window.addEventListener('unhandledrejection', (e) => {
-    console.error('[Loading] Promise rejection:', e.reason);
-    if (!isGameStarted) {
-        updateLoadingProgress(0, 'Errore di inizializzazione...');
-    }
-});
-
 export function showLoadingScreen() {
     // ri-mostro il loader e consento gli aggiornamenti
     isGameStarted = false;
