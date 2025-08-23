@@ -1,7 +1,7 @@
 // systems/interactionManager.js
 import * as THREE from 'three';
 import { hudManager } from '../ui/hudManager.js';
-import { gameManager } from '../gameManager.js';
+import { gameManager } from '../managers/gameManager.js';
 
 const _registry = new Set();
 /** config */

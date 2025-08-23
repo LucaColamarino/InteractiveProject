@@ -11,10 +11,10 @@ import { spawntorchAt } from './objects/torch.js';
 import { setFireShadowBudget } from './particles/FireParticleSystem.js';
 import { InventorySystem } from './systems/inventorySystem.js';
 import { MainMenu } from './ui/mainMenu.js';
-import {gameManager } from './gameManager.js';
+import {gameManager } from './managers/gameManager.js';
 import {updateLoadingProgress, hideLoadingScreen, showLoadingScreen,suspendLoadingScreen} from './loading.js';
 import {SpawnItems} from './spawners/itemsSpawner.js';
-import { PickableManager } from './pickableManager.js';
+import { PickableManager } from './managers/pickableManager.js';
 import { scene } from './scene.js';
 import './ui/mainMenu.css';
 

@@ -16,7 +16,12 @@ import { updateEnvironment } from './spawners/vegetationSpawner.js';
 import { updatetorchs } from './objects/torch.js';
 import { updateFires } from './particles/FireParticleSystem.js';
 import { LevelSystem } from './systems/LevelSystem.js';
-import { gameManager } from './gameManager.js';
+import { gameManager } from './managers/gameManager.js';
+import { initInventoryUI } from './ui/inventoryUi.js';
+import { refreshInventoryUI } from './ui/inventoryBridge.js';
+import { wireInventoryInteractions } from './ui/inventoryInteractions.js';
+
+
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
@@ -92,6 +97,22 @@ export function startLoop(p, c) {
   gameManager.player = p;
   gameManager.controller = c;
   gameManager.animSys = new AnimationSystem(gameManager.player.anim, gameManager.player.state);
+
+  initInventoryUI();
+
+  wireInventoryInteractions();
+
+  const inv = gameManager.inventory;
+  if (inv?.onChange) inv.onChange(() => refreshInventoryUI());
+  refreshInventoryUI(); // iniziale
+
+  // esempio: popola qualcosa
+  /*
+    setGold(123);
+  setInventorySlot(0, { id: 'potion_heal', name: 'Healing Potion', qty: 3, iconText: '🧪' });
+  setInventorySlot(1, { id: 'ore_iron', name: 'Iron Ore', qty: 12, iconText: '⛏️' });
+  setEquipment('weapon', { name: 'Bronze Sword', type: 'One‑Handed', iconText: '🗡️' });
+  */
 
   const controller = gameManager.controller;
   const player = gameManager.player;

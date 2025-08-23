@@ -1,7 +1,9 @@
 // systems/InputSystem.js
 import * as THREE from 'three';
 import { interactionManager } from './interactionManager.js';
-import { gameManager } from '../gameManager.js';
+import { gameManager } from '../managers/gameManager.js';
+import { toggleInventory } from '../ui/inventoryUi.js';
+import { refreshInventoryUI } from '../ui/inventoryBridge.js';
 
 let _controller = null;
 let _isSetup = false;
@@ -53,6 +55,10 @@ function _onKeyDown(e) {
       break;
     case 'KeyE':
       interactionManager.tryInteract(gameManager.controller);
+      break;
+    case 'KeyG':
+      refreshInventoryUI();
+      toggleInventory();
       break;
 
     case 'Digit1':

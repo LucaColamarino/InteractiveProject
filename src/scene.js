@@ -1,6 +1,6 @@
 // 🔧 Updated scene.js for high-quality shadows
 import * as THREE from 'three';
-import { gameManager } from './gameManager.js';
+import { gameManager } from './managers/gameManager.js';
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa0a0a0);
 

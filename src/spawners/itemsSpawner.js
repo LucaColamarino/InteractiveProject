@@ -1,7 +1,7 @@
 
 import * as THREE from 'three';
-  import { gameManager } from "../gameManager.js";
-  import { ironSword, magicWand, bronzeHelmet } from "../items.js";
+  import { gameManager } from "../managers/gameManager.js";
+  import { ironSword, magicWand, bronzeHelmet } from "../utils/items.js";
   import { getTerrainHeightAt } from '../map/map.js';
   
   export async function SpawnItems() {

@@ -7,7 +7,7 @@ import { getTerrainHeightAt } from '../map/map.js';
 import { spawnFire } from '../particles/FireParticleSystem.js';
 import { interactionManager } from '../systems/interactionManager.js';
 import { hudManager } from '../ui/hudManager.js';
-import { gameManager } from '../gameManager.js';
+import { gameManager } from '../managers/gameManager.js';
 import { setCameraFocus, clearCameraFocus} from '../player/cameraFollow.js';
 
 const loader = new FBXLoader();
