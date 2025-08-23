@@ -41,6 +41,9 @@ function ensureLightPool(scene, size = 8) {
   return __sharedLightPool;
 }
 
+// ---------- easing per la scale-in ----------
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
 /* ----------------------------- WorldPickup ----------------------------- */
 export class WorldPickup {
   constructor(opts = {}) {
@@ -67,6 +70,13 @@ export class WorldPickup {
     this._lightNear   = opts.lightNear ?? 1.15;
     this._lightFar    = opts.lightFar ?? 0.75;
 
+    // ---- parametri scale-in (generali) ----
+    this._scaleInEnabled = opts.scaleInEnabled ?? true;   // ON di default
+    this._scaleInFrom    = Math.max(0.01, opts.scaleInFrom ?? 0.1);
+    this._scaleInDur     = Math.max(0.01, opts.scaleInDuration ?? 0.55);
+    this._scaleInT       = 0;
+    this._scaleInActive  = false;
+
     this.onPicked     = (typeof opts.onPicked === 'function') ? opts.onPicked : null;
 
     // ---- root & model ----
@@ -78,9 +88,24 @@ export class WorldPickup {
     this.model = model;
     this.root.add(model);
 
+    // applica eventuale scala o posizione passata dal chiamante
     if (opts.scale)    model.scale.copy(opts.scale);
     if (opts.position) this.root.position.copy(opts.position);
     this._baseY = this.root.position.y;
+
+    // === inizializza l'animazione di materializzazione (solo sul modello) ===
+    this._scaleTarget = this.model.scale.clone();
+    if (this._scaleInEnabled) {
+      // parte piccolo -> scala target
+      const s = this._scaleInFrom;
+      this.model.scale.set(
+        this._scaleTarget.x * s,
+        this._scaleTarget.y * s,
+        this._scaleTarget.z * s
+      );
+      this._scaleInT = 0;
+      this._scaleInActive = true;
+    }
 
     // ---- ring (materiale per-istanza per colore dinamico) ----
     this.ring = null;
@@ -100,7 +125,7 @@ export class WorldPickup {
     this._light = null;
     if (this._enableLight && this.scene) {
       const pool = ensureLightPool(this.scene, opts.lightPoolSize ?? 8);
-      this._light = pool.acquire();   // se finisce, semplicemente non illumina
+      this._light = pool.acquire();               // se finisce, semplicemente non illumina
       if (this._light) this._light.intensity = this._lightFar; // livello base
     }
 
@@ -111,13 +136,17 @@ export class WorldPickup {
     this._lastInRange = false;
     this._worldPos = new THREE.Vector3(); // riuso per posizionare la luce
   }
+static warmLightPool(scene, size = 8) {
+  // forza la creazione del LightPool subito (non al primo spawn)
+  ensureLightPool(scene, size);
+}
 
   // === API per interactionManager ===
   getWorldPosition(out) { return out ? out.copy(this.root.position) : this.root.position; }
   canInteract() { return !this._dead; }
   getPrompt() {
-    const label = this.item?.label ?? this.item?.id ?? 'Oggetto';
-    return { key: 'E', text: `Raccogli ${label}` };
+    const label = this.item?.label ?? this.item?.name ?? 'Object';
+    return { key: 'E', text: `Pick up ${label}` };
   }
 
   doPickup() {
@@ -145,6 +174,23 @@ export class WorldPickup {
   update(dt, playerPos) {
     if (this._dead) return;
 
+    // --- animazione di materializzazione (scale-in sul MODEL, non sul ring) ---
+    if (this._scaleInActive) {
+      this._scaleInT += dt;
+      const k = Math.min(this._scaleInT / this._scaleInDur, 1);
+      const e = easeOutCubic(k);
+      const s = this._scaleInFrom + (1 - this._scaleInFrom) * e;
+      this.model.scale.set(
+        this._scaleTarget.x * s,
+        this._scaleTarget.y * s,
+        this._scaleTarget.z * s
+      );
+      if (k >= 1) {
+        this.model.scale.copy(this._scaleTarget); // chiusura precisa
+        this._scaleInActive = false;
+      }
+    }
+
     // animazioni leggere
     this._t += dt;
     if (this._hover) {
@@ -159,7 +205,7 @@ export class WorldPickup {
     const inRange = d2 <= this._r2;
 
     if (inRange !== this._lastInRange) {
-      if (this.ring)  this.ring.material.color.set(inRange ? this._ringNear : this._ringFar);
+      if (this.ring)   this.ring.material.color.set(inRange ? this._ringNear : this._ringFar);
       if (this._light) this._light.intensity = inRange ? this._lightNear : this._lightFar;
       this._lastInRange = inRange;
     }

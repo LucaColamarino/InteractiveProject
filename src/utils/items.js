@@ -15,10 +15,27 @@ export const magicWand = new WeaponItem({
   meta: { damage: 8, bonus: '+mana', rarity: 'rare' }
 });
 
-export const bronzeHelmet = new HelmetItem({
-  id: 'helmet_bronze_01',
+export const ironHelmet = new HelmetItem({
+  id: 'helmet_iron_01',
   name: 'Bronze Helmet',
-  modelPath: '/models/pickups/bronze_helmet.fbx',
+  modelPath: '/models/pickups/iron_helmet.fbx',
   meshPrefix: 'helmet',
   meta: { armor: 5 }
 });
+
+export const ironShield = new HelmetItem({
+  id: 'shield_iron_01',
+  name: 'Iron Shield',
+  modelPath: '/models/pickups/iron_shield.fbx',
+  meshPrefix: 'shield',
+  meta: { armor: 5 }
+});
+
+export const allItems = [ironSword, magicWand, ironHelmet,ironShield];
+
+export function getRandomItem() {
+  
+  const index = Math.floor(Math.random() * allItems.length);
+  console.log("getRandomItem:", allItems[index].name);
+  return allItems[index];
+}

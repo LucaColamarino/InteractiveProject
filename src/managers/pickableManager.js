@@ -5,12 +5,19 @@ import { WorldPickup } from '../objects/worldPickup.js';
 import { interactionManager } from '../systems/interactionManager.js';
 import { hudManager } from '../ui/hudManager.js';
 
+function _hasSkinnedMesh(root) {
+  let found = false;
+  root.traverse(o => { if (o.isSkinnedMesh) found = true; });
+  return found;
+}
+
 export class PickableManager {
   constructor({
     scene,
     inventory = null,     // se passato, aggiunge automaticamente all'inventario
     onPickup = null,      // callback(payload, item)
-    enableLight = true,   // ⬅️ allineato a WorldPickup
+    enableLight = true,   // allineato a WorldPickup
+    lightPoolSize = 8, 
   } = {}) {
     this.scene = scene;
     this.inventory = inventory;
@@ -18,12 +25,25 @@ export class PickableManager {
     this.enableLight = enableLight;
 
     this.loader = new FBXLoader();
-    this.itemsInWorld = []; // WorldPickup[]
+    this.itemsInWorld = [];
+    this.lightPoolSize = lightPoolSize;
+    // ---- cache prefab per evitare reload/parse ad ogni spawn ----
+    this.modelCache = new Map();   // path -> prefab normalizzato pronto da clonare
+    this._didFirstSpawn = false;   // se vuoi applicare deferral solo al primo spawn
+    try { WorldPickup.warmLightPool?.(this.scene, this.lightPoolSize); } catch {}
   }
 
+  // Carica un FBX, lo normalizza UNA volta, e mette in cache un "prefab" pronto.
   async _loadModel(path) {
-    const model = await this.loader.loadAsync(path);
-    model.traverse(o => {
+    if (this.modelCache.has(path)) {
+      const prefab = this.modelCache.get(path);
+      return prefab.clone(true);
+    }
+
+    const raw = await this.loader.loadAsync(path);
+
+    // setup base (shadow, emissive "safe")
+    raw.traverse(o => {
       if (o.isMesh) {
         o.castShadow = true;
         o.receiveShadow = true;
@@ -31,80 +51,116 @@ export class PickableManager {
       }
     });
 
-    // scala "comoda" e appoggia a y=0
-    const box = new THREE.Box3().setFromObject(model);
-    const size = new THREE.Vector3();
-    box.getSize(size);
+    // normalizza scala a un'altezza target (~0.9m) e appoggia a y=0
+    const box = new THREE.Box3().setFromObject(raw);
+    const size = new THREE.Vector3(); box.getSize(size);
     const targetHeight = 0.9;
     const h = Math.max(size.y, 1e-3);
     const s = targetHeight / h;
-    model.scale.setScalar(s);
+    raw.scale.setScalar(s);
 
-    const box2 = new THREE.Box3().setFromObject(model);
-    model.position.y -= box2.min.y;
+    const box2 = new THREE.Box3().setFromObject(raw);
+    raw.position.y -= box2.min.y;
 
-    return model;
+    // "fissa" i world matrices per clonazioni pulite
+    raw.updateMatrixWorld(true);
+
+    // se il modello è skinnato, fai un clone profondo come prefab (per sicurezza)
+    const prefab = _hasSkinnedMesh(raw) ? raw.clone(true) : raw;
+
+    // metti in cache il prefab
+    this.modelCache.set(path, prefab);
+
+    // ritorna una copia per l'istanza corrente
+    return prefab.clone(true);
+  }
+
+  // Precarica una lista di item o di path per eliminare hitch al primo spawn
+  async prewarm(itemsOrPaths = []) {
+    const paths = itemsOrPaths.map(x => typeof x === 'string' ? x : x?.modelPath).filter(Boolean);
+    const unique = [...new Set(paths)];
+    await Promise.all(unique.map(p => this._loadModel(p).catch(() => {})));
+
+    try { WorldPickup.warmLightPool?.(this.scene, this.lightPoolSize); } catch {}
   }
 
   /**
    * Spawna un GameItem nel mondo come pickup e lo registra all'interactionManager.
    * @param {GameItem} item
    * @param {THREE.Vector3} position
-   * @param {Object} opts { autoPickup, pickupRadius, enableLight, hover, rotate, ... }
+   * @param {Object} opts { autoPickup, pickupRadius, enableLight, hover, rotate, enableRing, ... }
+   * @returns {Promise<WorldPickup>}
    */
-  async spawnItem(item, position, opts = {}) {
+  spawnItem(item, position, opts = {}) {
     const {
-      autoPickup = false,         // default: manuale con "E"
+      autoPickup = false,
       pickupRadius = 1.5,
       enableLight = this.enableLight,
       hover = true,
       rotate = true,
+      enableRing = true,
     } = opts;
-    position.y+=0.6;
-    const model = await this._loadModel(item.modelPath);
-    const pickup = new WorldPickup({
-      scene: this.scene,
-      item,
-      model,
-      position,
-      autoPickup,
-      pickupRadius,
-      enableLight,
-      hover,
-      rotate,
-      onPicked: (payload, gameItem) => {
-        if (this.inventory?.addItem) this.inventory.addItem(payload);
-        if (typeof this.onPickup === 'function') this.onPickup(payload, gameItem);
-        hudManager.showNotification?.(`+ ${gameItem?.label ?? gameItem?.id ?? 'Item'}`);
-      }
+
+    return new Promise((resolve) => {
+      const doSpawn = async () => {
+        const pos = position.clone();
+        pos.y += 0.6; // piccolo lift per evitare compenetrazioni con il terreno
+
+        const model = await this._loadModel(item.modelPath);
+
+        const pickup = new WorldPickup({
+          scene: this.scene,
+          item,
+          model,
+          position: pos,
+          autoPickup,
+          pickupRadius,
+          enableLight,
+          hover,
+          rotate,
+          enableRing,
+          onPicked: (payload, gameItem) => {
+            // invio a inventario + callback utente
+            try { this.inventory?.addItem && this.inventory.addItem(payload); } catch {}
+            try { typeof this.onPickup === 'function' && this.onPickup(payload, gameItem); } catch {}
+            hudManager.showNotification?.(`+ ${gameItem?.label ?? gameItem?.id ?? 'Item'}`);
+          }
+        });
+
+        // Registrazione interazione "E"
+        const interactable = {
+          getWorldPosition: out => pickup.getWorldPosition(out),
+          canInteract: () => pickup.canInteract(),
+          getPrompt: () => pickup.getPrompt(),
+          onInteract: () => {
+            pickup.doPickup();
+            interactionManager.unregister(interactable);
+          },
+        };
+        interactionManager.register(interactable);
+
+        // cleanup automatico quando il pickup "muore"
+        const removeOnDead = () => {
+          if (pickup.isDead) {
+            const idx = this.itemsInWorld.indexOf(pickup);
+            if (idx >= 0) this.itemsInWorld.splice(idx, 1);
+            interactionManager.unregister(interactable);
+          }
+        };
+
+        this.itemsInWorld.push(pickup);
+        pickup._onDeadCheck = removeOnDead;
+
+        resolve(pickup);
+      };
+
+      // Deferral: sposta la creazione al prossimo frame per evitare hitch nel frame del trigger
+      requestAnimationFrame(doSpawn);
+
+      // Se preferisci solo al primo spawn:
+      // if (!this._didFirstSpawn) { this._didFirstSpawn = true; requestAnimationFrame(doSpawn); }
+      // else { doSpawn(); }
     });
-
-    // --- registra l'interactable per il tasto E ---
-    const interactable = {
-      getWorldPosition: out => pickup.getWorldPosition(out),
-      canInteract: () => pickup.canInteract(),
-      getPrompt: () => pickup.getPrompt(),
-      onInteract: (controller) => {
-        pickup.doPickup();
-        interactionManager.unregister(interactable);
-      },
-    };
-    interactionManager.register(interactable);
-
-    // cleanup automatico quando muore
-    const removeOnDead = () => {
-      if (pickup.isDead) {
-        const idx = this.itemsInWorld.indexOf(pickup);
-        if (idx >= 0) this.itemsInWorld.splice(idx, 1);
-        interactionManager.unregister(interactable);
-      }
-    };
-
-    this.itemsInWorld.push(pickup);
-    // piccola guardia in update globale
-    pickup._onDeadCheck = removeOnDead;
-
-    return pickup;
   }
 
   /** Da chiamare nel game loop */
@@ -120,8 +176,8 @@ export class PickableManager {
     const res = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const pos = positions[i];
-      const opt = perItemOptions[item.id] || {};
+      const pos  = positions[i];
+      const opt  = perItemOptions[item.id] || {};
       res.push(await this.spawnItem(item, pos, opt));
     }
     return res;

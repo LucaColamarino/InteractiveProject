@@ -13,10 +13,10 @@ import { InventorySystem } from './systems/inventorySystem.js';
 import { MainMenu } from './ui/mainMenu.js';
 import {gameManager } from './managers/gameManager.js';
 import {updateLoadingProgress, hideLoadingScreen, showLoadingScreen,suspendLoadingScreen} from './loading.js';
-import {SpawnItems} from './spawners/itemsSpawner.js';
 import { PickableManager } from './managers/pickableManager.js';
 import { scene } from './scene.js';
 import './ui/mainMenu.css';
+import { allItems } from './utils/items.js';
 
 
 
@@ -66,6 +66,7 @@ async function init() {
       usePointLight: true,
       interactKey: 'KeyE',             // premi E per pickup manuale (se autoPickup=false)
     });
+      gameManager.pickableManager.prewarm(allItems);
     console.log('[Main] Inizializzazione del gioco...');
     // Step 1: Impostazioni (5%)
     updateLoadingProgress(5, 'Configurazione impostazioni...');
@@ -94,8 +95,6 @@ async function init() {
     // Step 6: Vegetation (70%)
     updateLoadingProgress(70, 'Popolamento vegetazione...');
     await populateVegetation();
-
-    await SpawnItems();
     
     // Step 7: NPCs (80%)
     updateLoadingProgress(80, 'Spawn nemici...');
@@ -106,11 +105,12 @@ async function init() {
     updateLoadingProgress(90, 'Posizionamento oggetti...');
     spawnCampfireAt(0, 0);
     spawntorchAt(30, 15);
-    spawntorchAt(17, -20);
+    spawntorchAt(17, 20);
     spawntorchAt(-20, -15);
-    spawntorchAt(3, 13);
-    spawntorchAt(5, 2);
-    spawnChestAt(6, 6);
+    spawnChestAt(6, 6);    
+    //spawnChestAt(6, -6);
+    //spawnChestAt(-6, -6);
+    //spawnChestAt(-6, 6);
     
     // spawnWaterAltar(); // se lo vuoi attivo
 
