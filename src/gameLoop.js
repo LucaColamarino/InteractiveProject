@@ -1,14 +1,13 @@
 import * as THREE from 'three';
 import { renderer, scene, camera } from './scene.js';
 import { updateCamera } from './player/cameraFollow.js';
-import { changeForm } from './player/formManager.js';
 import { updateWater, terrainMaterial, updateSunPosition } from './map/map.js';
 import { updateEnemies, getEnemies } from './controllers/npcController.js';
 import { sun, moon } from './graphics/shadowManager.js';
 import Stats from 'stats.js';
-import { hudManager } from './ui/hudManager.js';
-import { updateCampfires } from './objects/campfire.js';
-import { setupInput, pumpActions } from './systems/InputSystem.js';
+import {hudManager } from './ui/hudManager.js';
+import {updateCampfires } from './objects/campfire.js';
+import {pumpActions } from './systems/InputSystem.js';
 import { AnimationSystem } from './systems/AnimationSystem.js';
 import { interactionManager } from './systems/interactionManager.js';
 import { updateChests } from './objects/chest.js';
@@ -84,38 +83,18 @@ function initXP() {
   // Se in futuro emetti eventi:
   // ActionBus.on('enemy:defeated', ({ xp: gain = 20 } = {}) => window.giveXP(gain));
 }
-
-async function handleFormChange(formName) {
-  const result = await changeForm(formName);
-  gameManager.player = result.player;
-  gameManager.controller = result.controller;
-  animSys = new AnimationSystem(result.player.anim, result.player.state);
-}
-
-export function startLoop(p, c) {
+export function startLoop(c) {
   console.log('[GameLoop] Starting main loop...');
-  gameManager.player = p;
   gameManager.controller = c;
-  gameManager.animSys = new AnimationSystem(gameManager.player.anim, gameManager.player.state);
+  gameManager.animSys = new AnimationSystem(gameManager.controller.player.anim, gameManager.controller.player.state);
 
   initInventoryUI();
-
   wireInventoryInteractions();
-
   const inv = gameManager.inventory;
   if (inv?.onChange) inv.onChange(() => refreshInventoryUI());
-  refreshInventoryUI(); // iniziale
-
-  // esempio: popola qualcosa
-  /*
-    setGold(123);
-  setInventorySlot(0, { id: 'potion_heal', name: 'Healing Potion', qty: 3, iconText: '🧪' });
-  setInventorySlot(1, { id: 'ore_iron', name: 'Iron Ore', qty: 12, iconText: '⛏️' });
-  setEquipment('weapon', { name: 'Bronze Sword', type: 'One‑Handed', iconText: '🗡️' });
-  */
-
+  refreshInventoryUI();
   const controller = gameManager.controller;
-  const player = gameManager.player;
+  const player = gameManager.controller.player;
   const animSys = gameManager.animSys;
   // Init HUD & XP
   hudManager.init();

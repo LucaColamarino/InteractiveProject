@@ -37,7 +37,7 @@ export class InventorySystem {
   getEquipped(slot = "weapon") { return this.equipment[slot]; }
 
   updateEquipmentVisibility() {
-    const meshes = gameManager.player?.model?.equipmentMeshes;
+    const meshes = gameManager.controller.player?.model?.equipmentMeshes;
     if (!meshes) return;
 
     // spegni tutto

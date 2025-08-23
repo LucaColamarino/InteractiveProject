@@ -5,10 +5,6 @@ import { getTerrainHeightAt } from '../map/map.js';
 import { ENTITY_CONFIG } from '../utils/entities.js';
 import { registerEnemy } from '../controllers/npcController.js';
 import { instantiateEntity, buildMixerAndActions, preloadEntity } from '../utils/entityFactory.js';
-
-export let playerRef = null;
-export function setPlayerReference(player) { playerRef = player; }
-
 // =============== Spawner ===============
 async function spawnEnemy(configKey, position, type) {
   const cfg = ENTITY_CONFIG[configKey];

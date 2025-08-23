@@ -1,6 +1,5 @@
 export let gameManager = null;
  class GameManager {
-   player = null;
    controller = null;
    running = false; 
    paused = false;

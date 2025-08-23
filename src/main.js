@@ -1,9 +1,7 @@
-import * as THREE from 'three';
-import { preloadAssets, changeForm } from './player/formManager.js';
 import { setupInput } from './systems/InputSystem.js';
 import { startLoop } from './gameLoop.js';
 import { createHeightmapTerrain, addWaterPlane, createSky } from './map/map.js';
-import { spawnAreaEnemies, setPlayerReference } from './spawners/npcSpawner.js';
+import { spawnAreaEnemies} from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
 import { spawnCampfireAt } from './objects/campfire.js';
 import { spawnChestAt } from './objects/chest.js';
@@ -17,8 +15,8 @@ import { PickableManager } from './managers/pickableManager.js';
 import { scene } from './scene.js';
 import './ui/mainMenu.css';
 import { allItems } from './utils/items.js';
-
-
+import { preloadAllEntities} from './utils/entityFactory.js';
+import {abilitiesByForm, spawnPlayer} from './player/Player.js'
 
 // Impostazioni condivise con il menu.
 const settings = (window.__gameSettings = {
@@ -75,7 +73,7 @@ async function init() {
 
     // Step 2: Asset loading (15%)
     updateLoadingProgress(15, 'Caricamento asset e risorse...');
-    await preloadAssets();
+    await preloadAllEntities(Object.keys(abilitiesByForm));
     
     // Step 3: Input setup (25%)
     updateLoadingProgress(25, 'Configurazione controlli...');
@@ -98,6 +96,7 @@ async function init() {
     
     // Step 7: NPCs (80%)
     updateLoadingProgress(80, 'Spawn nemici...');
+    
     spawnAreaEnemies();
     await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -116,12 +115,7 @@ async function init() {
 
     // Step 9: Player creation (95%)
     updateLoadingProgress(95, 'Inizializzazione giocatore...');
-    const result = await changeForm('human');
-    console.log(result.player.model.equipmentMeshes);
-
-    gameManager.player = result.player;
-    gameManager.controller = result.controller;
-    setPlayerReference(gameManager.player);
+    gameManager.controller = await spawnPlayer();
     gameManager.inventory.updateEquipmentVisibility();
     await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -135,7 +129,7 @@ async function init() {
     // Avvia loop
     gameManager.running = true;
     gameManager.paused = false;
-    startLoop(gameManager.player, gameManager.controller);
+    startLoop(gameManager.controller);
 
     // Notifica che il gioco è pronto
     window.dispatchEvent(new Event('game:started'));

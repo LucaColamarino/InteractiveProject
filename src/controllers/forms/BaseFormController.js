@@ -59,13 +59,11 @@ function _inSwordArc(playerObj, enemyObj) {
 
 export class BaseFormController {
   constructor(player, abilities) {
-    this.player = player;      // { model, anim: AnimationComponent }
+    this.player = player;
     this.abilities = abilities;
-
     this.velY = 0;
     this.isFlying = false;
     this.isOnGround = false;
-
     this.currentVelocity = new THREE.Vector3();
     this.accel = 30; this.decel = 20;
     this.isSprinting = false;

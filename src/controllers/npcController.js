@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
-import { playerRef } from '../spawners/npcSpawner.js';
+import { gameManager } from '../managers/gameManager.js';
 const enemies = [];
 const MAX_UPDATE_DISTANCE = 250;
 export function registerEnemy(enemy) {
@@ -15,6 +15,7 @@ export function getEnemies() {
 }
 
 export function updateEnemies(delta) {
+  const playerRef = gameManager.controller.player;
   for (const enemy of enemies) {
     if (!enemy.model || !playerRef?.model) continue;
     const dist = enemy.model.position.distanceTo(playerRef.model.position);
