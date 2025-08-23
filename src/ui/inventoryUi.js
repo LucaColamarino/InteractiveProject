@@ -1,6 +1,10 @@
 
 
 let _state = { inited: false, root: null, els: {} };
+let _wasPointerLocked = false;
+function _canvasEl() {
+  return document.getElementById('three-canvas') || document.querySelector('canvas');
+}
 
 export function initInventoryUI(options = {}) {
   if (_state.inited) return _state.els;
@@ -163,7 +167,7 @@ export function initInventoryUI(options = {}) {
   overlay.addEventListener('click', () => closeInventory());
 
   const wrap = el('div', { className: 'inv-wrap' });
-
+  wrap.style.display = 'none'; // <-- start hidden
   const panel = el('div', { className: 'inv-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Inventory' });
 
   // ----- LEFT: Equipment -----
@@ -279,8 +283,11 @@ function spanHint(label, key) {
 
 // ---------- API visibilità ----------
 export function openInventory() {
-  console.log('Opening inventory');
   ensureInit();
+  // ricorda stato e rilascia il lock del mouse
+  _wasPointerLocked = (document.pointerLockElement === _canvasEl());
+  document.exitPointerLock?.();
+
   _state.els.overlay.classList.add('is-open');
   _state.root.style.display = 'grid';
 }
@@ -288,7 +295,11 @@ export function closeInventory() {
   ensureInit();
   _state.els.overlay.classList.remove('is-open');
   _state.root.style.display = 'none';
+
+  // opzionale: rientra in pointer lock se lo eri prima di aprire
+  if (_wasPointerLocked) _canvasEl()?.requestPointerLock?.();
 }
+
 export function toggleInventory() {
   ensureInit();
   const isOpen = _state.root.style.display !== 'none' && _state.root.style.display !== '';
@@ -300,6 +311,13 @@ export function getInventoryEls() {
 }
 function ensureInit() {
   if (!_state.inited) initInventoryUI();
+}
+export function isInventoryOpen() {
+  ensureInit();
+  // visibile se il wrapper è grid (open) e overlay ha la classe is-open
+  const showing = _state.root.style.display !== 'none' && _state.root.style.display !== '';
+  const overlayOn = _state.els.overlay.classList.contains('is-open');
+  return showing && overlayOn;
 }
 
 // ---------- API di comodo per aggiornare UI ----------

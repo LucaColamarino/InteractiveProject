@@ -14,10 +14,43 @@ export const ENTITY_CONFIG = {
       sitIdle: '/models/animations/SittingIdle.fbx',
       standUp: '/models/animations/StandingUp.fbx',
     },
+    textures :{
+      diffuse: '/textures/knight/body_diffuse.png',
+      normal: '/textures/knight/body_normal.png',
+      specular : '/textures/knight/body_specular.png',
+    },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
   },
-    archer: {
+  archer: {
     modelPath: '/models/archer.fbx',
+    textures: {
+      clothes: {
+        diffuse: '/textures/archer/clothes_diffuse.png',
+        normal: '/textures/archer/clothes_normal.png',
+      },
+      body: {
+        diffuse: '/textures/archer/body_diffuse.png',
+        normal: '/textures/archer/body_normal.png'
+      },
+      eye: {
+        diffuse: '/textures/archer/body_diffuse.png',
+        normal: '/textures/archer/body_normal.png'
+      },
+      lashes: {
+        diffuse: '/textures/archer/body_diffuse.png',
+        normal: '/textures/archer/body_normal.png',
+        alphaMap: '/textures/archer/eyelash_alpha.png'
+      },
+      arrow: {
+        diffuse: '/textures/archer/arrow_diffuse.png',
+        normal: '/textures/archer/arrow_normal.jpg',
+        alphaMap: '/textures/archer/arrow_alpha.png'
+      },
+      bow: {
+        diffuse: '/textures/archer/bow_diffuse.jpg',
+        normal: '/textures/archer/bow_normal.jpg'
+      }
+    },
     animations: {
       idle: '/models/animations/ArcherIdle.fbx',
       walk: '/models/animations/ArcherWalk.fbx',

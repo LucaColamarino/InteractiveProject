@@ -2,16 +2,15 @@
 import * as THREE from 'three';
 import { interactionManager } from './interactionManager.js';
 import { gameManager } from '../managers/gameManager.js';
-import { toggleInventory } from '../ui/inventoryUi.js';
+import { toggleInventory, isInventoryOpen } from '../ui/inventoryUi.js';
 import { refreshInventoryUI } from '../ui/inventoryBridge.js';
 
 let _controller = null;
 let _isSetup = false;
 
-// --- Camera/orbit state ---
+// --- Camera / look state ---
 let _yaw = 0;      // gradi
 let _pitch = 15;   // gradi, clamp [-60, 60]
-const _orbitSensitivity = 0.15;
 const _lockSensitivity  = 0.10;
 
 // Pointer lock state
@@ -32,7 +31,7 @@ function _recomputeMoveVec() {
   const right   = new THREE.Vector3(Math.cos(yawRad), 0, -Math.sin(yawRad));
 
   _moveVec.set(0, 0, 0);
-  if(gameManager.controller?.isSitting) return; // se sei seduto non ti muovi
+  if (gameManager.controller?.isSitting) return; // se sei seduto non ti muovi
   if (_pressW) _moveVec.sub(forward);
   if (_pressS) _moveVec.add(forward);
   if (_pressD) _moveVec.add(right);
@@ -40,6 +39,9 @@ function _recomputeMoveVec() {
 }
 
 function _onKeyDown(e) {
+  // Se l'inventario è aperto, ignora i comandi di gioco eccetto G/Escape
+  if (isInventoryOpen?.() && e.code !== 'KeyG' && e.code !== 'Escape') return;
+
   switch (e.code) {
     case 'KeyW': _pressW = true; break;
     case 'KeyA': _pressA = true; break;
@@ -51,18 +53,19 @@ function _onKeyDown(e) {
       break;
     case 'Space':
       _isJump = true;
-      _controller?.jumpOrFly()
+      _controller?.jumpOrFly();
       break;
     case 'KeyE':
       interactionManager.tryInteract(gameManager.controller);
       break;
     case 'KeyG':
+      // Sincronizza dati reali -> UI, poi toggla UI (lo UI module gestisce anche il pointer lock)
       refreshInventoryUI();
       toggleInventory();
       break;
 
     case 'Digit1':
-      _controller?.attack('attack')
+      _controller?.attack('attack');
       break;
     case 'Escape':
       escape();
@@ -90,11 +93,10 @@ function _onKeyUp(e) {
   _recomputeMoveVec();
 }
 
-// Mouse: con pointer lock usiamo movementX/Y; senza, fallback a orbita tasto destro
-let _isOrbiting = false;
-let _lastMouseX = 0, _lastMouseY = 0;
-
 function _onMouseDown(e) {
+  // Non processare click se l'inventario è aperto
+  if (isInventoryOpen?.()) return;
+
   // Click sul canvas: se non siamo lockati, richiedi lock e NON attaccare in questo click
   if (!_pointerLocked && _isCanvasEvent(e)) {
     _suppressNextAttack = true;
@@ -102,17 +104,18 @@ function _onMouseDown(e) {
     return;
   }
 
-  if (e.button === 0) { // sinistro
+  // sinistro: attacco
+  if (e.button === 0) {
     if (_suppressNextAttack) {
       _suppressNextAttack = false;
       return;
     }
-    _controller?.attack('attack')
+    _controller?.attack('attack');
   }
 }
 
-function _onMouseUp(e) {
-  if (e.button === 2) _isOrbiting = false;
+function _onMouseUp(_e) {
+  // nessuna gestione del destro: orbit fallback rimosso
 }
 
 function _onMouseMove(e) {
@@ -121,24 +124,7 @@ function _onMouseMove(e) {
     const dy = -e.movementY || 0;
     _yaw   = (_yaw   - dx * _lockSensitivity) % 360;
     _pitch = THREE.MathUtils.clamp(_pitch - dy * _lockSensitivity, -60, 60);
-    return;
   }
-
-  // Fallback: orbita col tasto destro
-  if (_isOrbiting) {
-    const dx = e.clientX - _lastMouseX;
-    const dy = e.clientY - _lastMouseY;
-    _lastMouseX = e.clientX;
-    _lastMouseY = e.clientY;
-
-    _yaw   = (_yaw   - dx * _orbitSensitivity) % 360;
-    _pitch = THREE.MathUtils.clamp(_pitch - dy * _orbitSensitivity, -60, 60);
-  }
-}
-
-function _onContextMenu(e) {
-  // Evita menu contestuale con tasto destro per orbita
-  if (_isOrbiting || _isCanvasEvent(e)) e.preventDefault();
 }
 
 // --- Pointer Lock wiring ---
@@ -151,48 +137,70 @@ function _isCanvasEvent(e) {
 }
 
 function _requestPointerLock() {
-  const c = _canvasEl() || document.body;
-  if (document.pointerLockElement === c) return;
-  // Nota: alcune policy richiedono che la richiesta avvenga durante un input (click/tasto)
-  c.requestPointerLock?.();
+  const c = _canvasEl();
+  if (!c) return;
+  // non chiedere lock se inventario aperto o già lockato
+  if (isInventoryOpen?.() || document.pointerLockElement === c) return;
+
+  try {
+    // In Chrome questa può restituire una Promise
+    const p = c.requestPointerLock?.({ unadjustedMovement: true });
+    if (p && typeof p.catch === 'function') {
+      p.catch(err => {
+        // ESC durante/prima della richiesta genera SecurityError: lo ignoriamo
+        if (err?.name !== 'SecurityError') console.error('[Input] requestPointerLock', err);
+      });
+    }
+  } catch (err) {
+    if (err?.name !== 'SecurityError') console.error('[Input] requestPointerLock (sync)', err);
+  }
 }
 
 function _onPointerLockChange() {
-  const c = _canvasEl() || document.body;
+  const c = _canvasEl();
   _pointerLocked = (document.pointerLockElement === c);
   // Se si esce col tasto ESC, evita attacco immediato al click successivo
   if (!_pointerLocked) _suppressNextAttack = true;
+
+  // feedback cursore
+  if (c) c.style.cursor = _pointerLocked ? 'none' : 'crosshair';
 }
 
 function _onPointerLockError() {
-  console.warn('[Input] Pointer Lock error');
+  // zittisci l'errore legacy; loggare non serve
   _pointerLocked = false;
 }
 
 // --- API pubblica ---
-
 export function setupInput() {
   if (_isSetup) return;
   _isSetup = true;
+
   window.addEventListener('keydown', _onKeyDown);
   window.addEventListener('keyup', _onKeyUp);
   window.addEventListener('mousedown', _onMouseDown);
   window.addEventListener('mouseup', _onMouseUp);
   window.addEventListener('mousemove', _onMouseMove);
-  window.addEventListener('contextmenu', _onContextMenu);
-
 
   document.addEventListener('pointerlockchange', _onPointerLockChange);
   document.addEventListener('pointerlockerror', _onPointerLockError);
+
+  // reset tasti quando la finestra perde focus (evita tasti "bloccati")
+  window.addEventListener('blur', () => {
+    _pressW = _pressA = _pressS = _pressD = false;
+    _isShift = _isJump = false;
+    _recomputeMoveVec();
+  });
+
   window.addEventListener('resize', () => {
-  window.dispatchEvent(new Event('game:resize'));
+    window.dispatchEvent(new Event('game:resize'));
   });
 
   // Tooltip minimo opzionale:
   const c = _canvasEl();
   if (c) {
     c.style.cursor = 'crosshair';
-    c.title = 'Click per entrare in modalità mouse‑lock (ESC per uscire)';
+    c.title = 'Click per entrare in modalità mouse-lock (ESC per uscire)';
   }
 }
 
@@ -202,6 +210,12 @@ export function setupInput() {
  */
 export function pumpActions(controller) {
   _controller = gameManager.controller;
+
+  // se inventario aperto, azzera il movimento
+  if (isInventoryOpen?.()) {
+    _moveVec.set(0, 0, 0);
+  }
+
   if (_controller?.setInputState) {
     _controller.setInputState({
       moveVec: _moveVec,
@@ -220,23 +234,22 @@ export function setCameraAngles({ yaw = _yaw, pitch = _pitch } = {}) {
   _pitch = pitch;
 }
 
-
-
 export function isPointerLocked() {
   return _pointerLocked;
 }
 
 function escape() {
-    if (gameManager.running) {
-      gameManager.paused = !gameManager.paused;
-      if (gameManager.paused) {
-        gameManager.menu.openPause();
-        document.exitPointerLock?.();
-        window.dispatchEvent(new Event('game:pause'));
-      } else {
-        gameManager.menu.show(false);
-        document.querySelector('canvas')?.requestPointerLock?.();
-        window.dispatchEvent(new Event('game:resume'));
-      }
-    }
+  if (!gameManager.running) return;
+
+  gameManager.paused = !gameManager.paused;
+  if (gameManager.paused) {
+    gameManager.menu.openPause?.();
+    document.exitPointerLock?.();
+    window.dispatchEvent(new Event('game:pause'));
+  } else {
+    gameManager.menu.show?.(false);
+    // rientra nel lock in modo sicuro (non se inventario aperto)
+    _requestPointerLock();
+    window.dispatchEvent(new Event('game:resume'));
+  }
 }

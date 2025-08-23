@@ -1,5 +1,5 @@
 // src/ui/inventoryInteractions.js
-import { getInventoryEls } from './inventoryUI.js';
+import { getInventoryEls } from './inventoryUi.js';
 import { refreshInventoryUI } from './inventoryBridge.js';
 import { gameManager } from '../managers/gameManager.js';
 
