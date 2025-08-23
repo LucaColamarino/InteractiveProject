@@ -17,7 +17,6 @@ const cloneWarmCache = new Map();   // key -> FBX (materializzato pre-clone, opz
 function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   if (!path) return null;
   const t = textureLoader.load(path);
-  // maps di colore (albedo/diffuse) in sRGB, PBR maps (metalness/roughness/normal) in Linear
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (repeat !== 1) t.repeat.set(repeat, repeat);
@@ -25,84 +24,84 @@ function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   return t;
 }
 
-// euristiche per classificare il tipo di superficie a partire da nome materiale/mesh
-function classifySurface(matName = '', meshName = '') {
-  const m = matName.toLowerCase();
-  const n = meshName.toLowerCase();
-  const s = `${m} ${n}`;
-  if (/\b(armor|armour|helmet|helm|shield|sword|axe|mace|dagger|metal|plate|mail|gauntlet)\b/.test(s)) return 'metal';
-  if (/\b(skin|body|face|hand|head|arm|leg)\b/.test(s)) return 'skin';
-  if (/\b(cloth|fabric|shirt|pants|robe|cape|leather)\b/.test(s)) return 'cloth';
-  return 'generic';
-}
-
 /**
- * Costruisce un MeshStandardMaterial a partire da un set di mappe "diffuse/normal/alpha/specular".
- * - Non usiamo più 'skinning' nel costruttore: lo settiamo dopo (fix warning).
- * - Se presente 'specular', la usiamo come metalnessMap (euristica), con default diversi per metal/cloth/skin.
+ * Crea un MeshStandardMaterial a partire da:
+ *   { diffuse, normal, metallic, roughness, ao, opacity|alphaMap, emissive }
+ *
+ * Note:
+ * - niente specular / reflection legacy
+ * - niente heuristics basate sul nome del materiale/mesh
+ * - se mancano le mappe metallic/roughness usiamo valori di fallback
  */
-function buildStandardMaterialFromMaps(tex, { skinning = false, nameHint = '', matName = '', meshName = '' } = {}) {
-  const hasAlpha = !!tex?.alphaMap;
+function buildStandardMaterialFromMaps(
+  tex,
+  { skinning = false, nameHint = '' } = {}
+) {
+  const hasAlpha = !!(tex?.opacity || tex?.alphaMap);
 
-  // base maps
-  const map         = loadTex(tex?.diffuse, { srgb: true });
-  const normalMap   = loadTex(tex?.normal);                 // Linear
-  const alphaMap    = loadTex(tex?.alphaMap);               // Linear
-  const specularTex = loadTex(tex?.specular);               // trattata come metalnessMap euristica (Linear)
+  // mappe
+  const map          = loadTex(tex?.diffuse, { srgb: true });
+  const normalMap    = loadTex(tex?.normal);
+  const metalnessMap = loadTex(tex?.metallic);
+  const roughnessMap = loadTex(tex?.roughness);
+  const aoMap        = loadTex(tex?.ao);
+  const alphaMap     = loadTex(tex?.opacity || tex?.alphaMap);
+  const emissiveMap  = loadTex(tex?.emissive); // tipicamente grayscale; tienila Linear
 
-  // euristica per defaults
-  const surface = classifySurface(matName, meshName);
-  let metalness = 0.0;
-  let roughness = 0.7;
-
-  if (surface === 'metal') { metalness = 0.6; roughness = 0.35; }
-  else if (surface === 'cloth') { metalness = 0.0; roughness = 0.8; }
-  else if (surface === 'skin')  { metalness = 0.0; roughness = 0.55; }
-  // 'generic' lascia i default
-
-  // se abbiamo una "specular" dipinta nell'asset, riusiamola come metalnessMap (approssimazione)
-  const metalnessMap = specularTex || null;
-  if (metalnessMap) {
-    // abbassa un po’ il metalness base: la mappa farà il grosso del lavoro
-    if (surface === 'metal') metalness = Math.max(0.35, metalness * 0.8);
-    else metalness = Math.max(0.05, metalness * 0.5);
-  }
+  const metalness = tex?.metalnessValue ?? (metalnessMap ? 1.0 : 0.0);
+  const roughness = tex?.roughnessValue ?? (roughnessMap ? 0.7 : 0.45);
 
   const mat = new THREE.MeshStandardMaterial({
     map,
     normalMap,
+    metalnessMap,
+    roughnessMap,
+    aoMap,
     alphaMap,
     metalness,
     roughness,
-    metalnessMap,
+    emissiveMap,
+    emissive: emissiveMap ? new THREE.Color(0xffffff) : new THREE.Color(0x000000),
+    emissiveIntensity: emissiveMap ? 1.0 : 0.0,
     alphaTest: hasAlpha ? 0.5 : 0.0,
-    transparent: hasAlpha,
+    transparent: !!hasAlpha,
     depthWrite: hasAlpha ? false : true,
   });
-  if (skinning) mat.skinning = true; // <-- impostato DOPO (fix warning)
+  if (skinning) mat.skinning = true;
   mat.name = nameHint || mat.name || 'EntityMat';
+  if (normalMap) mat.normalMapType = THREE.TangentSpaceNormalMap;
 
-  // piccolo accent per metallo (opzionale)
-  if (surface === 'metal') {
-    mat.envMapIntensity = 1.0;
-  }
   return mat;
 }
 
 function isSimpleTexRoot(root) {
   if (!root || typeof root !== 'object') return false;
-  return ('diffuse' in root) || ('normal' in root) || ('alphaMap' in root) || ('specular' in root);
+  // riconosci un root "semplice" (un solo set di mappe)
+  return (
+    'diffuse'   in root || 'normal'   in root ||
+    'metallic'  in root || 'roughness' in root ||
+    'ao'        in root ||
+    'opacity'   in root || 'alphaMap' in root ||
+    'emissive'  in root
+  );
 }
 
+/**
+ * Matcha la voce di textures in base al nome materiale/mesh.
+ * Supporta chiavi combinate tipo "armor,helmet|shield".
+ */
 function resolveTexForNames(matName, meshName, root) {
   if (!root) return null;
   if (isSimpleTexRoot(root)) return { matchedKey: '(single)', texConfig: root };
+
   const m = (matName || '').toLowerCase();
   const n = (meshName || '').toLowerCase();
-  const keys = Object.keys(root).sort((a, b) => b.length - a.length);
+  const keys = Object.keys(root).sort((a, b) => b.length - a.length); // match più specifici prima
   for (const key of keys) {
-    const k = key.toLowerCase();
-    if (m.includes(k) || n.includes(k)) return { matchedKey: key, texConfig: root[key] };
+    const tokens = key.toLowerCase().split(/[,|]/).map(s => s.trim()).filter(Boolean);
+    if (tokens.some(tok => m.includes(tok) || n.includes(tok))) {
+      return { matchedKey: key, texConfig: root[key] };
+    }
   }
   return null;
 }
@@ -116,26 +115,22 @@ export function applyExternalMaterials(root, config) {
     const isSkinned = !!child.isSkinnedMesh;
     if (!(isMesh || isSkinned)) return;
 
-    // multilayer materials
     if (Array.isArray(child.material)) {
+      // materiali multipli
       const oldArr = child.material;
       const newArr = oldArr.map((oldMat, i) => {
         const res = resolveTexForNames(oldMat?.name, child.name, rootTex);
         if (res?.texConfig) {
-          const mat = buildStandardMaterialFromMaps(
-            res.texConfig,
-            { skinning: isSkinned, nameHint: res.matchedKey, matName: oldMat?.name, meshName: child.name }
-          );
+          const mat = buildStandardMaterialFromMaps(res.texConfig, { skinning: isSkinned, nameHint: res.matchedKey });
           if (oldMat?.transparent) {
             mat.transparent = true;
             mat.alphaTest = Math.max(mat.alphaTest, oldMat.alphaTest || 0);
           }
           return mat;
         }
-        // fallback: riusa o clona mantenendo skinning se serve
         const fallback = oldMat?.clone ? oldMat.clone() : new THREE.MeshStandardMaterial();
         if (isSkinned) fallback.skinning = true;
-        if (!fallback.name || fallback.name === '') fallback.name = oldMat?.name || `mat#${i}`;
+        if (!fallback.name) fallback.name = oldMat?.name || `mat#${i}`;
         return fallback;
       });
       if (child.geometry?.groups && child.geometry.groups.length > newArr.length) {
@@ -143,21 +138,26 @@ export function applyExternalMaterials(root, config) {
       }
       child.material = newArr;
     } else {
+      // singolo materiale
       const res = resolveTexForNames(child.material?.name, child.name, rootTex);
       if (res?.texConfig) {
-        child.material = buildStandardMaterialFromMaps(
-          res.texConfig,
-          { skinning: isSkinned, nameHint: res.matchedKey, matName: child.material?.name, meshName: child.name }
-        );
+        child.material = buildStandardMaterialFromMaps(res.texConfig, {
+          skinning: isSkinned, nameHint: res.matchedKey
+        });
       } else if (isSkinned && child.material && !child.material.skinning) {
-        // imposta skinning senza warning (clona solo se necessario)
         child.material = child.material.clone();
         child.material.skinning = true;
       }
     }
 
+    // flag comuni
     if (isSkinned && child.material && !child.material.skinning) child.material.skinning = true;
     if (isSkinned) child.frustumCulled = false;
+
+    // se c'è aoMap ma manca uv2, riusa uv1 (fallback veloce)
+    if ((child.isMesh || child.isSkinnedMesh) && child.material?.aoMap && !child.geometry.attributes.uv2) {
+      child.geometry.setAttribute('uv2', child.geometry.attributes.uv);
+    }
 
     child.castShadow = true;
     child.receiveShadow = true;
@@ -173,12 +173,12 @@ export async function preloadEntity(key) {
   const base = await fbxLoader.loadAsync(cfg.modelPath);
   baseModelCache.set(key, base);
 
-  // Prepara una versione materializzata (facoltativa) per warm-up
+  // Prepara una versione materializzata (opzionale) per warm-up
   const cloned = SkeletonUtils.clone(base);
   applyExternalMaterials(cloned, cfg);
   cloneWarmCache.set(key, cloned);
 
-  // Warm-up GPU shader compilation (opzionale ma utile)
+  // Warm-up GPU (facoltativo)
   const dummy = SkeletonUtils.clone(cloned);
   dummy.visible = false;
   if (cfg.scale) dummy.scale.copy(cfg.scale);
@@ -197,8 +197,7 @@ export async function preloadAllEntities(keys = Object.keys(ENTITY_CONFIG)) {
 }
 
 export function instantiateEntity(key) {
-  // Usa la versione warm/materializzata se presente, altrimenti clona il base
-  let source = cloneWarmCache.get(key) || baseModelCache.get(key);
+  const source = cloneWarmCache.get(key) || baseModelCache.get(key);
   if (!source) throw new Error(`Entity "${key}" non pre-caricata: chiama preloadEntity/preloadAllEntities prima.`);
 
   const cfg = ENTITY_CONFIG[key];
@@ -206,15 +205,16 @@ export function instantiateEntity(key) {
   fbx.animations = source.animations || fbx.animations;
   if (cfg?.scale) fbx.scale.copy(cfg.scale);
 
-  // Safety: se abbiamo clonato il "base" non materializzato, applica ora i materiali
   if (!cloneWarmCache.has(key)) applyExternalMaterials(fbx, cfg);
 
-  // flag comuni
   fbx.traverse(c => {
     if (c.isMesh || c.isSkinnedMesh) {
       c.castShadow = true;
       c.receiveShadow = true;
       if (c.isSkinnedMesh) c.frustumCulled = false;
+      if (c.material?.aoMap && !c.geometry.attributes.uv2) {
+        c.geometry.setAttribute('uv2', c.geometry.attributes.uv);
+      }
     }
   });
 

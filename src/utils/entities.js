@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { roughness } from 'three/tsl';
 
 export const ENTITY_CONFIG = {
   human: {
@@ -14,10 +15,18 @@ export const ENTITY_CONFIG = {
       sitIdle: '/models/animations/SittingIdle.fbx',
       standUp: '/models/animations/StandingUp.fbx',
     },
-    textures :{
-      diffuse: '/textures/knight/body_diffuse.png',
-      normal: '/textures/knight/body_normal.png',
-      specular : '/textures/knight/body_specular.png',
+    textures: {
+      armor: {
+        diffuse:  '/textures/knight/body_diffuse.png',
+        normal:   '/textures/knight/body_normal.png',
+        metallic: '/textures/knight/body_metallic.png', // <-- cambiato
+      },
+      wand: {
+        diffuse:   '/textures/knight/wand_diffuse.jpeg',
+        normal:    '/textures/knight/wand_normal.png',
+        metallic:  '/textures/knight/wand_metallic.jpeg',
+        roughness: '/textures/knight/wand_roughness.jpeg'
+      },
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
   },
