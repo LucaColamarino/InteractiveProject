@@ -14,27 +14,78 @@ const baseModelCache = new Map();   // key -> FBX (base)
 const cloneWarmCache = new Map();   // key -> FBX (materializzato pre-clone, opzionale)
 
 // --------------- Texture & material helpers ---------------
-function loadTex(path, { srgb = false } = {}) {
+function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   if (!path) return null;
   const t = textureLoader.load(path);
-  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  // maps di colore (albedo/diffuse) in sRGB, PBR maps (metalness/roughness/normal) in Linear
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if (repeat !== 1) t.repeat.set(repeat, repeat);
+  t.anisotropy = 8;
   return t;
 }
 
-function buildStandardMaterialFromMaps(tex, { skinning = false, nameHint = '' } = {}) {
+// euristiche per classificare il tipo di superficie a partire da nome materiale/mesh
+function classifySurface(matName = '', meshName = '') {
+  const m = matName.toLowerCase();
+  const n = meshName.toLowerCase();
+  const s = `${m} ${n}`;
+  if (/\b(armor|armour|helmet|helm|shield|sword|axe|mace|dagger|metal|plate|mail|gauntlet)\b/.test(s)) return 'metal';
+  if (/\b(skin|body|face|hand|head|arm|leg)\b/.test(s)) return 'skin';
+  if (/\b(cloth|fabric|shirt|pants|robe|cape|leather)\b/.test(s)) return 'cloth';
+  return 'generic';
+}
+
+/**
+ * Costruisce un MeshStandardMaterial a partire da un set di mappe "diffuse/normal/alpha/specular".
+ * - Non usiamo più 'skinning' nel costruttore: lo settiamo dopo (fix warning).
+ * - Se presente 'specular', la usiamo come metalnessMap (euristica), con default diversi per metal/cloth/skin.
+ */
+function buildStandardMaterialFromMaps(tex, { skinning = false, nameHint = '', matName = '', meshName = '' } = {}) {
   const hasAlpha = !!tex?.alphaMap;
+
+  // base maps
+  const map         = loadTex(tex?.diffuse, { srgb: true });
+  const normalMap   = loadTex(tex?.normal);                 // Linear
+  const alphaMap    = loadTex(tex?.alphaMap);               // Linear
+  const specularTex = loadTex(tex?.specular);               // trattata come metalnessMap euristica (Linear)
+
+  // euristica per defaults
+  const surface = classifySurface(matName, meshName);
+  let metalness = 0.0;
+  let roughness = 0.7;
+
+  if (surface === 'metal') { metalness = 0.6; roughness = 0.35; }
+  else if (surface === 'cloth') { metalness = 0.0; roughness = 0.8; }
+  else if (surface === 'skin')  { metalness = 0.0; roughness = 0.55; }
+  // 'generic' lascia i default
+
+  // se abbiamo una "specular" dipinta nell'asset, riusiamola come metalnessMap (approssimazione)
+  const metalnessMap = specularTex || null;
+  if (metalnessMap) {
+    // abbassa un po’ il metalness base: la mappa farà il grosso del lavoro
+    if (surface === 'metal') metalness = Math.max(0.35, metalness * 0.8);
+    else metalness = Math.max(0.05, metalness * 0.5);
+  }
+
   const mat = new THREE.MeshStandardMaterial({
-    map: loadTex(tex?.diffuse, { srgb: true }),
-    normalMap: loadTex(tex?.normal),
-    alphaMap: loadTex(tex?.alphaMap),
-    metalness: 0.1,
-    roughness: 0.9,
+    map,
+    normalMap,
+    alphaMap,
+    metalness,
+    roughness,
+    metalnessMap,
     alphaTest: hasAlpha ? 0.5 : 0.0,
     transparent: hasAlpha,
     depthWrite: hasAlpha ? false : true,
-    skinning
   });
+  if (skinning) mat.skinning = true; // <-- impostato DOPO (fix warning)
   mat.name = nameHint || mat.name || 'EntityMat';
+
+  // piccolo accent per metallo (opzionale)
+  if (surface === 'metal') {
+    mat.envMapIntensity = 1.0;
+  }
   return mat;
 }
 
@@ -65,15 +116,23 @@ export function applyExternalMaterials(root, config) {
     const isSkinned = !!child.isSkinnedMesh;
     if (!(isMesh || isSkinned)) return;
 
+    // multilayer materials
     if (Array.isArray(child.material)) {
       const oldArr = child.material;
       const newArr = oldArr.map((oldMat, i) => {
         const res = resolveTexForNames(oldMat?.name, child.name, rootTex);
         if (res?.texConfig) {
-          const mat = buildStandardMaterialFromMaps(res.texConfig, { skinning: isSkinned, nameHint: res.matchedKey });
-          if (oldMat?.transparent) { mat.transparent = true; mat.alphaTest = Math.max(mat.alphaTest, oldMat.alphaTest || 0); }
+          const mat = buildStandardMaterialFromMaps(
+            res.texConfig,
+            { skinning: isSkinned, nameHint: res.matchedKey, matName: oldMat?.name, meshName: child.name }
+          );
+          if (oldMat?.transparent) {
+            mat.transparent = true;
+            mat.alphaTest = Math.max(mat.alphaTest, oldMat.alphaTest || 0);
+          }
           return mat;
         }
+        // fallback: riusa o clona mantenendo skinning se serve
         const fallback = oldMat?.clone ? oldMat.clone() : new THREE.MeshStandardMaterial();
         if (isSkinned) fallback.skinning = true;
         if (!fallback.name || fallback.name === '') fallback.name = oldMat?.name || `mat#${i}`;
@@ -86,8 +145,12 @@ export function applyExternalMaterials(root, config) {
     } else {
       const res = resolveTexForNames(child.material?.name, child.name, rootTex);
       if (res?.texConfig) {
-        child.material = buildStandardMaterialFromMaps(res.texConfig, { skinning: isSkinned, nameHint: res.matchedKey });
+        child.material = buildStandardMaterialFromMaps(
+          res.texConfig,
+          { skinning: isSkinned, nameHint: res.matchedKey, matName: child.material?.name, meshName: child.name }
+        );
       } else if (isSkinned && child.material && !child.material.skinning) {
+        // imposta skinning senza warning (clona solo se necessario)
         child.material = child.material.clone();
         child.material.skinning = true;
       }
@@ -95,6 +158,7 @@ export function applyExternalMaterials(root, config) {
 
     if (isSkinned && child.material && !child.material.skinning) child.material.skinning = true;
     if (isSkinned) child.frustumCulled = false;
+
     child.castShadow = true;
     child.receiveShadow = true;
   });
@@ -159,7 +223,6 @@ export function instantiateEntity(key) {
 
 // --------------- Animations (uniform API) ---------------
 export function buildMixerAndActions(targetFBX, cfg) {
-  // Se hai indices, usali, altrimenti usa loadAnimations(paths)
   if (cfg?.animationIndices) {
     const mixer = new THREE.AnimationMixer(targetFBX);
     const actions = {};
