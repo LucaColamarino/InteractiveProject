@@ -3,175 +3,263 @@ import * as THREE from 'three';
 import { AttackStrategy } from './AttackStrategy.js';
 import { getEnemies, killEnemy } from '../../controllers/npcController.js';
 import { hudManager } from '../../ui/hudManager.js';
+import { MagicProjectile } from '../projectiles/magicProjectile.js';
+import { scene } from '../../scene.js';
 
-const DEFAULTS = {
-  speed: 35, cooldown: 0.45, damage: 20,
-  boltRadius: 0.5, lifetime: 2.0,
-  multishot: 1, spreadDeg: 0, homing: 0.0,
-  lockRange: 20, aimConeDeg: 18,
-  muzzleOffset: new THREE.Vector3(0, 1.3, 0.5),
+const TAG = '[WandMagicStrategy]';
+const dlog = (...a) => {
+  if (typeof window !== 'undefined' && window.__WAND_DEBUG__) console.log(TAG, ...a);
 };
 
-// Durate fade pensate per essere percettivamente “burrose”
-const FADE_IN = 0.10;
-const FADE_OUT = 0.12;
+const DEFAULTS = {
+  speed: 35,           // velocità del bolt
+  cooldown: 0.45,      // tempo tra cast
+  damage: 20,          // XP o danno per colpo
+  boltRadius: 0.5,     // raggio di collisione "soft"
+  lifetime: 2.0,       // vita del proiettile
+  multishot: 1,        // numero di bolt per cast
+  spreadDeg: 0,        // spread angolare tra i bolt
+  homing: 0.0,         // forza di homing [0..]
+  lockRange: 20,       // max distanza di auto-lock
+  aimConeDeg: 18,      // cono di auto-lock
+  muzzleOffset: new THREE.Vector3(0, 1.3, 0.5), // offset dal player
+};
+
+const isFiniteVec3 = (v) =>
+  v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
 
 export class WandMagicStrategy extends AttackStrategy {
   constructor() {
     super();
-    this.cooldown = DEFAULTS.cooldown; this._cd = 0;
-    this.speed = DEFAULTS.speed; this.damage = DEFAULTS.damage;
-    this.boltRadius = DEFAULTS.boltRadius; this.lifetime = DEFAULTS.lifetime;
-    this.multishot = DEFAULTS.multishot; this.spreadDeg = DEFAULTS.spreadDeg;
-    this.homing = DEFAULTS.homing; this.lockRange = DEFAULTS.lockRange;
-    this.aimConeDeg = DEFAULTS.aimConeDeg;
-    this.muzzleOffset = DEFAULTS.muzzleOffset.clone();
+    Object.assign(this, DEFAULTS);
 
-    this._castState = null;                // { action, clip, fired }
-    this._pool = []; this._poolSize = 24;
+    this._cd = 0;
+    this._castState = null; // { action, clip, clipName, fired }
+    this._pool = [];
+    this._poolSize = 24;
+
+    this.debug = true; // pip/linee e log (toggle globale: window.__WAND_DEBUG__)
 
     this._tmp = {
-      fwd: new THREE.Vector3(), right: new THREE.Vector3(1,0,0), up: new THREE.Vector3(0,1,0),
-      dir: new THREE.Vector3(), to: new THREE.Vector3(), muzzleWorld: new THREE.Vector3(),
-      q: new THREE.Quaternion(),
+      fwd: new THREE.Vector3(),
+      dir: new THREE.Vector3(),
+      to: new THREE.Vector3(),
+      muzzleWorld: new THREE.Vector3(),
+      qWorld: new THREE.Quaternion(),
+      qYaw: new THREE.Quaternion(),
+      upWorld: new THREE.Vector3(),
+      rightWorld: new THREE.Vector3(),
+      posWorld: new THREE.Vector3(),
     };
+
+    this._debugPips = [];
+
+    dlog('constructed with defaults', { ...DEFAULTS });
   }
 
   onEquip(controller, weaponItem) {
     const m = weaponItem?.meta || {};
-    this.speed       = m.speed       ?? this.speed;
-    this.cooldown    = m.cooldown    ?? this.cooldown;
-    this.damage      = m.damage      ?? this.damage;
-    this.boltRadius  = m.boltRadius  ?? this.boltRadius;
-    this.lifetime    = m.lifetime    ?? this.lifetime;
-    this.multishot   = m.multishot   ?? this.multishot;
-    this.spreadDeg   = m.spreadDeg   ?? this.spreadDeg;
-    this.homing      = m.homing      ?? this.homing;
-    this.lockRange   = m.lockRange   ?? this.lockRange;
-    this.aimConeDeg  = m.aimConeDeg  ?? this.aimConeDeg;
+    for (const k of Object.keys(DEFAULTS)) {
+      if (m[k] !== undefined) this[k] = m[k];
+    }
+    if (m.muzzleOffset instanceof THREE.Vector3) {
+      this.muzzleOffset.copy(m.muzzleOffset);
+    } else if (Array.isArray(m.muzzleOffset) && m.muzzleOffset.length === 3) {
+      this.muzzleOffset.set(...m.muzzleOffset);
+    }
+    if (!isFiniteVec3(this.muzzleOffset)) {
+      console.warn(`${TAG} invalid muzzleOffset meta, fallback to default`);
+      this.muzzleOffset.set(0, 1.3, 0.5);
+    }
 
-    if (m.muzzleOffset instanceof THREE.Vector3) this.muzzleOffset.copy(m.muzzleOffset);
-    else if (Array.isArray(m.muzzleOffset) && m.muzzleOffset.length === 3) this.muzzleOffset.set(...m.muzzleOffset);
-
-    this._ensurePool(controller);
+    this._ensurePool(); // usa scene globale
+    dlog('onEquip meta', m);
   }
 
-attack(controller, clipName = 'wandCast') {
-  if (controller.isAttacking || this._cd > 0) return;
+  attack(controller, clipName = 'wandCast') {
+    if (controller.isAttacking || this._cd > 0) {
+      dlog('attack blocked', { isAttacking: controller.isAttacking, cd: this._cd });
+      return false;
+    }
 
-  controller.isAttacking = true;
-  this._cd = this.cooldown;
+    if (!this._pool.length) this._ensurePool();
 
-  const actions = controller.player.anim?.actions || {};
-  const castAction = actions[clipName] || actions['attack'] || null;
-  const clip = castAction?.getClip?.();
-  const castDur = clip?.duration ?? 0.35;
+    const actions = controller.player.animator?.actions || {};
+    let action = actions[clipName] || actions['attack'] || null;
+    if (!action) {
+      const key = Object.keys(actions).find(k => k.toLowerCase().includes('attack'));
+      if (key) action = actions[key];
+    }
+    if (!action) { dlog('attack failed: no action'); return false; }
 
-  controller.lockMovementFor(castDur);
+    const chosenName = action._clipName || clipName;
+    const ok = controller.player.animator?.playAction(chosenName);
+    if (!ok) { dlog('playAction failed', chosenName); return false; }
 
-  // avvia dal direttore
-  controller.player.animator?.playAction(clipName) || controller.player.animator?.playAction('attack');
+    const clip = action.getClip?.() || null;
+    const dur  = clip?.duration ?? 0.35;
+    controller.lockMovementFor(dur);
+    controller.isAttacking = true;
+    this._cd = this.cooldown;
 
-  // memorizza stato per il timing dello spawn
-  this._castState = { action: castAction, clip, fired: false };
-}
+    this._castState = { action, clip, clipName: chosenName, fired: false };
+    dlog('attack start', { chosenName, dur, cooldown: this._cd });
+    return true;
+  }
 
   update(controller, dt) {
     if (this._cd > 0) this._cd = Math.max(0, this._cd - dt);
 
-  // fire a ~35% della clip (se esiste), altrimenti fallback immediato
-  if (this._castState?.action && this._castState.clip) {
-    const { action, clip } = this._castState;
-    const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
-    if (!this._castState.fired && frac >= 0.35) {
+    // timing & fire rispetto alla clip
+    if (this._castState?.action && this._castState.clip) {
+      const { action, clip } = this._castState;
+      const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
+      if (!this._castState.fired && frac >= 0.35) {
+        dlog('fire at frac', frac.toFixed(3));
+        this._fireBoltsNow(controller);
+        this._castState.fired = true;
+      }
+      const weight = controller.player.animator?._getActionWeight?.(this._castState.clipName) ?? 0;
+      const ended = !action.isRunning?.() || weight <= 0.001 || frac >= 0.999;
+      if (ended) {
+        dlog('attack ended', { frac: frac.toFixed(3), weight });
+        this._castState = null;
+        controller.isAttacking = false;
+      }
+    } else if (this._castState && !this._castState.fired) {
+      // nessuna clip → spara subito
+      dlog('no clip; immediate fire');
       this._fireBoltsNow(controller);
       this._castState.fired = true;
+      this._castState = null;
+      controller.isAttacking = false;
     }
-  } else if (!this._castState?.fired && controller.isAttacking) {
-    // se non c’è clip disponibile, spara subito
-    this._fireBoltsNow(controller);
-    this._castState = { fired: true };
-  }
 
-    // aggiorna proiettili (nessuna allocazione nuova)
-    const pool = this._pool, tmp = this._tmp;
-    for (let i = 0, n = pool.length; i < n; i++) {
-      const b = pool[i]; if (!b.active) continue;
+    // update proiettili
+    let activeCount = 0;
+    for (const p of this._pool) {
+      if (!p.active) continue;
+      activeCount++;
 
-      if (this.homing > 0 && b.target && b.target.alive) {
-        tmp.to.subVectors(b.target.model.position, b.mesh.position).normalize();
-        b.vel.lerp(tmp.to.multiplyScalar(this.speed), Math.min(this.homing * dt, 1));
+      if (this.homing > 0 && p.target && p.target.alive) {
+        p.steerToTarget(this.homing, dt);
       }
+      p.integrate(dt);
 
-      b.mesh.position.addScaledVector(b.vel, dt);
-      b.life -= dt;
+      const hit = p.checkCollision();
+      if (hit) {
+        dlog('projectile hit', hit.model?.uuid || hit);
+        this._onHitEnemy(hit);
+        p.deactivate();
+      }
+    }
+    if (activeCount && (Math.random() < 0.05)) dlog('active projectiles', activeCount);
 
-      const hitEnemy = this._checkCollision(b);
-      if (hitEnemy) { this._onHitEnemy(hitEnemy); this._deactivate(b); continue; }
-      if (b.life <= 0) this._deactivate(b);
+    // cleanup debug pips
+    if (this._debugPips.length) {
+      for (let i = this._debugPips.length - 1; i >= 0; i--) {
+        const o = this._debugPips[i];
+        o.life -= dt;
+        if (o.life <= 0) {
+          o.mesh.parent?.remove(o.mesh);
+          this._debugPips.splice(i, 1);
+        }
+      }
     }
   }
 
-cancel(controller) {
-  for (const b of this._pool) if (b.active) this._deactivate(b);
-  this._castState = null;
-}
-
+  cancel(controller) {
+    dlog('cancel');
+    this._castState = null;
+    controller.isAttacking = false;
+    for (const p of this._pool) if (p.active) p.deactivate();
+  }
 
   // ---------- internals ----------
   _fireBoltsNow(controller) {
-    const fwd = this._tmp.fwd.set(0,0,-1)
-      .applyQuaternion(controller.player.model.quaternion)
-      .normalize();
+    if (!this._pool.length) this._ensurePool();
 
+    const model = controller.player.model;
+    model.updateMatrixWorld(true);
+
+    // base world
+    model.getWorldPosition(this._tmp.posWorld);
+    model.getWorldQuaternion(this._tmp.qWorld);
+
+    const upWorld   = this._tmp.upWorld.set(0,1,0).applyQuaternion(this._tmp.qWorld).normalize();
+    const fwdWorld  = this._tmp.fwd.set(0,0,-1).applyQuaternion(this._tmp.qWorld).normalize();
+    const rightWorld= this._tmp.rightWorld.set(1,0,0).applyQuaternion(this._tmp.qWorld).normalize();
+
+    // muzzle robusto = pos + up*Y + fwd*Z + right*X (ignora localToWorld sull'offset)
+    const offX = this.muzzleOffset?.x ?? 0;
+    const offY = this.muzzleOffset?.y ?? 1.3;
+    const offZ = this.muzzleOffset?.z ?? 0.5;
+
+    const muzzle = this._tmp.muzzleWorld.copy(this._tmp.posWorld)
+      .addScaledVector(upWorld, offY)
+      .addScaledVector(fwdWorld, offZ)
+      .addScaledVector(rightWorld, offX);
+
+    if (!isFiniteVec3(muzzle)) {
+      console.warn(`${TAG} muzzle NaN -> fallback`);
+      muzzle.copy(this._tmp.posWorld).addScaledVector(upWorld, 1.3).addScaledVector(fwdWorld, 0.5);
+    }
+
+    dlog('muzzle & dir', { muzzle: muzzle.toArray(), fwd: fwdWorld.toArray() });
+    if (this.debug && isFiniteVec3(muzzle)) this._spawnDebugPip(muzzle);
+
+    // multishot
     const n = Math.max(1, this.multishot | 0);
     const half = (n - 1) * 0.5;
 
     for (let i = 0; i < n; i++) {
       const t = (n === 1) ? 0 : (i - half) / half;
       const yaw = THREE.MathUtils.degToRad((this.spreadDeg || 0) * t);
-      this._spawnBolt(controller, fwd, yaw);
+      this._spawnProjectile(muzzle, fwdWorld, upWorld, yaw, i, n);
     }
   }
 
-  _ensurePool(controller) {
-    if (this._pool.length) return;
-    const geom = new THREE.SphereGeometry(0.12, 10, 10);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x66ccff, transparent: true, opacity: 0.95,
-      blending: THREE.AdditiveBlending
+  _spawnProjectile(origin, forward, upWorld, yawOffsetRad = 0, i = 0, n = 1) {
+    const p = this._acquire();
+    if (!p) { console.warn(`${TAG} no free projectile in pool (size=${this._poolSize})`); return; }
+
+    this._tmp.qYaw.setFromAxisAngle(upWorld, yawOffsetRad);
+    const dir = this._tmp.dir.copy(forward).applyQuaternion(this._tmp.qYaw).normalize();
+
+    if (!isFiniteVec3(origin) || !isFiniteVec3(dir)) {
+      console.warn(`${TAG} invalid origin/dir, abort`, { origin, dir });
+      return;
+    }
+
+    const target = this._acquireTarget(origin, dir);
+    p.radius = this.boltRadius;
+    p.activate(origin, dir, this.speed, this.lifetime, target);
+
+    dlog('spawn', {
+      index: i, total: n,
+      origin: origin.toArray(),
+      dir: dir.toArray(),
+      yawDeg: THREE.MathUtils.radToDeg(yawOffsetRad).toFixed(2),
+      target: target ? (target.model?.uuid || 'enemy') : null
     });
-    const root = getSceneRoot(controller.player.model);
-    for (let i = 0; i < this._poolSize; i++) {
-      const m = new THREE.Mesh(geom, mat.clone());
-      m.visible = false; m.castShadow = false; m.receiveShadow = false; m.frustumCulled = false;
-      root.add(m);
-      this._pool.push({ mesh: m, vel: new THREE.Vector3(), life: 0, active: false, target: null });
-    }
   }
 
-  _spawnBolt(controller, forward, yawOffsetRad = 0) {
-    const b = this._acquire(); if (!b) return;
+  _ensurePool() {
+    const need = this._poolSize;
+    const have = this._pool.length;
+    if (have >= need) return;
 
-    const model = controller.player.model, tmp = this._tmp;
-    tmp.muzzleWorld.copy(this.muzzleOffset).applyQuaternion(model.quaternion).add(model.position);
-
-    const qYaw = tmp.q.setFromAxisAngle(tmp.up.set(0,1,0), yawOffsetRad);
-    const dir = tmp.dir.copy(forward).applyQuaternion(qYaw).normalize();
-
-    b.target = this._acquireTarget(tmp.muzzleWorld, dir);
-    if (b.target && this.homing > 0) {
-      tmp.to.subVectors(b.target.model.position, tmp.muzzleWorld).normalize();
-      dir.lerp(tmp.to, 0.35).normalize();
+    for (let i = have; i < need; i++) {
+      this._pool.push(new MagicProjectile(scene, {
+        radius: this.boltRadius,
+        size: 0.28,      // visibile
+        color: 0xffffff  // molto visibile
+      }));
     }
-
-    b.mesh.position.copy(tmp.muzzleWorld);
-    b.vel.copy(dir).multiplyScalar(this.speed);
-    b.life = this.lifetime; b.active = true; b.mesh.visible = true;
+    console.log(`${TAG} pool created/expanded:`, { count: this._pool.length, isScene: !!scene?.isScene });
   }
 
-  _acquire() { for (const b of this._pool) if (!b.active) return b; return null; }
-  _deactivate(b) { b.active = false; b.mesh.visible = false; b.target = null; }
+  _acquire() { return this._pool.find(p => !p.active) || null; }
 
   _acquireTarget(origin, dir) {
     const enemies = getEnemies();
@@ -186,31 +274,27 @@ cancel(controller) {
       const dot = dir.dot(to);
       if (dot >= bestDot && dist <= bestDist) { bestDot = dot; bestDist = dist; best = e; }
     }
+    if (best) dlog('target acquired');
     return best;
-  }
-
-  _checkCollision(bolt) {
-    const R = this.boltRadius;
-    if (bolt.target && bolt.target.alive) {
-      if (bolt.mesh.position.distanceTo(bolt.target.model.position) <= (R + 0.8)) return bolt.target;
-    }
-    for (const e of getEnemies())
-      if (bolt.mesh.position.distanceTo(e.model.position) <= (R + 0.8)) return e;
-    return null;
   }
 
   _onHitEnemy(enemy) {
     killEnemy(enemy);
-    if (typeof window !== 'undefined' && typeof window.giveXP === 'function')
+    if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
       window.giveXP(this.damage);
+    }
     hudManager.showNotification('Magic Hit!');
   }
-}
 
-function getSceneRoot(obj){ let r=obj; while (r.parent) r = r.parent; return r; }
-function getLocomotionAction(actions, speed){
-  if (!actions) return null;
-  if (speed > 5)   return actions.run  || actions.walk || actions.idle || null;
-  if (speed > 0.1) return actions.walk || actions.run  || actions.idle || null;
-  return actions.idle || actions.walk || actions.run || null;
+  _spawnDebugPip(worldPos) {
+    const g = new THREE.SphereGeometry(0.06, 10, 10);
+    const m = new THREE.MeshBasicMaterial({
+      color: 0xffaa00, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending
+    });
+    const pip = new THREE.Mesh(g, m);
+    pip.position.copy(worldPos);
+    scene.add(pip);
+    this._debugPips.push({ mesh: pip, life: 0.35 });
+    dlog('debug pip @', worldPos.toArray());
+  }
 }
