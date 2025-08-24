@@ -68,22 +68,6 @@ export class HumanFormController extends BaseFormController {
   /** chiamata da InputSystem con click sinistro */
   attack() {
     if (!this._attackStrategy) return;
-
-    // decidi il nome clip (fallback "attack")
-    const clipName =
-      (this._equippedWeaponId?.toLowerCase?.().includes('wand')) ? 'wandCast' :
-      (this._equippedWeaponId?.toLowerCase?.().includes('sword')) ? 'swordAttack' :
-      'attack';
-
-    // marca stato e suona l’azione full-body
-    this.isAttacking = true;
-    const ok = this.player.animator.playAction(clipName);
-    if (!ok) {
-      // se non esiste clip specifica, prova 'attack' generico
-      this.player.animator.playAction('attack');
-    }
-
-    // la strategia può fare spawn di hitbox/danni ma non deve gestire play/stop animazioni
     this._attackStrategy.attack?.(this);
   }
 
@@ -91,7 +75,7 @@ export class HumanFormController extends BaseFormController {
     super.update(dt);
 
     // rete di sicurezza: se non c'è nessuna full attiva, rilascia lo stato
-    const full = this.player.animator?._active?.full || null;
+    const full = this.player.animator?._activeFull || null;
     if (this.isAttacking && !full) {
       this.isAttacking = false;
     }

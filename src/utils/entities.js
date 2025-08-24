@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { roughness } from 'three/tsl';
 
 export const ENTITY_CONFIG = {
   human: {
@@ -20,7 +19,7 @@ export const ENTITY_CONFIG = {
       armor: {
         diffuse:  '/textures/knight/body_diffuse.png',
         normal:   '/textures/knight/body_normal.png',
-        metallic: '/textures/knight/body_metallic.png', // <-- cambiato
+        metallic: '/textures/knight/body_metallic.png',
       },
       wand: {
         diffuse:   '/textures/knight/wand_diffuse.jpeg',

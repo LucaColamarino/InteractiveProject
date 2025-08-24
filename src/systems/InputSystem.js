@@ -133,19 +133,8 @@ function _requestPointerLock() {
   if (!c) return;
   // non chiedere lock se inventario aperto o già lockato
   if (isInventoryOpen?.() || document.pointerLockElement === c) return;
+    c.requestPointerLock?.({ unadjustedMovement: true });
 
-  try {
-    // In Chrome questa può restituire una Promise
-    const p = c.requestPointerLock?.({ unadjustedMovement: true });
-    if (p && typeof p.catch === 'function') {
-      p.catch(err => {
-        // ESC durante/prima della richiesta genera SecurityError: lo ignoriamo
-        if (err?.name !== 'SecurityError') console.error('[Input] requestPointerLock', err);
-      });
-    }
-  } catch (err) {
-    if (err?.name !== 'SecurityError') console.error('[Input] requestPointerLock (sync)', err);
-  }
 }
 
 function _onPointerLockChange() {

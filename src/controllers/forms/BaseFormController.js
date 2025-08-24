@@ -21,7 +21,7 @@ export class BaseFormController {
     this.isAttacking = false;      // settato da chi lancia azioni full (es. attacco)
     this.attackFreezesMovement = true;
     this._moveLockT = 0;
-
+    this._zeroVec = new THREE.Vector3();
     // Input (fornito dall'esterno)
     this._input = { moveVec: new THREE.Vector3(), isShiftPressed: false, isJumpPressed: false };
   }
@@ -59,7 +59,7 @@ export class BaseFormController {
     const baseSpeed = this.abilities?.speed ?? 5;
     const targetSpeed = this.isSprinting ? baseSpeed * 1.5 : baseSpeed;
 
-    const inputVec = movementLocked ? new THREE.Vector3() : this._input.moveVec;
+    const inputVec = movementLocked ? this._zeroVec : this._input.moveVec;
     const desired = inputVec.clone().normalize().multiplyScalar(targetSpeed);
     const a = (inputVec.lengthSq() > 0) ? this.accel : this.decel;
     this.currentVelocity.lerp(desired, a * dt);

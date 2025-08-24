@@ -63,7 +63,7 @@ export class Animator {
 
   /** Call ogni frame */
   update(dt) {
-    if (this.mixer) this.mixer.update(Math.min(dt, 1/30));
+    if (this.mixer) this.mixer.update(dt);
     const s = this._getState() || {};
     const v = s.speed ?? 0;
 
@@ -97,6 +97,13 @@ export class Animator {
       const clip = a?.getClip?.();
       const dur = clip?.duration || 0;
       const t   = a?.time ?? 0;
+      // fail-safe: se l'azione non sta più girando o ha peso ~0, considera la full finita
+      if (a && (!a.isRunning?.() || (a.getEffectiveWeight?.() ?? 0) <= 0.001)) {
+        this._activeFull = null;
+        this._fullFading = false;
+        this._locoSupportT = this._locoHold;
+      }
+
 
       // di default, mentre la full "corre", portiamo loco a 0
       let suppressLoco = true;
