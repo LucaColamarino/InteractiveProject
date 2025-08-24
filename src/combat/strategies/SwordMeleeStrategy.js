@@ -79,13 +79,11 @@ cancel(controller) {
   // NON mettere isAttacking=false qui
 }
 
+_end(controller) {
+  if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+  this._attackState = null;
+}
 
-  // ---- internal ----
-  _end(controller) {
-    controller.isAttacking = false;
-    if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
-    this._attackState = null;
-  }
 
   _applyHits(controller) {
     const playerObj = controller.player.model;
