@@ -11,59 +11,75 @@ export class Animator {
     this.actions = animComp?.actions || {};
     this._getState = stateRefFn || (() => ({}));
 
-    // Overlay: 'full' (attack/jump/die/block...)
+    // Overlay full-body (attack/jump/die...)
     this._activeFull = null;
+    this._fullFading = false; // evita retrigger del fadeOut anticipato
 
-    // Config
-    this._blendSpeed = 8.0;      // reattività del blending (↑ = più snappy)
-    this._flyBlend   = 10.0;     // reattività su fly/sit
-    this._fullFadeIn = 0.16;
-    this._fullFadeOut= 0.16;
+    // Config blending
+    this._blendSpeed   = 8.0;   // reattività blend locomozione
+    this._flyBlend     = 10.0;  // reattività quando c'è overlay
+    this._fullFadeIn   = 0.16;
+    this._fullFadeOut  = 0.16;
 
-    // Soglie velocità per il blendspace (m/s)
-    this._tWalkOn  = 0.25;  // inizio transizione idle→walk
-    this._tRunOn   = 5.5;   // inizio transizione walk→run
-    this._tRunFull = 7.0;   // run piena
+    // Anticipo rientro loco PRIMA che la full finisca
+    this._fullBackWindow = 0.20; // secondi finali in cui rientra la locomozione
 
-    // Pesi correnti (loco)
+    // Floor anti T-pose
+    this._weightFloor = 0.06; // peso minimo totale
+    this._locoHold    = 0.12; // sostegno loco start/stop full
+
+    // Soglie velocità per blendspace
+    this._tWalkOn  = 0.25;
+    this._tRunOn   = 5.5;
+    this._tRunFull = 7.0;
+
+    // Pesi correnti/target
     this._w = { idle: 1, walk: 0, run: 0, fly: 0, sitIdle: 0 };
     this._targetW = { ...this._w };
+
+    // Timer sostegno loco
+    this._locoSupportT = 0;
 
     if (this.mixer) {
       this.mixer.addEventListener('finished', (e) => {
         const a = e?.action;
-        if (a) a.setEffectiveWeight?.(0);
-        if (a && this._activeFull === a._clipName) this._activeFull = null;
+        if (!a) return;
+        // Non azzeriamo brutalmente il peso qui: il fadeOut anticipato l'ha già portato giù
+        if (a && this._activeFull === a._clipName) {
+          this._activeFull = null;
+          this._fullFading = false;
+          this._locoSupportT = this._locoHold; // piccolo sostegno nel rientro
+        }
       });
     }
 
-    // Avvio locomotive: tieni idle/walk/run sempre in play
+    // Avvia sempre le clip di locomozione
     this._ensurePlayLoop('idle', 1);
     this._ensurePlayLoop('walk', 0);
     this._ensurePlayLoop('run',  0);
-    // opzionali
-    this._ensurePlayLoop('fly',     0);
+    this._ensurePlayLoop('fly',  0);
     this._ensurePlayLoop('sitIdle', 0);
   }
 
-  /** Call every frame */
+  /** Call ogni frame */
   update(dt) {
     if (this.mixer) this.mixer.update(Math.min(dt, 1/30));
     const s = this._getState() || {};
     const v = s.speed ?? 0;
 
-    // Decidi target weights
+    if (this._locoSupportT > 0) this._locoSupportT -= dt;
+
+    // === Target pesi locomozione (stato "desiderato") ===
     if (s.isSitting && this.actions.sitIdle) {
       this._setTargetSolo('sitIdle');
     } else if (s.isFlying && this.actions.fly) {
       this._setTargetSolo('fly');
     } else {
-      // 1D blendspace: idle↔walk↔run
-      const iw = this._remapClamped(v, 0,   this._tWalkOn, 1, 0); // idle piena a v=0 → 0 a v>=tWalkOn
-      const wr = this._remapClamped(v, this._tWalkOn, this._tRunOn, 0, 1); // walk sale tra soglie
-      const rr = this._remapClamped(v, this._tRunOn, this._tRunFull, 0, 1); // run sale dopo runOn
+      // 1D blendspace: idle ↔ walk ↔ run
+      const iw = this._remapClamped(v, 0, this._tWalkOn, 1, 0);
+      const wr = this._remapClamped(v, this._tWalkOn, this._tRunOn, 0, 1);
+      const rr = this._remapClamped(v, this._tRunOn, this._tRunFull, 0, 1);
 
-      // Normalizza morbido: idle prende quel che resta
       const wRun  = rr;
       const wWalk = Math.max(0, wr * (1 - wRun));
       const wIdle = Math.max(0, 1 - (wWalk + wRun));
@@ -75,14 +91,43 @@ export class Animator {
       this._targetW.sitIdle = 0;
     }
 
-    // Se una full action è attiva, porta a 0 i pesi loco ma lentamente (niente snap)
+    // === Overlay full ===
     if (this._activeFull) {
-      this._targetW.idle = 0;
-      this._targetW.walk = 0;
-      this._targetW.run  = 0;
+      const a = this.actions[this._activeFull];
+      const clip = a?.getClip?.();
+      const dur = clip?.duration || 0;
+      const t   = a?.time ?? 0;
+
+      // di default, mentre la full "corre", portiamo loco a 0
+      let suppressLoco = true;
+
+      // se siamo negli ULTIMI secondi della full, prepariamo il rientro:
+      if (dur > 0 && (dur - t) <= this._fullBackWindow) {
+        suppressLoco = false; // consenti risalita dei targetW già calcolati
+        if (!_bool(a, '_antifadeTriggered')) {
+          // lancia un fadeOut anticipato della full
+          a.fadeOut?.(this._fullFadeOut);
+          a._antifadeTriggered = true;
+          this._fullFading = true;
+          // sostieni un filo di loco durante l'overlap
+          this._locoSupportT = Math.max(this._locoSupportT, this._locoHold);
+        }
+      }
+
+      if (suppressLoco) {
+        this._targetW.idle = 0;
+        this._targetW.walk = 0;
+        this._targetW.run  = 0;
+        this._targetW.fly = 0;
+        this._targetW.sitIdle = 0;
+        // durante la salita iniziale della full, sostieni un attimo la loco
+        if (this._locoSupportT <= 0) this._locoSupportT = this._locoHold;
+      }
+    } else {
+      // nessuna full → i targetW restano quelli "desiderati"
     }
 
-    // Interpola i pesi verso il target
+    // === Interpola pesi verso target ===
     const k = (this._activeFull ? this._flyBlend : this._blendSpeed) * dt;
     this._w.idle    = this._lerp(this._w.idle,    this._targetW.idle,    k);
     this._w.walk    = this._lerp(this._w.walk,    this._targetW.walk,    k);
@@ -90,7 +135,28 @@ export class Animator {
     this._w.fly     = this._lerp(this._w.fly,     this._targetW.fly,     k);
     this._w.sitIdle = this._lerp(this._w.sitIdle, this._targetW.sitIdle, k);
 
-    // Applica i pesi alle actions (se esistono)
+    // === Floor anti T-pose ===
+    const fullW = this._getActionWeight(this._activeFull);
+    const locoSum = this._w.idle + this._w.walk + this._w.run + this._w.fly + this._w.sitIdle;
+    const total = (fullW || 0) + locoSum;
+
+    if (total < this._weightFloor) {
+      const prefer =
+        (this._targetW.run > 0.5) ? 'run' :
+        (this._targetW.walk > 0.5) ? 'walk' :
+        (this._targetW.fly  > 0.5) ? 'fly' :
+        (this._targetW.sitIdle > 0.5) ? 'sitIdle' : 'idle';
+      this._w[prefer] = Math.max(this._w[prefer], this._weightFloor);
+    }
+
+    if (this._locoSupportT > 0 && locoSum < 0.15) {
+      const prefer = (this._targetW.walk + this._targetW.run > 0.5)
+        ? (this._w.run > this._w.walk ? 'run' : 'walk')
+        : 'idle';
+      this._w[prefer] = Math.max(this._w[prefer], 0.15);
+    }
+
+    // === Applica pesi ===
     this._applyWeight('idle',    this._w.idle);
     this._applyWeight('walk',    this._w.walk);
     this._applyWeight('run',     this._w.run);
@@ -98,24 +164,36 @@ export class Animator {
     this._applyWeight('sitIdle', this._w.sitIdle);
   }
 
-  /** Avvia un'azione full‑body (attacco/jump/die...) lasciando girare la locomozione sotto (peso→0) */
+  /** Avvia un'azione full-body con overlap: niente T-pose a inizio */
   playAction(name, { fadeIn = this._fullFadeIn, fadeOut = this._fullFadeOut } = {}) {
     const a = this.actions[name];
     if (!a) return false;
 
     if (this._activeFull && this._activeFull !== name) {
       this.actions[this._activeFull]?.fadeOut?.(fadeOut);
+      this._fullFading = true;
     }
 
-    // tieni idle/walk/run in play, ma il loro peso bersaglio scende a 0 (gestito in update)
+    // Assicura che le loco restino in play (peso scenderà gradualmente)
     this._ensurePlayLoop('idle');
     this._ensurePlayLoop('walk');
     this._ensurePlayLoop('run');
 
     this._safeEnable(a);
+    a.setLoop?.(THREE.LoopOnce, 1);
+    a.clampWhenFinished = true;
+
+    // piccolo peso iniziale per evitare frame “zero”
+    a.setEffectiveWeight?.(Math.max(0.05, a.getEffectiveWeight?.() ?? 0));
     a.reset().fadeIn(fadeIn).play();
     a._clipName = name;
+
     this._activeFull = name;
+    this._fullFading = false;
+    this._locoSupportT = this._locoHold; // sostieni loco nei primi ms
+    // marca per il fadeOut anticipato (usato in update)
+    a._antifadeTriggered = false;
+
     return true;
   }
 
@@ -124,12 +202,16 @@ export class Animator {
     if (!a) return;
     a.fadeOut?.(fadeOut);
     a.stop?.();
-    if (this._activeFull === name) this._activeFull = null;
+    if (this._activeFull === name) {
+      this._activeFull = null;
+      this._fullFading = false;
+      this._locoSupportT = this._locoHold;
+    }
   }
 
   // ===== internals =====
 
-  _ensurePlayLoop(name, initialWeight = 0) {
+  _ensurePlayLoop(name, initialWeight = undefined) {
     const a = this.actions[name];
     if (!a) return;
     a.enabled = true;
@@ -137,7 +219,7 @@ export class Animator {
     a.clampWhenFinished = false;
     a.setEffectiveTimeScale?.(1);
     if (!a.isRunning?.()) a.play();
-    a.setEffectiveWeight?.(initialWeight);
+    if (initialWeight !== undefined) a.setEffectiveWeight?.(initialWeight);
   }
 
   _applyWeight(name, w) {
@@ -145,6 +227,11 @@ export class Animator {
     if (!a) return;
     a.enabled = true;
     a.setEffectiveWeight?.(w);
+  }
+
+  _getActionWeight(name) {
+    const a = name ? this.actions[name] : null;
+    return a?.getEffectiveWeight ? a.getEffectiveWeight() : 0;
   }
 
   _safeEnable(a) {
@@ -159,7 +246,7 @@ export class Animator {
     if (name === 'fly') this._targetW.fly = 1;
     else if (name === 'sitIdle') this._targetW.sitIdle = 1;
 
-    // assicurati che siano in play così il rientro è fluido
+    // restano in play per rientro fluido
     this._ensurePlayLoop('idle');
     this._ensurePlayLoop('walk');
     this._ensurePlayLoop('run');
@@ -174,3 +261,5 @@ export class Animator {
 
   _lerp(a, b, k) { return a + (b - a) * THREE.MathUtils.clamp(k, 0, 1); }
 }
+
+function _bool(obj, key){ return !!(obj && obj[key]); }
