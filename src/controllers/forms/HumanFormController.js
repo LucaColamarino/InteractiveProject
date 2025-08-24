@@ -66,9 +66,17 @@ export class HumanFormController extends BaseFormController {
   }
 
   /** chiamata da InputSystem con click sinistro */
-  attack() {
+  baseAttack() {
     if (!this._attackStrategy) return;
-    this._attackStrategy.attack?.(this);
+    this._attackStrategy.baseAttack?.(this);
+  }
+  secondAttack() {
+    if (!this._attackStrategy) return;
+    this._attackStrategy.secondAttack?.(this);
+  }
+  specialAttack() {
+    if (!this._attackStrategy) return;
+    this._attackStrategy.specialAttack?.(this);
   }
 
   update(dt) {

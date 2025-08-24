@@ -86,6 +86,10 @@ function _onKeyDown(e) {
     case 'KeyE':
       interactionManager.tryInteract(gameManager.controller);
       break;
+    case 'KeyQ':
+      if (_suppressNextAttack) { _suppressNextAttack = false; return; }
+      _controller?.specialAttack?.();
+      break;
 
     case 'KeyG':
       refreshInventoryUI();
@@ -128,7 +132,10 @@ function _onMouseDown(e) {
   }
   if (e.button === 0) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
-    _controller?.attack?.();
+    _controller?.baseAttack?.();
+  }else if (e.button === 2) {
+    if (_suppressNextAttack) { _suppressNextAttack = false; return; }
+    _controller?.secondAttack?.();
   }
 }
 function _onMouseMove(e) {
