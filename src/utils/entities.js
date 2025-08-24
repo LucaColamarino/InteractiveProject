@@ -9,11 +9,12 @@ export const ENTITY_CONFIG = {
       walk: '/models/animations/KnightWalk.fbx',
       run: '/models/animations/KnightRun.fbx',
       jump: '/models/animations/KnightJump.fbx',
-      attack: '/models/animations/KnightAttack.fbx',
       die: '/models/animations/KnightDie.fbx',
       block: '/models/animations/KnightBlock.fbx',
       sitIdle: '/models/animations/SittingIdle.fbx',
       standUp: '/models/animations/StandingUp.fbx',
+      swordAttack: '/models/animations/KnightSwordAttack.fbx',
+      wandCast: '/models/animations/KnightWandAttack.fbx',
     },
     textures: {
       armor: {

@@ -6,22 +6,29 @@ import { instantiateEntity, buildMixerAndActions } from '../utils/entityFactory.
 import { getTerrainHeightAt } from '../map/map.js';
 import { HumanFormController } from '../controllers/forms/HumanFormController.js';
 import { scene } from '../scene.js';
-
+import { Animator } from '../components/Animator.js'; // <-- nuovo
 export class Player {
   constructor(model, mixer, actions) {
     this.model = model;
-    this.anim = new AnimationComponent(mixer, actions);
+    this.anim = new AnimationComponent(mixer, actions); // compatibilità
+    // nuovo orchestratore centralizzato
+    this.animator = new Animator({ mixer, actions }, () => this.state);
+
     this.state = { speed:0, isFlying:false, isSitting:false, isAttacking:false, isSprinting:false };
-    // dentro Player constructor
+
+    // hitbox (ok com’è)
     this.swordHitbox = new THREE.Mesh(
-      new THREE.BoxGeometry(0.3, 1, 1.5), // un box davanti al player
-      new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, visible: false }) // visibile per debug
+      new THREE.BoxGeometry(0.3, 1, 1.5),
+      new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, visible: false })
     );
     this.model.add(this.swordHitbox);
-    this.swordHitbox.position.set(0, 1, 1); // posizionala davanti alla mano
-
+    this.swordHitbox.position.set(0, 1, 1);
   }
-  update(dt) { this.anim.update(dt); }
+
+  update(dt) {
+    // delega all’orchestratore
+    this.animator.update(dt);
+  }
 }
 
 function createAbilities(formName, overrides = {}) {
@@ -66,7 +73,6 @@ export async function spawnPlayer(position = new THREE.Vector3(5,getTerrainHeigh
       const player = new Player(group, mixer, actions);
       player.model.equipmentMeshes = getEquipmentMesh(player.model);
       const controller = new HumanFormController(player, abilities);
-      player.anim.play('idle');
       return controller;
 }
 function getEquipmentMesh(root) {

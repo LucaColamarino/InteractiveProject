@@ -12,23 +12,28 @@ export class BowRangedStrategy extends AttackStrategy {
     this.cooldown = weaponItem?.meta?.cooldown ?? 0.5;
    }
 
-  attack(controller, clipName='shoot') {
-    if (controller.isAttacking || this._cd > 0) return;
-    controller.isAttacking = true;
-    controller.player.anim?.play(clipName, { once: true });
+// dentro BowRangedStrategy
+attack(controller, clipName='shoot') {
+  if (controller.isAttacking || this._cd > 0) return;
 
-    // spawn “proiettile” minimal (raycast / sfera invisibile)
-    this._spawnProjectile(controller);
+  controller.isAttacking = true;              // segnale alto-livello
+  this._cd = this.cooldown;
 
-    // fine attacco breve
-    setTimeout(() => { controller.isAttacking = false; }, 250);
-    this._cd = this.cooldown;
-  }
+  const actions = controller.player.anim?.actions || {};
+  const act = actions[clipName] || actions['attack'] || null;
+  const dur = act?.getClip?.()?.duration ?? 0.35;
 
-  update(controller, dt) {
-    if (this._cd > 0) this._cd -= dt;
-    // se usi proiettili persistenti, aggiorna qui la loro posizione e collisione
-  }
+  controller.lockMovementFor(dur * 0.6);      // piccolo freeze
+  controller.player.animator?.playAction(clipName) || controller.player.animator?.playAction('attack');
+
+  // spara subito (ranged feeling reattivo)
+  this._spawnProjectile(controller);
+  // NON mettere isAttacking=false qui: ci pensa il controller quando finisce la clip
+}
+
+update(controller, dt) {
+  if (this._cd > 0) this._cd -= dt;
+}
 
   cancel(controller) { controller.isAttacking = false; }
 

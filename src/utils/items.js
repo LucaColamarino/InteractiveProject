@@ -11,10 +11,15 @@ export const magicWand = new WeaponItem({
   id: 'wand_magic_01',
   name: 'Magic Wand',
   modelPath: '/models/pickups/magic_wand.fbx',
-  meshPrefix: 'wand',              // gestisce wand, wand1, wand2, wand3...
-  meta: { damage: 8, bonus: '+mana', rarity: 'rare', weaponKind: 'wand', speed: 35, cooldown: 0.45 }
+  meshPrefix: 'wand',
+ meta: {
+   damage: 20, rarity: 'rare', weaponKind: 'wand',
+   speed: 35, cooldown: 0.45, boltRadius: 0.5, lifetime: 2.0,
+   multishot: 1, spreadDeg: 0, homing: 0.0,
+   // opzionale: offset [x,y,z] dal centro del player da cui parte il bolt
+   muzzleOffset: [0, 1.3, 0.5]
+ }
 });
-
 export const ironHelmet = new HelmetItem({
   id: 'helmet_iron_01',
   name: 'Iron Helmet',
@@ -37,5 +42,5 @@ export function getRandomItem() {
   
   const index = Math.floor(Math.random() * allItems.length);
   console.log("getRandomItem:", allItems[index].name);
-  return allItems[0];
+  return allItems[1];
 }

@@ -16,13 +16,17 @@ export class BaseFormController {
     this.velY = 0;
     this.isFlying = false;
     this.isOnGround = false;
-    this.isSprinting = false;
     this.isSitting = false;
-    this.isAttacking = false; // popolata dai controller che gestiscono il combat
+    this.isSprinting = false;
+    this.isAttacking = false;      // settato da chi lancia azioni full (es. attacco)
+    this.attackFreezesMovement = true;
+    this._moveLockT = 0;
 
     // Input (fornito dall'esterno)
     this._input = { moveVec: new THREE.Vector3(), isShiftPressed: false, isJumpPressed: false };
   }
+
+  lockMovementFor(sec = 0) { this._moveLockT = Math.max(this._moveLockT, sec); }
 
   setInputState(st) {
     this._input.moveVec.copy(st.moveVec || new THREE.Vector3());
@@ -33,10 +37,9 @@ export class BaseFormController {
 
   sitToggle() { this.isSitting = !this.isSitting; }
 
-  // Default: i controller specifici (es. umano/uccello) possono override-are
   jumpOrFly() {
+    if (this._moveLockT > 0 || (this.attackFreezesMovement && this.isAttacking)) return;
     if (this.abilities?.canFly) {
-      // Decollo solo se a terra
       const p = this.player.model.position;
       const tY = getTerrainHeightAt(p.x, p.z);
       const onGround = p.y <= tY + 0.01;
@@ -44,23 +47,28 @@ export class BaseFormController {
     } else if (this.isOnGround) {
       this.velY = this.abilities?.jumpForce ?? 8;
       this.isOnGround = false;
+      // opzionale: potresti far partire un'azione jump (full) qui
     }
   }
 
   update(dt) {
+    const movementLocked = this._moveLockT > 0 || (this.attackFreezesMovement && this.isAttacking);
+    if (this._moveLockT > 0) this._moveLockT -= dt;
+
     // ----- Movimento orizzontale -----
     const baseSpeed = this.abilities?.speed ?? 5;
     const targetSpeed = this.isSprinting ? baseSpeed * 1.5 : baseSpeed;
 
-    const desired = this._input.moveVec.clone().normalize().multiplyScalar(targetSpeed);
-    const a = this._input.moveVec.lengthSq() > 0 ? this.accel : this.decel;
+    const inputVec = movementLocked ? new THREE.Vector3() : this._input.moveVec;
+    const desired = inputVec.clone().normalize().multiplyScalar(targetSpeed);
+    const a = (inputVec.lengthSq() > 0) ? this.accel : this.decel;
     this.currentVelocity.lerp(desired, a * dt);
 
     const step = this.currentVelocity.clone().multiplyScalar(dt);
     this.player.model.position.add(step);
 
     // Orientamento verso la direzione di marcia
-    if (this.currentVelocity.lengthSq() > 1e-3) {
+    if (!movementLocked && this.currentVelocity.lengthSq() > 1e-3) {
       const yaw = Math.atan2(this.currentVelocity.x, this.currentVelocity.z);
       const cur = this.player.model.rotation.y;
       let d = yaw - cur; if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI;
@@ -74,20 +82,20 @@ export class BaseFormController {
       if (this._input.isShiftPressed) this.velY -= 30 * dt;     // scendere
       this.velY += g * 0.2 * dt; // gravità attenuata in volo
     } else {
-      this.velY += g * dt; // gravità piena
+      this.velY += g * dt;       // gravità piena
     }
     this.player.model.position.y += this.velY * dt;
 
-    // Colla terreno e reset stati
+    // Colla al terreno e reset stati
     this._ensureAboveTerrain();
 
-    // Esporta stato per il sistema animazioni
+    // Esporta stato per l’Animator (lui decide le clip)
     Object.assign(this.player.state, {
       speed: this.currentVelocity.length(),
       isFlying: this.isFlying,
       isSprinting: this.isSprinting,
       isSitting: this.isSitting,
-      isAttacking: this.isAttacking,
+      isAttacking: this.isAttacking, // informativo
     });
   }
 
@@ -106,4 +114,3 @@ export class BaseFormController {
     }
   }
 }
-

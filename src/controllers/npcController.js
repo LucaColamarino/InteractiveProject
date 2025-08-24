@@ -4,9 +4,19 @@ import * as THREE from 'three';
 import { scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
 import { gameManager } from '../managers/gameManager.js';
+
 const enemies = [];
 const MAX_UPDATE_DISTANCE = 250;
+
 export function registerEnemy(enemy) {
+  // Assicurati che ogni nemico abbia uno state
+  enemy.state = enemy.state || {
+    speed: 0,
+    isFlying: false,
+    isSitting: false,
+    isAttacking: false,
+    isSprinting: false,
+  };
   enemies.push(enemy);
 }
 
@@ -15,85 +25,84 @@ export function getEnemies() {
 }
 
 export function updateEnemies(delta) {
-  const playerRef = gameManager.controller.player;
+  const playerRef = gameManager.controller?.player;
   for (const enemy of enemies) {
     if (!enemy.model || !playerRef?.model) continue;
+
+    // skip se lontano
     const dist = enemy.model.position.distanceTo(playerRef.model.position);
     if (dist > MAX_UPDATE_DISTANCE) continue;
+
+    // --- MOTORE MIXER/ANIMATOR ---
+    const step = Math.min(delta, 0.05);
+    enemy.mixer?.update(step);
+
+    // --- MORTE / DYING ---
     if (!enemy.alive) {
-  // Finché la clip "die" gira, lasciamo il mixer aggiornare
-  if (enemy.actions?.die?.isRunning()) {
-    enemy.mixer?.update(Math.min(delta, 0.05));
-  } else if (enemy._fading) {
-    // Fading per frame (senza traverse)
-    const DURATION = 1.5; // secondi di fade
-    enemy._fade -= (delta / DURATION);
-    const opacity = (enemy._fade > 0) ? enemy._fade : 0;
-
-    for (const part of enemy._fading.parts) {
-      for (const m of part.materials) {
-        if (m && typeof m.opacity !== 'undefined') m.opacity = opacity;
+      // già morto → gestiamo fading se attivo
+      if (enemy._fading) {
+        const DURATION = 1.5;
+        enemy._fade -= (delta / DURATION);
+        const opacity = Math.max(0, enemy._fade);
+        for (const part of enemy._fading.parts) {
+          for (const m of part.materials) if (m && 'opacity' in m) m.opacity = opacity;
+        }
+        if (enemy._fade <= 0) {
+          for (const part of enemy._fading.parts) for (const m of part.materials) m?.dispose?.();
+          enemy._fading = null;
+          scene.remove(enemy.model);
+          const idx = enemies.indexOf(enemy);
+          if (idx !== -1) enemies.splice(idx, 1);
+        }
+      } else {
+        // già morto ma niente fade -> niente
       }
+      // aggiorna comunque l'animator per tenere i pesi puliti
+      enemy.animator?.update(delta);
+      continue;
     }
 
-    if (enemy._fade <= 0) {
-      // cleanup materiali (clonati) e rimozione dalla scena
-      for (const part of enemy._fading.parts) {
-        for (const m of part.materials) m?.dispose?.();
-        // NON disporre la geometry se è condivisa tra istanze
+    // se sta "morendo" (die in corso) non muovere, ma controlla fine clip per marcare alive=false
+    if (enemy._dying) {
+      const dieRunning = enemy.actions?.die?.isRunning?.() ?? false;
+      enemy.animator?.update(delta);
+      if (!dieRunning) {
+        // la clip die è finita → ora diventa "morto" e parte il fade
+        enemy._dying = false;
+        enemy.alive = false;
+        startFadeOut(enemy);
       }
-      enemy._fading = null;
-      scene.remove(enemy.model);
-      const index = enemies.indexOf(enemy);
-      if (index !== -1) enemies.splice(index, 1);
+      continue;
     }
-  }
-  // niente altro da fare per i nemici non vivi
-  continue;
-}
 
-
-    enemy.mixer?.update(Math.min(delta, 0.05));
-
+    // ===== AI / MOVIMENTO =====
     if (enemy.type === 'wyvern') {
-      enemy.stateTimer += delta;
+      // Stato timer per volo/terra
+      enemy.stateTimer = (enemy.stateTimer || 0) + delta;
+
+      const terrainY = getTerrainHeightAt(enemy.model.position.x, enemy.model.position.z);
 
       if (enemy.behaviorState === 'flying') {
-        const terrainY = getTerrainHeightAt(enemy.model.position.x, enemy.model.position.z);
+        // decide se iniziare discesa
+        if (!enemy.landing && enemy.stateTimer > (enemy.flyTime ?? 10) + Math.random() * 10) {
+          enemy.landing = true;
+        }
 
-        // Se è in fase di atterraggio
         if (enemy.landing) {
-          const targetY = terrainY + enemy.yOffset;
-          enemy.model.position.y = THREE.MathUtils.lerp(
-            enemy.model.position.y,
-            targetY,
-            delta * 2
-          );
-
-          // Quando è praticamente a terra, cambia stato
+          const targetY = terrainY + (enemy.yOffset ?? 0);
+          enemy.model.position.y = THREE.MathUtils.lerp(enemy.model.position.y, targetY, delta * 2);
           if (Math.abs(enemy.model.position.y - targetY) < 0.2) {
             enemy.model.position.y = targetY;
             enemy.behaviorState = 'walking';
             enemy.landing = false;
             enemy.stateTimer = 0;
-            enemy.actions.fly?.stop();
-            enemy.actions.walk?.play();
           }
         } else {
-          // Decidi se iniziare la discesa
-          if (enemy.stateTimer > enemy.flyTime + Math.random() * 10) {
-            enemy.landing = true;
-          }
-
-          const flightHeight = terrainY + enemy.altitude + Math.sin(enemy.stateTimer * 2) * 1.5;
-          enemy.model.position.y = THREE.MathUtils.lerp(
-            enemy.model.position.y,
-            flightHeight,
-            delta * 5
-          );
+          const flightHeight = terrainY + (enemy.altitude ?? 12) + Math.sin(enemy.stateTimer * 2) * 1.5;
+          enemy.model.position.y = THREE.MathUtils.lerp(enemy.model.position.y, flightHeight, delta * 5);
         }
 
-        enemy.angle += delta * 0.5;
+        enemy.angle = (enemy.angle ?? Math.random() * Math.PI * 2) + delta * 0.5;
         const dir = new THREE.Vector3(Math.cos(enemy.angle), 0, Math.sin(enemy.angle));
         enemy.model.position.x += dir.x * delta * 5;
         enemy.model.position.z += dir.z * delta * 5;
@@ -101,74 +110,72 @@ export function updateEnemies(delta) {
         const target = enemy.model.position.clone().add(dir);
         enemy.model.lookAt(target);
 
-        if (!enemy.actions.fly?.isRunning()) {
-          enemy.actions.walk?.stop();
-          enemy.actions.fly?.play();
-        }
-      } else if (enemy.behaviorState === 'walking') {
-        if (enemy.stateTimer > enemy.walkTime * Math.random()*10) {
+        // stato per l'Animator
+        enemy.state.isFlying = true;
+        enemy.state.speed = 5; // velocità "percepita" per scegliere clip fly
+      }
+      else { // walking
+        if (enemy.stateTimer > (enemy.walkTime ?? 5) * (0.5 + Math.random())) {
           enemy.behaviorState = 'flying';
           enemy.stateTimer = 0;
           enemy.altitude = 10 + Math.random() * 5;
-          enemy.actions.walk?.stop();
-          enemy.actions.fly?.play();
         } else {
-          enemy.angle += delta * 0.2;
+          enemy.angle = (enemy.angle ?? Math.random() * Math.PI * 2) + delta * 0.2;
           const dir = new THREE.Vector3(Math.cos(enemy.angle), 0, Math.sin(enemy.angle));
           const moveSpeed = enemy.speed ?? 1.0;
           enemy.model.position.addScaledVector(dir, moveSpeed * delta);
 
-          const x = enemy.model.position.x;
-          const z = enemy.model.position.z;
-          const terrainY = getTerrainHeightAt(x, z);
-          const targetY = terrainY + enemy.yOffset;
-          enemy.model.position.y = THREE.MathUtils.lerp(
-            enemy.model.position.y,
-            targetY,
-            delta * 5
-          );
+          const x = enemy.model.position.x, z = enemy.model.position.z;
+          const targetY = getTerrainHeightAt(x, z) + (enemy.yOffset ?? 0);
+          enemy.model.position.y = THREE.MathUtils.lerp(enemy.model.position.y, targetY, delta * 5);
 
           const target = enemy.model.position.clone().add(dir);
           enemy.model.lookAt(target);
 
-          if (!enemy.actions.walk?.isRunning()) {
-            enemy.actions.fly?.stop();
-            enemy.actions.walk?.play();
-          }
+          enemy.state.isFlying = false;
+          enemy.state.speed = moveSpeed;
         }
       }
-    } else if (enemy.angle !== undefined) {
-      enemy.angle += delta * 0.2;
+    } else {
+      // walker / werewolf
+      enemy.angle = (enemy.angle ?? Math.random() * Math.PI * 2) + delta * 0.2;
       const dir = new THREE.Vector3(Math.cos(enemy.angle), 0, Math.sin(enemy.angle));
       const moveSpeed = enemy.speed ?? 1.0;
-      enemy.model.position.addScaledVector(dir, moveSpeed * delta);
 
-      const x = enemy.model.position.x;
-      const z = enemy.model.position.z;
+      enemy.model.position.addScaledVector(dir, moveSpeed * delta);
+      const x = enemy.model.position.x, z = enemy.model.position.z;
       enemy.model.position.y = getTerrainHeightAt(x, z);
 
       const target = enemy.model.position.clone().add(dir);
       enemy.model.lookAt(target);
+
+      enemy.state.isFlying = false;
+      enemy.state.speed = moveSpeed;
     }
+
+    // ===== ANIMAZIONI (centralizzate) =====
+    enemy.animator?.update(delta);
   }
 }
 
 export function killEnemy(enemy) {
-  enemy.angle = undefined;
   if (!enemy || !enemy.alive) return;
 
-  for (const action of Object.values(enemy.actions)) {
-    action.stop();
-  }
+  // ferma eventuali loop residui (non serve se l'Animator gestisce i pesi, ma è ok come safety)
+  for (const a of Object.values(enemy.actions || {})) a?.stop?.();
 
-  if (enemy.actions.die) {
+  // avvia animazione di morte come azione "full"
+  if (enemy.animator && enemy.actions?.die) {
+    enemy._dying = true;           // segnale per l'update loop
+    enemy.animator.playAction('die');
+  } else if (enemy.actions?.die) {
+    // fallback senza Animator
     const dieAction = enemy.actions.die;
-    dieAction.reset();
-    dieAction.setLoop(THREE.LoopOnce, 1);
+    dieAction.reset().setLoop(THREE.LoopOnce, 1);
     dieAction.clampWhenFinished = true;
     dieAction.play();
-
-    enemy.mixer.addEventListener('finished', function onDieFinish(e) {
+    // listener per fine → avvia fade
+    enemy.mixer?.addEventListener('finished', function onDieFinish(e) {
       if (e.action === dieAction) {
         enemy.mixer.removeEventListener('finished', onDieFinish);
         enemy.alive = false;
@@ -176,43 +183,33 @@ export function killEnemy(enemy) {
       }
     });
   } else {
+    // nessuna animazione di morte → muori subito
     enemy.alive = false;
     startFadeOut(enemy);
   }
 }
 
 function startFadeOut(enemy) {
-  // Cache di parti e materiali clonati (una volta sola)
+  // clona materiali una volta, abilita trasparenza e abbassa ombre
   const parts = [];
   enemy.model.traverse(child => {
     if (!child.isMesh) return;
-
     const toArray = (m) => Array.isArray(m) ? m : [m];
     const mats = toArray(child.material);
-
     const clones = mats.map((mat) => {
       const c = (typeof mat?.clone === 'function') ? mat.clone() : mat;
       if (!c) return c;
-      c.transparent = true;     // lo facciamo una volta
-      // c.depthWrite = false;  // opzionale: dipende dalla tua scena
-      // c.alphaHash = true;    // opzionale (MSAA), evita alcuni artefatti
-      c.needsUpdate = true;     // solo ora (non ad ogni frame)
+      c.transparent = true;
+      c.needsUpdate = true;
       return c;
     });
-
     child.material = Array.isArray(child.material) ? clones : clones[0];
-    // alleggerisci shading durante il fade
     child.castShadow = false;
     child.receiveShadow = false;
-
     parts.push({ mesh: child, materials: clones });
   });
 
-  // Flag di stato fade per updateEnemies
   enemy._fade = 1.0;
   enemy._fading = { parts };
-  // opzionale: il modello è statico durante il fade
   enemy.model.matrixAutoUpdate = false;
 }
-
-

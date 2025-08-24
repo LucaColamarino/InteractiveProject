@@ -2,20 +2,19 @@
 import { BaseFormController } from './BaseFormController.js';
 import { SwordMeleeStrategy } from '../../combat/strategies/SwordMeleeStrategy.js';
 import { BowRangedStrategy } from '../../combat/strategies/BowRangedStrategy.js';
+import { WandMagicStrategy } from '../../combat/strategies/WandMagicStrategy.js';
 
 const STRATEGY_REGISTRY = {
   sword: () => new SwordMeleeStrategy(),
-  greatsword: () => new SwordMeleeStrategy(), // puoi parametrizzare reach/arcDeg
+  greatsword: () => new SwordMeleeStrategy(),
   bow: () => new BowRangedStrategy(),
-  wand: () => new BowRangedStrategy(),        // o una MagicBoltStrategy dedicata
+  wand: () => new WandMagicStrategy(),
 };
 
 function getWeaponKind(item) {
   if (!item) return null;
-  // 1) se già presente un campo dedicato
-  if (item.kind) return item.kind;              // es. 'sword' | 'bow' | ...
+  if (item.kind) return item.kind;
   if (item.meta?.weaponKind) return item.meta.weaponKind;
-  // 2) fallback su id/meshPrefix
   const s = (item.id || item.meshPrefix || '').toLowerCase();
   if (s.includes('greatsword')) return 'greatsword';
   if (s.includes('sword')) return 'sword';
@@ -25,29 +24,33 @@ function getWeaponKind(item) {
   if (s.includes('wand') || s.includes('staff')) return 'wand';
   return 'sword';
 }
+
 export class HumanFormController extends BaseFormController {
   constructor(player, abilities) {
     super(player, abilities);
     this._attackStrategy = null;
     this._equippedWeapon = null;
     this._equippedWeaponId = null;
-    this._invUnsub = null;
   }
 
   setWeaponItem(item) {
-    // disarma
     if (!item) {
-      this._equippedWeapon = null;
-      this._equippedWeaponId = null;
       this._attackStrategy?.cancel?.(this);
       this._attackStrategy = null;
+      this._equippedWeapon = null;
+      this._equippedWeaponId = null;
+      // stop eventuali azioni full rimaste
+      this.player.animator.stopAction('swordAttack');
+      this.player.animator.stopAction('wandCast');
+      this.player.animator.stopAction('attack');
+      this.isAttacking = false;
       return;
     }
-    // se è la stessa arma, non fare nulla
     if (this._equippedWeaponId && item.id === this._equippedWeaponId) return;
-    // cambia strategia in base al tipo arma logico
+
     const kind = getWeaponKind(item);
     const make = STRATEGY_REGISTRY[kind] || STRATEGY_REGISTRY['sword'];
+
     this._attackStrategy?.cancel?.(this);
     this._attackStrategy = make();
     this._attackStrategy.onEquip?.(this, item);
@@ -55,30 +58,44 @@ export class HumanFormController extends BaseFormController {
     this._equippedWeapon = item;
     this._equippedWeaponId = item.id || null;
   }
-  // chiamala quando cambia l'inventario (o farla girare in update con polling leggero)
+
   syncWeaponFromInventory(inventory) {
     const item = inventory?.equipment?.weapon || null;
-    if (!item && this._equippedWeaponId !== null) {
-      this.setWeaponItem(null);
-      return;
-    }
-    if (item && item.id !== this._equippedWeaponId) {
-      this.setWeaponItem(item);
-    }
+    if (!item && this._equippedWeaponId !== null) { this.setWeaponItem(null); return; }
+    if (item && item.id !== this._equippedWeaponId) { this.setWeaponItem(item); }
   }
 
-  attack(clipName) {
-    if (!this._attackStrategy) return; // niente arma equip
-    // clip di default per arma (se non specificato)
-    if (!clipName) {
-      const kind = getWeaponKind(this._equippedWeapon);
-      clipName = (kind === 'bow' || kind === 'wand') ? 'shoot' : 'attack';
+  /** chiamata da InputSystem con click sinistro */
+  attack() {
+    if (!this._attackStrategy) return;
+
+    // decidi il nome clip (fallback "attack")
+    const clipName =
+      (this._equippedWeaponId?.toLowerCase?.().includes('wand')) ? 'wandCast' :
+      (this._equippedWeaponId?.toLowerCase?.().includes('sword')) ? 'swordAttack' :
+      'attack';
+
+    // marca stato e suona l’azione full-body
+    this.isAttacking = true;
+    const ok = this.player.animator.playAction(clipName);
+    if (!ok) {
+      // se non esiste clip specifica, prova 'attack' generico
+      this.player.animator.playAction('attack');
     }
-    this._attackStrategy.attack(this, clipName);
+
+    // la strategia può fare spawn di hitbox/danni ma non deve gestire play/stop animazioni
+    this._attackStrategy.attack?.(this);
   }
 
   update(dt) {
     super.update(dt);
+
+    // rete di sicurezza: se non c'è nessuna full attiva, rilascia lo stato
+    const full = this.player.animator?._active?.full || null;
+    if (this.isAttacking && !full) {
+      this.isAttacking = false;
+    }
+
     this._attackStrategy?.update?.(this, dt);
   }
 }

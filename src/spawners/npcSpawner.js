@@ -5,6 +5,8 @@ import { getTerrainHeightAt } from '../map/map.js';
 import { ENTITY_CONFIG } from '../utils/entities.js';
 import { registerEnemy } from '../controllers/npcController.js';
 import { instantiateEntity, buildMixerAndActions, preloadEntity } from '../utils/entityFactory.js';
+import { Animator } from '../components/Animator.js'; // <-- nuovo
+
 // =============== Spawner ===============
 async function spawnEnemy(configKey, position, type) {
   const cfg = ENTITY_CONFIG[configKey];
@@ -13,12 +15,13 @@ async function spawnEnemy(configKey, position, type) {
 
   const fbx = instantiateEntity(configKey);
 
+  // posizionamento a terra
   const terrainY = getTerrainHeightAt(position.x, position.z);
   position.y = Number.isFinite(terrainY) ? terrainY + (cfg.yOffset ?? 0) : (cfg.yOffset ?? 0);
   fbx.position.copy(position);
   scene.add(fbx);
 
-  // ⬇️  FIX: serve await perché buildMixerAndActions può essere async
+  // mixer + actions
   let mixer = null, actions = {};
   try {
     const res = await buildMixerAndActions(fbx, cfg);
@@ -28,18 +31,12 @@ async function spawnEnemy(configKey, position, type) {
     console.warn('[NPC] buildMixerAndActions error:', configKey, e);
   }
 
-  // Play sicuro con fallback
-  const play = (k) => actions?.[k]?.play && actions[k].play();
-  if (!play('walk')) {
-    if (!play('idle')) {
-      const first = Object.values(actions)[0];
-      if (first?.play) first.play();
-    }
-  }
-  console.debug('[NPC]', configKey, 'actions:', Object.keys(actions));
+  // --- Stato + Animator centralizzato ---
+  const state = { speed: 0, isFlying: false, isSitting: false, isAttacking: false, isSprinting: false };
+  const animator = new Animator({ mixer, actions }, () => state); // avvia idle se c'è
 
   registerEnemy({
-    type, model: fbx, mixer, actions,
+    type, model: fbx, mixer, actions, animator, state,
     angle: Math.random() * Math.PI * 2,
     speed: type === 'werewolf' ? 1.0 : 3.0,
     alive: true,
@@ -59,7 +56,10 @@ export function spawnFlyingWyvern(pos) { spawnEnemy('wyvern', pos, 'wyvern'); }
 
 export function spawnEnemies() {
   const num_archers = 10, num_werewolves = 0, num_wyvern = 0;
-  for (let i = 0; i < num_archers; i++) spawnWalkingNpc(new THREE.Vector3(Math.random() * 100 - 50, 0, Math.random() * 200 - 100));
-  for (let i = 0; i < num_werewolves; i++) spawnWerewolfNpc(new THREE.Vector3(-250 + Math.random() * 100, 0, Math.random() * 100 - 50));
-  for (let i = 0; i < num_wyvern; i++) spawnFlyingWyvern(new THREE.Vector3(250 + Math.random() * 150, 70, Math.random() * 150));
+  for (let i = 0; i < num_archers; i++)
+    spawnWalkingNpc(new THREE.Vector3(Math.random() * 100 - 50, 0, Math.random() * 200 - 100));
+  for (let i = 0; i < num_werewolves; i++)
+    spawnWerewolfNpc(new THREE.Vector3(-250 + Math.random() * 100, 0, Math.random() * 100 - 50));
+  for (let i = 0; i < num_wyvern; i++)
+    spawnFlyingWyvern(new THREE.Vector3(250 + Math.random() * 150, 70, Math.random() * 150));
 }

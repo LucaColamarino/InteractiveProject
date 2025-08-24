@@ -5,10 +5,11 @@ import { updateWater, terrainMaterial, updateSunPosition } from './map/map.js';
 import { updateEnemies, getEnemies } from './controllers/npcController.js';
 import { sun, moon } from './graphics/shadowManager.js';
 import Stats from 'stats.js';
-import {hudManager } from './ui/hudManager.js';
-import {updateCampfires } from './objects/campfire.js';
-import {pumpActions } from './systems/InputSystem.js';
-import { AnimationSystem } from './systems/AnimationSystem.js';
+import { hudManager } from './ui/hudManager.js';
+import { updateCampfires } from './objects/campfire.js';
+import { pumpActions } from './systems/InputSystem.js';
+// ⬇️ RIMOSSO: AnimationSystem
+// import { AnimationSystem } from './systems/AnimationSystem.js';
 import { interactionManager } from './systems/interactionManager.js';
 import { updateChests } from './objects/chest.js';
 import { updateEnvironment } from './spawners/vegetationSpawner.js';
@@ -20,12 +21,10 @@ import { initInventoryUI } from './ui/inventoryUi.js';
 import { refreshInventoryUI } from './ui/inventoryBridge.js';
 import { wireInventoryInteractions } from './ui/inventoryInteractions.js';
 
-
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 const clock = new THREE.Clock();
-
 
 // === XP SYSTEM (single source of truth) ===
 const STORAGE_KEY = 'player_xp';
@@ -71,34 +70,34 @@ function initXP() {
   loadXP();
   renderXPHud();
 
-  // API globale per assegnare XP da qualsiasi punto (enemy kill, quest, ecc.)
+  // API globale per assegnare XP da qualsiasi punto
   window.giveXP = function(amount = 10) {
     const before = xp.level;
-    const leveled = xp.addXP(Math.max(0, amount|0)); // safe int >= 0
+    const leveled = xp.addXP(Math.max(0, amount|0));
     saveXP();
     renderXPHud();
     if (leveled && xp.level > before) toastLevelUp(xp.level);
   };
-
-  // Se in futuro emetti eventi:
-  // ActionBus.on('enemy:defeated', ({ xp: gain = 20 } = {}) => window.giveXP(gain));
 }
+
 export function startLoop(c) {
   console.log('[GameLoop] Starting main loop...');
   gameManager.controller = c;
-  gameManager.animSys = new AnimationSystem(gameManager.controller.player.anim, gameManager.controller.player.state);
 
+  // ⬇️ Inventory UI
   initInventoryUI();
   wireInventoryInteractions();
   const inv = gameManager.inventory;
   if (inv?.onChange) inv.onChange(() => refreshInventoryUI());
   refreshInventoryUI();
+
   const controller = gameManager.controller;
-  const player = gameManager.controller.player;
-  const animSys = gameManager.animSys;
-  // Init HUD & XP
+  const player = controller?.player;
+
+  // HUD & XP
   hudManager.init();
   initXP();
+
   function animate() {
     stats.begin();
     requestAnimationFrame(animate);
@@ -113,10 +112,9 @@ export function startLoop(c) {
 
     try {
       if (controller) {
-        pumpActions(controller);
-        controller.update(delta);
-        if (player) player.update(delta);
-        animSys.update();
+        pumpActions(controller);    // input → controller.setInputState(...)
+        controller.update(delta);   // movimento/stati (Base/HumanFormController)
+        if (player) player.update(delta); // <-- ORA qui vive l’Animator
       }
 
       if (player?.model) {
@@ -131,11 +129,12 @@ export function startLoop(c) {
       updateFires(delta);
       updateChests(delta);
       updatetorchs(delta);
-      updateCamera(player, delta); 
+      updateCamera(player, delta);
       updateEnvironment();
       gameManager.pickableManager?.update(delta, player?.model?.position);
       interactionManager.update();
       hudManager.update(player, controller, camera, getEnemies());
+
       renderer.render(scene, camera);
     } catch (e) {
       console.error('🚨 Render crash:', e);
@@ -151,6 +150,3 @@ export function startLoop(c) {
 
   animate();
 }
-
-// Esempio di uso:
-// window.giveXP(25);

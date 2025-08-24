@@ -25,13 +25,18 @@ let _isJump = false;
 
 // Helpers
 function _recomputeMoveVec() {
+  if (_controller?.isAttacking) {
+    _moveVec.set(0, 0, 0);
+    return;
+  }
+
   // Movimento relativo alla camera (_yaw)
   const yawRad = THREE.MathUtils.degToRad(_yaw);
   const forward = new THREE.Vector3(Math.sin(yawRad), 0, Math.cos(yawRad));
   const right   = new THREE.Vector3(Math.cos(yawRad), 0, -Math.sin(yawRad));
 
   _moveVec.set(0, 0, 0);
-  if (gameManager.controller?.isSitting) return; // se sei seduto non ti muovi
+  if (_controller?.isSitting) return;
   if (_pressW) _moveVec.sub(forward);
   if (_pressS) _moveVec.add(forward);
   if (_pressD) _moveVec.add(right);
@@ -97,7 +102,7 @@ function _onMouseDown(e) {
       _suppressNextAttack = false;
       return;
     }
-    _controller?.attack('attack');
+    _controller?.attack();
   }
 }
 
@@ -196,22 +201,21 @@ export function setupInput() {
  * Ritorna gli angoli camera per chi li usa (cameraFollow).
  */
 export function pumpActions(controller) {
-  _controller = gameManager.controller;
+  _controller = controller ?? gameManager.controller ?? null;
 
-  // se inventario aperto, azzera il movimento
   if (isInventoryOpen?.()) {
     _moveVec.set(0, 0, 0);
   }
 
-  if (_controller?.setInputState) {
-    _controller.setInputState({
-      moveVec: _moveVec,
-      isShiftPressed: _isShift,
-      isJumpPressed: _isJump,
-    });
-  }
+  _controller?.setInputState?.({
+    moveVec: _moveVec,
+    isShiftPressed: _isShift,
+    isJumpPressed: _isJump,
+  });
+
   return getCameraAngles();
 }
+
 
 export function getCameraAngles() {
   return { yaw: _yaw, pitch: _pitch };

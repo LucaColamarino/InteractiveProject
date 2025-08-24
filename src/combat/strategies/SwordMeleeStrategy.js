@@ -33,52 +33,52 @@ export class SwordMeleeStrategy extends AttackStrategy {
     }
   }
 
-  attack(controller, clipName='attack') {
-    const action = controller.player.anim?.actions?.[clipName];
-    if (controller.isAttacking || !action) return;
+// dentro SwordMeleeStrategy
+attack(controller, clipName='swordAttack') {
+  const actions = controller.player.anim?.actions || {};
+  const action = actions?.[clipName] || null;
+  if (controller.isAttacking || !action) return;
 
-    controller.isAttacking = true;
-    controller.player.anim.play(clipName, { once: true });
+  controller.isAttacking = true;
 
-    const clip = action.getClip?.() || null;
-    this._attackState = { action, clip, windows: HIT_WINDOWS, enemiesHit: new Set() };
+  const clip = action.getClip?.() || null;
+  const dur = clip?.duration ?? 0.6;
+  controller.lockMovementFor(dur);            // blocca per tutta l’anim
 
-    this._updateArcDebug(controller);   // prepara/ruota mesh debug
-    if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+  // Avvia l’azione "full" dal direttore
+  controller.player.animator?.playAction(clipName);
 
-    const mixer = controller.player.anim?.mixer;
-    if (mixer && action) {
-      const onFinished = (e) => {
-        if (e.action === action) {
-          mixer.removeEventListener('finished', onFinished);
-          this._end(controller);
-        }
-      };
-      mixer.addEventListener('finished', onFinished);
-    } else {
-      setTimeout(() => this._end(controller), 600);
-    }
+  this._attackState = { action, clip, windows: HIT_WINDOWS, enemiesHit: new Set() };
+  this._updateArcDebug(controller);
+  if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+
+  // NIENTE listener finished e niente stop manuale:
+  // quando l’azione finisce, l’Animator libera il layer e il controller toglie isAttacking.
+}
+
+update(controller, dt) {
+  if (!this._attackState?.action) return;
+
+  const a = this._attackState.action;
+  const clip = this._attackState.clip;
+  const tFrac = clip && clip.duration > 0 ? (a.time / clip.duration) : 1.0;
+
+  const inWindow = this._attackState.windows.some(w => tFrac >= w.start && tFrac <= w.end);
+  if (inWindow) {
+    if (this._arcDebugMesh) this._arcDebugMesh.visible = true;
+    this._applyHits(controller);
+  } else if (this._arcDebugMesh) {
+    this._arcDebugMesh.visible = false;
   }
+}
 
-  update(controller, dt) {
-    if (!this._attackState?.action) return;
+cancel(controller) {
+  // niente stop azione: lo fa l’Animator/clamp
+  this._attackState = null;
+  if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+  // NON mettere isAttacking=false qui
+}
 
-    const a = this._attackState.action;
-    const clip = this._attackState.clip;
-    const tFrac = clip && clip.duration > 0 ? (a.time / clip.duration) : 1.0;
-    const inWindow = this._attackState.windows.some(w => tFrac >= w.start && tFrac <= w.end);
-
-    if (inWindow) {
-      if (this._arcDebugMesh) this._arcDebugMesh.visible = true;
-      this._applyHits(controller);
-    } else if (this._arcDebugMesh) {
-      this._arcDebugMesh.visible = false;
-    }
-
-    if (a.time >= (clip?.duration ?? 0)) this._end(controller);
-  }
-
-  cancel(controller) { this._end(controller); }
 
   // ---- internal ----
   _end(controller) {
