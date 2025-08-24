@@ -1,6 +1,4 @@
-// Incapsula mixer/azioni e lo "stato" animazione corrente
 import * as THREE from 'three';
-
 export class AnimationComponent {
   constructor(mixer, actions) {
     this.mixer = mixer;
