@@ -1,6 +1,4 @@
-import * as THREE from "three";
 import { gameManager } from "../managers/gameManager";
-import { refreshInventoryUI } from "../ui/inventoryBridge";
 export class InventorySystem {
   constructor() {
     this.items = [];

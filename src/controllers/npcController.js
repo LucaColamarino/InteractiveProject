@@ -21,11 +21,37 @@ export function updateEnemies(delta) {
     const dist = enemy.model.position.distanceTo(playerRef.model.position);
     if (dist > MAX_UPDATE_DISTANCE) continue;
     if (!enemy.alive) {
-      if (enemy.actions?.die?.isRunning()) {
-        enemy.mixer?.update(Math.min(delta, 0.05));
+  // Finché la clip "die" gira, lasciamo il mixer aggiornare
+  if (enemy.actions?.die?.isRunning()) {
+    enemy.mixer?.update(Math.min(delta, 0.05));
+  } else if (enemy._fading) {
+    // Fading per frame (senza traverse)
+    const DURATION = 1.5; // secondi di fade
+    enemy._fade -= (delta / DURATION);
+    const opacity = (enemy._fade > 0) ? enemy._fade : 0;
+
+    for (const part of enemy._fading.parts) {
+      for (const m of part.materials) {
+        if (m && typeof m.opacity !== 'undefined') m.opacity = opacity;
       }
-      continue;
     }
+
+    if (enemy._fade <= 0) {
+      // cleanup materiali (clonati) e rimozione dalla scena
+      for (const part of enemy._fading.parts) {
+        for (const m of part.materials) m?.dispose?.();
+        // NON disporre la geometry se è condivisa tra istanze
+      }
+      enemy._fading = null;
+      scene.remove(enemy.model);
+      const index = enemies.indexOf(enemy);
+      if (index !== -1) enemies.splice(index, 1);
+    }
+  }
+  // niente altro da fare per i nemici non vivi
+  continue;
+}
+
 
     enemy.mixer?.update(Math.min(delta, 0.05));
 
@@ -156,27 +182,37 @@ export function killEnemy(enemy) {
 }
 
 function startFadeOut(enemy) {
+  // Cache di parti e materiali clonati (una volta sola)
+  const parts = [];
   enemy.model.traverse(child => {
-    if (child.isMesh) {
-      child.material = child.material.clone();
-      child.material.transparent = true;
-    }
-  });
+    if (!child.isMesh) return;
 
-  let fade = 1.0;
-  const fadeInterval = setInterval(() => {
-    fade -= 0.02;
-    enemy.model.traverse(child => {
-      if (child.isMesh && child.material?.opacity !== undefined) {
-        child.material.opacity = fade;
-      }
+    const toArray = (m) => Array.isArray(m) ? m : [m];
+    const mats = toArray(child.material);
+
+    const clones = mats.map((mat) => {
+      const c = (typeof mat?.clone === 'function') ? mat.clone() : mat;
+      if (!c) return c;
+      c.transparent = true;     // lo facciamo una volta
+      // c.depthWrite = false;  // opzionale: dipende dalla tua scena
+      // c.alphaHash = true;    // opzionale (MSAA), evita alcuni artefatti
+      c.needsUpdate = true;     // solo ora (non ad ogni frame)
+      return c;
     });
 
-    if (fade <= 0) {
-      clearInterval(fadeInterval);
-      scene.remove(enemy.model);
-      const index = enemies.indexOf(enemy);
-      if (index !== -1) enemies.splice(index, 1);
-    }
-  }, 100);
+    child.material = Array.isArray(child.material) ? clones : clones[0];
+    // alleggerisci shading durante il fade
+    child.castShadow = false;
+    child.receiveShadow = false;
+
+    parts.push({ mesh: child, materials: clones });
+  });
+
+  // Flag di stato fade per updateEnemies
+  enemy._fade = 1.0;
+  enemy._fading = { parts };
+  // opzionale: il modello è statico durante il fade
+  enemy.model.matrixAutoUpdate = false;
 }
+
+

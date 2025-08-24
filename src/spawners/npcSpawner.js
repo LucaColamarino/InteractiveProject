@@ -57,7 +57,7 @@ export function spawnWalkingNpc(pos) { spawnEnemy('archer', pos, 'walker'); }
 export function spawnWerewolfNpc(pos) { spawnEnemy('werewolf', pos, 'werewolf'); }
 export function spawnFlyingWyvern(pos) { spawnEnemy('wyvern', pos, 'wyvern'); }
 
-export function spawnAreaEnemies() {
+export function spawnEnemies() {
   const num_archers = 10, num_werewolves = 0, num_wyvern = 0;
   for (let i = 0; i < num_archers; i++) spawnWalkingNpc(new THREE.Vector3(Math.random() * 100 - 50, 0, Math.random() * 200 - 100));
   for (let i = 0; i < num_werewolves; i++) spawnWerewolfNpc(new THREE.Vector3(-250 + Math.random() * 100, 0, Math.random() * 100 - 50));

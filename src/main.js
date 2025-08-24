@@ -1,7 +1,7 @@
 import { setupInput } from './systems/InputSystem.js';
 import { startLoop } from './gameLoop.js';
 import { createHeightmapTerrain, addWaterPlane, createSky } from './map/map.js';
-import { spawnAreaEnemies} from './spawners/npcSpawner.js';
+import {spawnEnemies} from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
 import { spawnCampfireAt } from './objects/campfire.js';
 import { spawnChestAt } from './objects/chest.js';
@@ -13,7 +13,6 @@ import {gameManager } from './managers/gameManager.js';
 import {updateLoadingProgress, hideLoadingScreen, showLoadingScreen,suspendLoadingScreen} from './loading.js';
 import { PickableManager } from './managers/pickableManager.js';
 import { scene } from './scene.js';
-import './ui/mainMenu.css';
 import { allItems } from './utils/items.js';
 import { preloadAllEntities} from './utils/entityFactory.js';
 import {abilitiesByForm, spawnPlayer} from './player/Player.js'
@@ -67,41 +66,40 @@ async function init() {
       gameManager.pickableManager.prewarm(allItems);
     console.log('[Main] Inizializzazione del gioco...');
     // Step 1: Impostazioni (5%)
-    updateLoadingProgress(5, 'Configurazione impostazioni...');
+    updateLoadingProgress(5, 'Settings configuration...');
     applyMenuSettings(settings);
-    await new Promise(resolve => setTimeout(resolve, 200)); // Piccola pausa visiva
+    await new Promise(resolve => setTimeout(resolve, 100)); 
 
     // Step 2: Asset loading (15%)
-    updateLoadingProgress(15, 'Caricamento asset e risorse...');
+    updateLoadingProgress(15, 'Loading assets and resources...');
     await preloadAllEntities(Object.keys(abilitiesByForm));
     
     // Step 3: Input setup (25%)
-    updateLoadingProgress(25, 'Configurazione controlli...');
+    updateLoadingProgress(25, 'Controls configuration...');
     setupInput();
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Step 4: Terrain creation (45%)
-    updateLoadingProgress(45, 'Generazione terreno...');
+    updateLoadingProgress(45, 'Terrain Generation...');
     await createHeightmapTerrain();
     
     // Step 5: Sky and water (55%)
-    updateLoadingProgress(55, 'Creazione cielo e acqua...');
+    updateLoadingProgress(55, 'Creating sky and water...');
     createSky();
     addWaterPlane();
     await new Promise(resolve => setTimeout(resolve, 150));
 
     // Step 6: Vegetation (70%)
-    updateLoadingProgress(70, 'Popolamento vegetazione...');
+    updateLoadingProgress(70, 'Populate vegetation...');
     await populateVegetation();
     
     // Step 7: NPCs (80%)
-    updateLoadingProgress(80, 'Spawn nemici...');
-    
-    spawnAreaEnemies();
+    updateLoadingProgress(80, 'Spawn enemies...');
+    spawnEnemies();
     await new Promise(resolve => setTimeout(resolve, 100));
 
     // Step 8: Objects (90%)
-    updateLoadingProgress(90, 'Posizionamento oggetti...');
+    updateLoadingProgress(90, 'Placing objects...');
     spawnCampfireAt(0, 0);
     spawntorchAt(30, 15);
     spawntorchAt(17, 20);
@@ -114,14 +112,18 @@ async function init() {
     // spawnWaterAltar(); // se lo vuoi attivo
 
     // Step 9: Player creation (95%)
-    updateLoadingProgress(95, 'Inizializzazione giocatore...');
+    updateLoadingProgress(95, 'Player initialization...');
     gameManager.controller = await spawnPlayer();
     gameManager.inventory.updateEquipmentVisibility();
-    await new Promise(resolve => setTimeout(resolve, 200));
+    gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
+    gameManager.inventory.onChange(() => {
+      gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Step 10: Final setup (100%)
-    updateLoadingProgress(100, 'Finalizzazione...');
-    await new Promise(resolve => setTimeout(resolve, 300));
+    updateLoadingProgress(100, 'Finalyzing...');
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Nascondi loading screen
     hideLoadingScreen();

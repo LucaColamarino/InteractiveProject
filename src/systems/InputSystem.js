@@ -59,13 +59,8 @@ function _onKeyDown(e) {
       interactionManager.tryInteract(gameManager.controller);
       break;
     case 'KeyG':
-      // Sincronizza dati reali -> UI, poi toggla UI (lo UI module gestisce anche il pointer lock)
       refreshInventoryUI();
       toggleInventory();
-      break;
-
-    case 'Digit1':
-      _controller?.attack('attack');
       break;
     case 'Escape':
       escape();
@@ -94,16 +89,8 @@ function _onKeyUp(e) {
 }
 
 function _onMouseDown(e) {
-  // Non processare click se l'inventario è aperto
   if (isInventoryOpen?.()) return;
-
-  // Click sul canvas: se non siamo lockati, richiedi lock e NON attaccare in questo click
-  if (!_pointerLocked && _isCanvasEvent(e)) {
-    _suppressNextAttack = true;
-    _requestPointerLock();
-    return;
-  }
-
+  if (!_pointerLocked && _isCanvasEvent(e)) {_requestPointerLock();return;}
   // sinistro: attacco
   if (e.button === 0) {
     if (_suppressNextAttack) {

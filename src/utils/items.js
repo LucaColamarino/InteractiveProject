@@ -1,10 +1,10 @@
-import {WeaponItem, HelmetItem} from './gameItem.js';
+import {WeaponItem, HelmetItem, ShieldItem} from './gameItem.js';
 export const ironSword = new WeaponItem({
   id: 'sword_iron_01',
   name: 'Iron Sword',
   modelPath: '/models/pickups/iron_sword.fbx',
   meshPrefix: 'sword',             // per l’equipment (sword*)
-  meta: { damage: 12, rarity: 'common' }
+  meta: { damage: 12, rarity: 'common', weaponKind: 'sword', reach: 2.7, arcDeg: 90 }
 });
 
 export const magicWand = new WeaponItem({
@@ -12,18 +12,18 @@ export const magicWand = new WeaponItem({
   name: 'Magic Wand',
   modelPath: '/models/pickups/magic_wand.fbx',
   meshPrefix: 'wand',              // gestisce wand, wand1, wand2, wand3...
-  meta: { damage: 8, bonus: '+mana', rarity: 'rare' }
+  meta: { damage: 8, bonus: '+mana', rarity: 'rare', weaponKind: 'wand', speed: 35, cooldown: 0.45 }
 });
 
 export const ironHelmet = new HelmetItem({
   id: 'helmet_iron_01',
-  name: 'Bronze Helmet',
+  name: 'Iron Helmet',
   modelPath: '/models/pickups/iron_helmet.fbx',
   meshPrefix: 'helmet',
   meta: { armor: 5 }
 });
 
-export const ironShield = new HelmetItem({
+export const ironShield = new ShieldItem({
   id: 'shield_iron_01',
   name: 'Iron Shield',
   modelPath: '/models/pickups/iron_shield.fbx',
@@ -37,5 +37,5 @@ export function getRandomItem() {
   
   const index = Math.floor(Math.random() * allItems.length);
   console.log("getRandomItem:", allItems[index].name);
-  return allItems[index];
+  return allItems[0];
 }
