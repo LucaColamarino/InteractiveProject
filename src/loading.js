@@ -6,34 +6,36 @@ let loadingProgress = 0;
 let isGameStarted = false;
 // Elementi DOM
 const loadingScreen = document.getElementById('loading-screen');
-const progressBar = document.getElementById('loading-percent');
+const progressFill  = document.getElementById('loading-progress'); // CORRETTO
 const loadingMessage = document.getElementById('loading-message');
+const loadingPercent = document.getElementById('loading-percent'); // per il testo
 
 export function updateLoadingProgress(percent, message = '') {
-    if (isGameStarted) return; // Impedisce aggiornamenti dopo che il gioco è iniziato
-    
+    if (isGameStarted) return;
+
     loadingProgress = Math.min(100, Math.max(0, percent));
-    
+
     console.log(`[Loading] Progress: ${loadingProgress}% - ${message}`);
-    
-    // Aggiorna barra visualmente
-    if (progressBar) {
-        progressBar.textContent = loadingProgress + '%';
+
+    // Aggiorna barra grafica
+    if (progressFill) {
+        progressFill.style.width = loadingProgress + '%';
     }
-    
+
+    // Aggiorna testo percentuale
+    if (loadingPercent) {
+        loadingPercent.textContent = loadingProgress + '%';
+    }
+
     // Aggiorna messaggio
     if (loadingMessage && message) {
         loadingMessage.textContent = message;
     }
-    
-    // Auto-nascondi quando raggiungiamo il 100%
+
     if (loadingProgress >= 100) {
-        setTimeout(() => {
-            hideLoadingScreen();
-        }, 800);
+        setTimeout(() => hideLoadingScreen(), 800);
     }
 }
-
 export function hideLoadingScreen() {
     if (!loadingScreen || isGameStarted) return;
     

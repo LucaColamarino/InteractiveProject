@@ -1,195 +1,79 @@
-/* design-system.css - Sistema di Design Unificato per Metamorphosis */
-
 :root {
-  /* === COLORI PRIMARI === */
-  --primary-blue: #64c8ff;
-  --primary-blue-dark: #4a9fd4;
-  --primary-blue-light: #87d4ff;
-  
-  /* === COLORI DI SUPERFICIE === */
-  --surface-dark: rgba(10, 15, 25, 0.9);
-  --surface-medium: rgba(20, 30, 50, 0.9);
-  --surface-light: rgba(30, 45, 70, 0.8);
-  --surface-overlay: rgba(20, 30, 50, 0.95);
-  
-  /* === COLORI FUNZIONALI === */
-  --accent-green: #2ed573;
-  --accent-green-light: #7bed9f;
-  --warning-orange: #f39c12;
-  --warning-orange-light: #f1c40f;
-  --danger-red: #ff4757;
-  --danger-red-light: #ff6b7a;
-  --mana-blue: #3742fa;
-  --mana-blue-light: #5352ed;
-  
-  /* === TESTI === */
-  --text-primary: #e0f0ff;
-  --text-secondary: #cfd3ff;
-  --text-tertiary: #bdbdbd;
-  --text-inverse: #ffffff;
-  
-  /* === SPAZIATURE === */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
-  --space-xxl: 32px;
-  --space-xxxl: 48px;
-  
-  /* === BORDER RADIUS === */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-full: 50%;
-  
-  /* === SHADOWS & GLOWS === */
-  --glow-subtle: 0 0 10px rgba(100, 200, 255, 0.2);
-  --glow-normal: 0 0 15px rgba(100, 200, 255, 0.4);
-  --glow-strong: 0 0 25px rgba(100, 200, 255, 0.6);
-  --glow-intense: 0 0 35px rgba(100, 200, 255, 0.8);
-  --glow-inset: inset 0 0 15px rgba(100, 200, 255, 0.3);
-  
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
-  --shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-  
-  /* === TIMING ANIMAZIONI === */
-  --timing-fast: 150ms;
-  --timing-normal: 300ms;
-  --timing-slow: 600ms;
-  --timing-very-slow: 1000ms;
-  
-  /* === EASINGS === */
-  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
-  --ease-in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --ease-elastic: cubic-bezier(0.68, 0, 0.265, 1.55);
-  
-  /* === TYPOGRAPHY === */
-  --font-primary: 'Exo 2', sans-serif;
-  --font-display: 'Orbitron', monospace;
-  --font-mono: 'Orbitron', monospace;
-  
-  --font-size-xs: 10px;
-  --font-size-sm: 12px;
-  --font-size-md: 14px;
-  --font-size-lg: 16px;
-  --font-size-xl: 18px;
-  --font-size-xxl: 24px;
-  --font-size-xxxl: 28px;
-  
-  --font-weight-normal: 400;
-  --font-weight-medium: 600;
-  --font-weight-bold: 700;
-  --font-weight-black: 900;
-  
-  /* === Z-INDEX LAYERS === */
-  --z-background: 0;
-  --z-content: 1;
-  --z-hud: 10000;
-  --z-modal: 10001;
-  --z-tooltip: 10002;
-  
-  /* === DIMENSIONI COMPONENTI === */
-  --btn-height-sm: 32px;
-  --btn-height-md: 40px;
-  --btn-height-lg: 48px;
-  
-  --progress-height: 24px;
-  --progress-width: 200px;
-  --progress-width-sm: 160px;
-  
-  /* === PATTERN BIOLOGICI === */
-  --hex-pattern: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2364c8ff' fill-opacity='0.03'%3E%3Cpath d='m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  
-  --dna-gradient: linear-gradient(45deg, 
-    transparent 25%, 
-    rgba(100, 200, 255, 0.02) 25%, 
-    rgba(100, 200, 255, 0.02) 50%, 
-    transparent 50%, 
-    transparent 75%, 
-    rgba(100, 200, 255, 0.02) 75%);
+--surface-light: rgba(30, 45, 70, 0.82);
+--surface-overlay: rgba(20, 30, 50, 0.96);
+
+
+/* === FUNZIONALI === */
+--accent-green: #2ed573;
+--accent-green-light: #7bed9f;
+--warning-orange: #f39c12;
+--warning-orange-light: #f1c40f;
+--danger-red: #ff4757;
+--danger-red-light: #ff6b7a;
+--mana-blue: #3742fa;
+--mana-blue-light: #5352ed;
+
+
+/* === TESTI === */
+--text-primary: #e8f2ff;
+--text-secondary: #d2dbfb;
+--text-tertiary: #bdbdbd;
+--text-inverse: #ffffff;
+
+
+/* === SPACING === */
+--space-xs: 4px; --space-sm: 8px; --space-md: 12px; --space-lg: 16px;
+--space-xl: 24px; --space-xxl: 32px; --space-xxxl: 48px;
+
+
+/* === RADII === */
+--radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px; --radius-xl: 20px; --radius-full: 50%;
+
+
+/* === SHADOWS / GLOWS === */
+--glow-subtle: 0 0 10px rgba(100, 200, 255, 0.18);
+--glow-normal: 0 0 16px rgba(100, 200, 255, 0.35);
+--glow-strong: 0 0 26px rgba(100, 200, 255, 0.55);
+--shadow-sm: 0 2px 6px rgba(0,0,0,.35);
+--shadow-md: 0 8px 22px rgba(0,0,0,.5);
+--shadow-lg: 0 18px 44px rgba(0,0,0,.6);
+--shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.55);
+
+
+/* === TIMING / EASING === */
+--timing-fast: 150ms; --timing-normal: 300ms; --timing-slow: 600ms; --timing-very-slow: 1000ms;
+--ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+--ease-in-out-back: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+
+/* === TYPO === */
+--font-primary: 'Exo 2', system-ui, sans-serif;
+--font-display: 'Cinzel', serif; /* allinea allo StartMenu */
+--font-mono: 'Orbitron', monospace;
+
+
+--font-size-xs: 10px; --font-size-sm: 12px; --font-size-md: 14px; --font-size-lg: 16px;
+--font-size-xl: 18px; --font-size-xxl: 24px; --font-size-xxxl: 28px;
+--font-weight-normal: 400; --font-weight-medium: 600; --font-weight-bold: 700; --font-weight-black: 900;
+
+
+/* === Z === */
+--z-background: 0; --z-content: 1; --z-hud: 10000; --z-modal: 10001; --z-tooltip: 10002;
+
+
+/* === COMPONENT DIMENSIONS === */
+--btn-height-sm: 32px; --btn-height-md: 40px; --btn-height-lg: 48px;
+--progress-height: 24px; --progress-width: 200px; --progress-width-sm: 160px;
+
+
+/* === PATTERN (tenui, niente griglie/stelline) === */
+--dna-gradient: linear-gradient(45deg, transparent 25%, rgba(255, 177, 74, 0.06) 25%, rgba(255, 177, 74, 0.06) 50%, transparent 50%, transparent 75%, rgba(255, 177, 74, 0.06) 75%);
 }
 
-/* === UTILITY CLASSES === */
-.bio-pattern {
-  background-image: var(--hex-pattern);
-}
 
-.dna-pattern {
-  background-image: var(--dna-gradient);
-  background-size: 20px 20px;
-}
-
-.glow-text {
-  text-shadow: 0 0 10px currentColor;
-}
-
-.pulse-glow {
-  animation: pulseGlow 2s infinite;
-}
-
-@keyframes pulseGlow {
-  0%, 100% { 
-    box-shadow: var(--glow-normal); 
-  }
-  50% { 
-    box-shadow: var(--glow-strong); 
-  }
-}
-
-/* === BASE RESET === */
-* {
-  box-sizing: border-box;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  font-family: var(--font-primary);
-  color: var(--text-primary);
-  background-color: #000;
-}
-
-/* === COMPONENT BASE CLASSES === */
-.surface {
-  background: var(--surface-dark);
-  border: 1px solid rgba(100, 200, 255, 0.2);
-}
-
-.surface-elevated {
-  background: var(--surface-medium);
-  box-shadow: var(--shadow-md), var(--glow-subtle);
-}
-
-.btn-base {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: var(--surface-light);
-  color: var(--text-primary);
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-medium);
-  font-size: var(--font-size-md);
-  cursor: pointer;
-  transition: all var(--timing-fast) var(--ease-out-quart);
-  text-decoration: none;
-  min-height: var(--btn-height-md);
-}
-
-.btn-base:hover {
-  background: var(--surface-medium);
-  box-shadow: var(--glow-subtle);
-  transform: translateY(-1px);
-}
-
-.btn-base:active {
-  transform: translateY(1px);
-  transition-duration: 50ms;
-}
+/* Utilities minime */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; color: var(--text-primary); background: #000; font-family: var(--font-primary); }
+.surface { background: var(--surface-dark); border: 1px solid rgba(255, 177, 74, 0.18); }
+.btn-base { display:inline-flex; align-items:center; justify-content:center; gap:var(--space-sm); padding:var(--space-md) var(--space-xl); min-height:var(--btn-height-md); border-radius:var(--radius-md); border:1px solid rgba(255,255,255,.12); background:rgba(30,25,20,.75); color:var(--text-primary); font-family:var(--font-display); transition: all var(--timing-fast) var(--ease-out-quart); }
+.btn-base:hover { transform: translateY(-1px); box-shadow: 0 0 18px rgba(212,175,55,.18); }

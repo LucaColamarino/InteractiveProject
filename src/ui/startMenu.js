@@ -58,13 +58,6 @@ export class StartMenu {
           <p>"In the depths of darkness, only the worthy shall prevail..."</p>
         </div>
       </div>
-      
-      <div class="sm-corner-ornaments">
-        <div class="sm-ornament sm-ornament-tl"></div>
-        <div class="sm-ornament sm-ornament-tr"></div>
-        <div class="sm-ornament sm-ornament-bl"></div>
-        <div class="sm-ornament sm-ornament-br"></div>
-      </div>
     `;
     
     document.body.appendChild(root);

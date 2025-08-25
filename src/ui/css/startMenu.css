@@ -15,6 +15,7 @@
   opacity: 0;
   transform: scale(0.95);
   transition: all 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+  isolation: isolate;
 }
 
 #start-menu.sm-show {
@@ -269,7 +270,6 @@
   border-right-color: #8b1a1a;
   color: #ff6b6b;
 }
-
 .sm-quote {
   text-align: center;
   font-family: 'Cinzel', serif;
@@ -279,28 +279,24 @@
   max-width: 400px;
   margin-top: 20px;
 }
-
 .sm-quote p {
   margin: 0;
   font-size: 16px;
   line-height: 1.4;
   position: relative;
 }
-
 .sm-quote p::before,
 .sm-quote p::after {
   content: '❦';
   font-size: 12px;
   opacity: 0.5;
 }
-
 .sm-corner-ornaments {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 5;
 }
-
 .sm-ornament {
   position: absolute;
   width: 80px;
@@ -311,40 +307,34 @@
   opacity: 0.6;
   animation: ornamentGlow 6s ease-in-out infinite;
 }
-
 .sm-ornament-tl {
   top: 40px;
   left: 40px;
   animation-delay: 0s;
 }
-
 .sm-ornament-tr {
   top: 40px;
   right: 40px;
   transform: rotate(90deg);
   animation-delay: 1.5s;
 }
-
 .sm-ornament-bl {
   bottom: 40px;
   left: 40px;
   transform: rotate(-90deg);
   animation-delay: 3s;
 }
-
 .sm-ornament-br {
   bottom: 40px;
   right: 40px;
   transform: rotate(180deg);
   animation-delay: 4.5s;
 }
-
 /* Animations */
 @keyframes flameBorder {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-
 @keyframes titleGlow {
   0%, 100% { 
     background-position: 0% 50%;
@@ -361,54 +351,45 @@
       0 0 45px rgba(255, 215, 0, 0.2);
   }
 }
-
 @keyframes titlePulse {
   0%, 100% { opacity: 0.1; transform: scale(1); }
   50% { opacity: 0.2; transform: scale(1.05); }
 }
-
 @keyframes fogDrift {
   0%, 100% { transform: translateX(-10px); opacity: 0.3; }
   50% { transform: translateX(10px); opacity: 0.5; }
 }
-
 @keyframes emberPulse {
   0%, 100% { transform: translateY(-50%) scale(1); opacity: 1; }
   50% { transform: translateY(-50%) scale(1.5); opacity: 0.7; }
 }
-
 @keyframes ornamentGlow {
   0%, 100% { opacity: 0.6; filter: brightness(1); }
   50% { opacity: 0.8; filter: brightness(1.2); }
 }
-
 /* Responsive */
 @media (max-width: 768px) {
   .sm-card {
     padding: 40px 20px;
     gap: 30px;
   }
-  
+ 
   .sm-menu {
     min-width: 280px;
   }
-  
   .sm-btn {
     padding: 14px 20px;
     min-height: 50px;
     font-size: 16px;
-  }
-  
+  }  
   .sm-btn-icon {
     font-size: 20px;
     margin-right: 12px;
-  }
-  
+  }  
   .sm-ornament {
     width: 50px;
     height: 50px;
   }
-  
   .sm-ornament-tl,
   .sm-ornament-tr,
   .sm-ornament-bl,
@@ -419,16 +400,13 @@
     right: 20px;
   }
 }
-
 @media (max-width: 480px) {
   .sm-card {
     padding: 30px 15px;
   }
-  
   .sm-title-main {
     letter-spacing: 1px;
   }
-  
   .sm-title-sub {
     letter-spacing: 4px;
   }
