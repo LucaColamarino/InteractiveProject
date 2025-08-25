@@ -154,7 +154,19 @@ export class TreeSpawner {
     t.generateMipmaps = true;
     return t;
   }
-
+getNearbyTrees(x, z, radius = 10) {
+  const key = this._getSpatialKey(x, z);
+  const nearbyKeys = this._getNearbyKeys(key, radius);
+  const out = [];
+  for (const k of nearbyKeys) {
+    if (this._spatialGrid.has(k)) {
+      for (const pos of this._spatialGrid.get(k)) {
+        out.push(pos);
+      }
+    }
+  }
+  return out;
+}
   _loadTexSet(set = {}, anisotropy = 8) {
     const out = {};
     for (const k of Object.keys(set || {})) {

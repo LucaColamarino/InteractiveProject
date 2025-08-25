@@ -6,7 +6,8 @@ import { scene, camera } from "../scene.js";
 import { getTerrainHeightAt } from "../map/map.js";
 
 let bushes = null;
-let trees  = null;
+export let  trees  = null;
+let rocks = null;
 
 export async function populateVegetation() {
   await Promise.all([spawnSmallRocks(),spawnBushes(),spawnTrees()]);
@@ -51,7 +52,7 @@ async function spawnTrees() {
 }
 
 async function spawnSmallRocks() {
- trees = new SmallRockSpawner({
+ rocks = new SmallRockSpawner({
   scene,
   getTerrainHeightAt,
   lodDistances: [60, 140, 260, 400], // 4 livelli
@@ -62,7 +63,7 @@ async function spawnSmallRocks() {
 });
 
   const area = { x: 0, z: 0, width: 500, depth: 500 };
-  await trees.spawn('/models/environment/smallrock.fbx',2000 , area); //200
+  await rocks.spawn('/models/environment/smallrock.fbx',2000 , area); //200
 }
 
 
