@@ -22,8 +22,8 @@ export class StartMenu {
         <div class="sm-flame-border"></div>
         <div class="sm-title-container">
           <h1 class="sm-title">
-            <span class="sm-title-main">DARK SOULS</span>
-            <span class="sm-title-sub">REBORN</span>
+            <span class="sm-title-main">METAMORPHOSIS</span>
+            <span class="sm-title-sub">EVOLVE BEYOND</span>
           </h1>
           <div class="sm-title-glow"></div>
         </div>

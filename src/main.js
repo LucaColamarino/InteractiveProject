@@ -100,7 +100,7 @@ async function init() {
     spawntorchAt(-20, -15);
     spawnChestAt(6, 6,ironShield);
 
-    spawnChestAt(-6, -6, ironSword);
+    spawnChestAt(-6, -6, magicWand);
 
     updateLoadingProgress(95, 'Player initialization...');
     gameManager.controller = await spawnPlayer();

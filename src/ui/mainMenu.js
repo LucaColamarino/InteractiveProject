@@ -22,7 +22,7 @@ export class MainMenu {
     root.innerHTML = `
       <div class="mm-backdrop"></div>
       <div class="mm-card">
-        <h1 class="mm-title">My Game</h1>
+        <h1 class="mm-title">Metamorphosis</h1>
 
         <div class="mm-section">
           <button id="mm-resume" class="mm-btn" style="display = 'inline-block'">⏯ Resume</button>
@@ -60,8 +60,6 @@ export class MainMenu {
         <div class="mm-section">
           <button id="mm-quit" class="mm-btn mm-danger">Quit</button>
         </div>
-
-        <p class="mm-hint">Tip: premi ESC per aprire/chiudere questo menu in gioco.</p>
       </div>
     `;
     document.body.appendChild(root);

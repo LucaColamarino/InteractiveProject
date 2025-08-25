@@ -151,7 +151,7 @@ function updateRadarSystem(player, enemies, camera) {
   // Yaw camera
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
-  const yawDeg = M.toDeg(Math.atan2(dir.x, dir.z));
+  const yawDeg = M.toDeg(Math.atan2(dir.x, dir.z))+90;
 
   // Pos player
   const p = player.model.position;
@@ -209,7 +209,7 @@ function updateRadarSystem(player, enemies, camera) {
   // Freccia direzione
   if (radar.headingArrow) {
     withBaseTransform(radar.headingArrow);
-    setTransform(radar.headingArrow, `translate(-50%, -60%) rotate(${-yawDeg}deg)`);
+    setTransform(radar.headingArrow, `translate(-7px, -5px) rotate(${-yawDeg}deg)`);
   }
 }
 

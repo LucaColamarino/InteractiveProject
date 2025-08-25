@@ -1,7 +1,7 @@
 :root {
 --surface-light: rgba(30, 45, 70, 0.82);
 --surface-overlay: rgba(20, 30, 50, 0.96);
-
+--font-display: 'Cinzel', serif;
 
 /* === FUNZIONALI === */
 --accent-green: #2ed573;
