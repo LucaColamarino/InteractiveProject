@@ -10,10 +10,12 @@ export const ENTITY_CONFIG = {
       jump: '/models/animations/KnightJump.fbx',
       die: '/models/animations/KnightDie.fbx',
       block: '/models/animations/KnightBlock.fbx',
+      shieldBlock: '/models/animations/KnightBlockShield.fbx',
       sitIdle: '/models/animations/SittingIdle.fbx',
       standUp: '/models/animations/StandingUp.fbx',
       swordAttack: '/models/animations/KnightSwordAttack.fbx',
       wandCast: '/models/animations/KnightWandAttack.fbx',
+      shockwave: '/models/animations/KnightShockwave.fbx'
     },
     textures: {
       armor: {

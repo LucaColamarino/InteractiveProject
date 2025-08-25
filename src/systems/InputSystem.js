@@ -196,10 +196,10 @@ function _onMouseDown(e) {
   // Attacchi
   if (e.button === 0) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
-    _controller?.baseAttack?.();
+    _controller?.attack?.();
   } else if (e.button === 2) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
-    _controller?.secondAttack?.();
+   _controller?.block?.();
   }
 }
 

@@ -6,7 +6,7 @@ const HIT_WINDOWS = [{ start: 0.30, end: 0.55 }];
 const DEFAULT_SWORD_ARC = {
   reach: 2.7,
   arcDeg: 90,
-  // 0° = davanti al player. Metti 180 per colpire dietro.
+  // 0° = davanti al player (usa 180 per colpire anche dietro)
   yawOffsetDeg: 180,
   pitchOffsetDeg: -10,
   yOffset: 1.3
@@ -15,39 +15,44 @@ const DEFAULT_SWORD_ARC = {
 export class AttackStrategy {
   constructor() {
     this._arcDebugMesh = null;
-    this._attackState = null; // { action, clip, clipName, windows, enemiesHit:Set }
-    this._arc = { ...DEFAULT_SWORD_ARC };
-    this.debug = false; // mostra/nasconde la mesh di debug
-  }
-
-  // ---- hook opzionali per le sottoclassi ----
-  onEquip(controller, weaponItem) {}
-  cancel(controller) {
+    // { action, clip, clipName, windows:[{start,end}], winApplied:Bool[], enemiesHit:Set }
     this._attackState = null;
-    controller.isAttacking = false;
-    if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+    this._arc = { ...DEFAULT_SWORD_ARC };
+    this.debug = true; // mostra/nasconde la mesh di debug
   }
 
-  // ---- API pubblica: attacco base condiviso (slash) ----
-  attack(controller) { return this.baseAttack(controller); }
+  onEquip(controller, weaponItem) {
+    // sovrascritto nelle sottoclassi (es: set reach/arc)
+  }
 
+  attack(controller) {
+    // sovrascritto nelle sottoclassi
+  }
+
+  specialAttack(controller) {
+    // sovrascritto nelle sottoclassi
+  }
+
+  // ---- Attacco base comune (es. sword slash) ----
   baseAttack(controller) {
-    const clipName = 'swordAttack';
     const actions = controller.player.animator?.actions || {};
+    const primary = actions['swordAttack'] || actions['attack'] || null;
+    if (!primary || this._attackState) return false;
 
-    let action = actions[clipName] || actions['attack'] || null;
+    // se non c'è 'swordAttack', cerca un'anim qualsiasi contenente "attack"
+    let action = primary;
     if (!action) {
       const key = Object.keys(actions).find(k => k.toLowerCase().includes('attack'));
       if (key) action = actions[key];
     }
-    if (!action || this._attackState) return false;
+    if (!action) return false;
 
-    const chosenName = action._clipName || clipName;
-    const ok = controller.player.animator?.playAction(chosenName);
+    const clipName = action._clipName || 'swordAttack';
+    const ok = controller.player.animator?.playAction(clipName);
     if (!ok) return false;
 
     const clip = action.getClip?.() || null;
-    const dur  = clip?.duration ?? action.getClip?.()?.duration ?? 0.8;
+    const dur  = clip?.duration ?? 0.8;
 
     controller.lockMovementFor(dur);
     controller.isAttacking = true;
@@ -55,70 +60,52 @@ export class AttackStrategy {
     this._attackState = {
       action,
       clip,
-      clipName: chosenName,
+      clipName,
       windows: HIT_WINDOWS,
+      winApplied: HIT_WINDOWS.map(() => false),
       enemiesHit: new Set()
     };
 
     this._updateArcDebug(controller);
     if (this._arcDebugMesh) this._arcDebugMesh.visible = this.debug;
-
     return true;
   }
 
-  // ---- update comune: gestisce tempo, finestra hit e fine anim ----
+  // ---- Ciclo di vita attacco base: gestisce finestre hit ----
   update(controller, dt) {
-    // nessun attacco in corso → gestisci solo vis debug
-    if (!this._attackState?.action) {
-      if (this._arcDebugMesh) this._arcDebugMesh.visible = this.debug;
-      return;
-    }
+    if (!this._attackState?.clip) return;
 
-    this._updateArcDebug(controller);
+    const { action, clip, windows, winApplied } = this._attackState;
+    const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
 
-    const a = this._attackState.action;
-    const clipDur = this._getClipDurationSafe(this._attackState);
-    const t = a.time ?? 0;
-    const tFrac = clipDur > 0 ? THREE.MathUtils.clamp(t / clipDur, 0, 1) : 1.0;
-
-    const inWindow = this._attackState.windows.some(
-      (w) => tFrac >= w.start && tFrac <= w.end
-    );
-
-    if (this._arcDebugMesh) {
-      this._arcDebugMesh.visible = this.debug;
-      if (this.debug) {
-        this._arcDebugMesh.material.color.set(inWindow ? 0xff0000 : 0x00ffff);
+    // 1) Applica i colpi nelle finestre attive (una sola volta per finestra)
+    for (let i = 0; i < windows.length; i++) {
+      const w = windows[i];
+      if (!winApplied[i] && frac >= w.start && frac <= w.end) {
+        this._applyHits?.(controller);
+        winApplied[i] = true;
       }
     }
 
-    // fine animazione → reset
-    const anim = controller.player.animator;
-    const weight = anim?._getActionWeight?.(this._attackState.clipName) ?? 0;
-    const ended = !a.isRunning?.() || weight <= 0.001 || tFrac >= 0.999;
+    // 2) Fine animazione -> reset stato
+    const weight = controller.player.animator?._getActionWeight?.(this._attackState.clipName) ?? 0;
+    const ended = !action.isRunning?.() || weight <= 0.001 || frac >= 0.999;
+
     if (ended) {
       this._attackState = null;
       controller.isAttacking = false;
-      if (this._arcDebugMesh) this._arcDebugMesh.visible = this.debug;
-      return;
+      if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
     }
-
-    // finestra aperta → lascia alla sottoclasse applicare i colpi
-    if (inWindow) this._applyHits(controller);
   }
 
-  // ---- da overridare nelle sottoclassi per definire il danno ----
-  _applyHits(controller) {}
-
-  // ---- helpers protetti ------------------------------------------------------
-
-  _getClipDurationSafe(state) {
-    const a = state?.action;
-    const c = state?.clip;
-    const d = c?.duration ?? a?.getClip?.()?.duration ?? 1.0;
-    return (typeof d === 'number' && isFinite(d) && d > 0) ? d : 1.0;
+  cancel(controller) {
+    this._attackState = null;
+    controller.isAttacking = false;
+    controller.isBlocking = false;
+    if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
   }
 
+  // ================== ARCO DI COLPO (comune) ==================
   _setArc(reach, arcDeg) {
     if (typeof reach === 'number') this._arc.reach = reach;
     if (typeof arcDeg === 'number') this._arc.arcDeg = arcDeg;
@@ -129,8 +116,11 @@ export class AttackStrategy {
   }
 
   _inSwordArc(playerObj, enemyObj) {
+    if (!playerObj || !enemyObj) return false;
+
     const { reach, arcDeg, yOffset } = this._arc;
 
+    // origine del colpo leggermente sopra il terreno (altezza busto)
     const Pc = playerObj.position.clone();
     Pc.y += yOffset;
 
@@ -196,9 +186,37 @@ export class AttackStrategy {
     this._arcDebugMesh = mesh;
     return mesh;
   }
+
+  // ================== BLOCCO COMUNE ==================
+  block(controller) {
+    if (controller.isAttacking) return false;
+
+    const animator = controller.player.animator;
+    if (!animator?.actions) return false;
+
+    const hasShield = controller.player.equipment?.offhand?.type === 'shield';
+    const clipName = hasShield ? 'blockShield' : 'block';
+    const action = animator.actions[clipName];
+    if (!action) return false;
+
+    const ok = animator.playAction(clipName);
+    if (!ok) return false;
+
+    const clip = action.getClip?.() || null;
+    const dur = clip?.duration ?? 0.5;
+
+    controller.lockMovementFor(dur);
+    controller.isBlocking = true;
+
+    setTimeout(() => {
+      controller.isBlocking = false;
+    }, dur * 1000);
+
+    return true;
+  }
 }
 
-// ---------- helpers file‑local ----------
+// ---------------- helpers (file-local) ----------------
 function makeArcGeometry(reach, arcDeg, segments = 32) {
   const verts = [0, 0, 0];
   const half = THREE.MathUtils.degToRad(arcDeg * 0.5);
@@ -227,6 +245,7 @@ function localSlashDir(arc) {
   );
   return dir.applyEuler(e).normalize();
 }
+
 function worldSlashDir(playerObj, arc) {
   return localSlashDir(arc).applyQuaternion(playerObj.quaternion).normalize();
 }
