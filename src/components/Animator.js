@@ -20,7 +20,7 @@ export class Animator {
     this._flyBlend     = 10.0;  // reattività quando c'è overlay
     this._fullFadeIn   = 0.16;
     this._fullFadeOut  = 0.16;
-
+    this._isHoldFull = false;
     // Anticipo rientro loco PRIMA che la full finisca
     this._fullBackWindow = 0.20; // secondi finali in cui rientra la locomozione
 
@@ -91,48 +91,49 @@ export class Animator {
       this._targetW.sitIdle = 0;
     }
 
-    // === Overlay full ===
-    if (this._activeFull) {
-      const a = this.actions[this._activeFull];
-      const clip = a?.getClip?.();
-      const dur = clip?.duration || 0;
-      const t   = a?.time ?? 0;
-      // fail-safe: se l'azione non sta più girando o ha peso ~0, considera la full finita
-      if (a && (!a.isRunning?.() || (a.getEffectiveWeight?.() ?? 0) <= 0.001)) {
-        this._activeFull = null;
-        this._fullFading = false;
-        this._locoSupportT = this._locoHold;
+// === Overlay full ===
+if (this._activeFull) {
+  const a = this.actions[this._activeFull];
+  const clip = a?.getClip?.();
+  const dur = clip?.duration || 0;
+  const t   = a?.time ?? 0;
+
+  // fail-safe se l'action non sta più girando o ha peso ~0
+  if (a && (!a.isRunning?.() || (a.getEffectiveWeight?.() ?? 0) <= 0.001)) {
+    this._activeFull = null;
+    this._fullFading = false;
+    this._isHoldFull = false;
+    this._locoSupportT = this._locoHold;
+  }
+
+  // di default, mentre la full "corre", portiamo loco a 0
+  let suppressLoco = true;
+
+  if (!this._isHoldFull) {
+    // SOLO per le full normali (non hold): rientro e antifade negli ultimi secondi
+    if (dur > 0 && (dur - t) <= this._fullBackWindow) {
+      suppressLoco = false;
+      if (!_bool(a, '_antifadeTriggered')) {
+        a.fadeOut?.(this._fullFadeOut);
+        a._antifadeTriggered = true;
+        this._fullFading = true;
+        this._locoSupportT = Math.max(this._locoSupportT, this._locoHold);
       }
-
-
-      // di default, mentre la full "corre", portiamo loco a 0
-      let suppressLoco = true;
-
-      // se siamo negli ULTIMI secondi della full, prepariamo il rientro:
-      if (dur > 0 && (dur - t) <= this._fullBackWindow) {
-        suppressLoco = false; // consenti risalita dei targetW già calcolati
-        if (!_bool(a, '_antifadeTriggered')) {
-          // lancia un fadeOut anticipato della full
-          a.fadeOut?.(this._fullFadeOut);
-          a._antifadeTriggered = true;
-          this._fullFading = true;
-          // sostieni un filo di loco durante l'overlap
-          this._locoSupportT = Math.max(this._locoSupportT, this._locoHold);
-        }
-      }
-
-      if (suppressLoco) {
-        this._targetW.idle = 0;
-        this._targetW.walk = 0;
-        this._targetW.run  = 0;
-        this._targetW.fly = 0;
-        this._targetW.sitIdle = 0;
-        // durante la salita iniziale della full, sostieni un attimo la loco
-        if (this._locoSupportT <= 0) this._locoSupportT = this._locoHold;
-      }
-    } else {
-      // nessuna full → i targetW restano quelli "desiderati"
     }
+  }
+
+  if (suppressLoco) {
+    this._targetW.idle = 0;
+    this._targetW.walk = 0;
+    this._targetW.run  = 0;
+    this._targetW.fly = 0;
+    this._targetW.sitIdle = 0;
+    if (this._locoSupportT <= 0) this._locoSupportT = this._locoHold;
+  }
+} else {
+  // nessuna full → i target restano quelli calcolati sopra
+}
+
 
     // === Interpola pesi verso target ===
     const k = (this._activeFull ? this._flyBlend : this._blendSpeed) * dt;
@@ -215,6 +216,52 @@ export class Animator {
       this._locoSupportT = this._locoHold;
     }
   }
+
+  /** Avvia un'azione full-body in modalità HOLD: loop infinito finché non la fermi */
+playHold(name, { fadeIn = this._fullFadeIn } = {}) {
+  const a = this.actions[name];
+  if (!a) return false;
+
+  // Se c'è già una full diversa, sfumala
+  if (this._activeFull && this._activeFull !== name) {
+    this.actions[this._activeFull]?.fadeOut?.(this._fullFadeOut);
+    this._fullFading = true;
+  }
+
+  // Mantieni in play le loco (scenderanno di peso)
+  this._ensurePlayLoop('idle');
+  this._ensurePlayLoop('walk');
+  this._ensurePlayLoop('run');
+
+  this._safeEnable(a);
+  a.setLoop?.(THREE.LoopRepeat, Infinity);
+  a.clampWhenFinished = false;
+  a.setEffectiveWeight?.(Math.max(0.05, a.getEffectiveWeight?.() ?? 0));
+  a.reset().fadeIn(fadeIn).play();
+  a._clipName = name;
+
+  this._activeFull = name;
+  this._fullFading = false;
+  this._isHoldFull = true;          // <— importante: siamo in modalità hold
+  this._locoSupportT = this._locoHold;
+  return true;
+}
+
+/** Ferma un'azione hold con fade-out pulito */
+stopHold(name, { fadeOut = this._fullFadeOut } = {}) {
+  const a = this.actions[name];
+  if (!a) return;
+  a.fadeOut?.(fadeOut);
+  a.stop?.();
+
+  if (this._activeFull === name) {
+    this._activeFull = null;
+    this._fullFading = false;
+    this._isHoldFull = false;
+    this._locoSupportT = this._locoHold;
+  }
+}
+
 
   // ===== internals =====
 

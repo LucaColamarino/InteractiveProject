@@ -1,6 +1,6 @@
 // combat/strategies/AttackStrategy.js
 import * as THREE from 'three';
-import { gameManager } from '../../managers/gameManager';
+import { gameManager } from '../../managers/gameManager.js';
 
 const HIT_WINDOWS = [{ start: 0.30, end: 0.55 }];
 
@@ -19,20 +19,15 @@ export class AttackStrategy {
     // { action, clip, clipName, windows:[{start,end}], winApplied:Bool[], enemiesHit:Set }
     this._attackState = null;
     this._arc = { ...DEFAULT_SWORD_ARC };
-    this.debug = true; // mostra/nasconde la mesh di debug
+    this.debug = true;
+
+    // Stato parata
+    this._blockClipName = null;  // 'block' o 'blockShield'
   }
 
-  onEquip(controller, weaponItem) {
-    // sovrascritto nelle sottoclassi (es: set reach/arc)
-  }
-
-  attack(controller) {
-    // sovrascritto nelle sottoclassi
-  }
-
-  specialAttack(controller) {
-    // sovrascritto nelle sottoclassi
-  }
+  onEquip(controller, weaponItem) { /* override se serve */ }
+  attack(controller) { /* override */ }
+  specialAttack(controller) { /* override */ }
 
   // ---- Attacco base comune (es. sword slash) ----
   baseAttack(controller) {
@@ -40,7 +35,6 @@ export class AttackStrategy {
     const primary = actions['swordAttack'] || actions['attack'] || null;
     if (!primary || this._attackState) return false;
 
-    // se non c'è 'swordAttack', cerca un'anim qualsiasi contenente "attack"
     let action = primary;
     if (!action) {
       const key = Object.keys(actions).find(k => k.toLowerCase().includes('attack'));
@@ -49,7 +43,7 @@ export class AttackStrategy {
     if (!action) return false;
 
     const clipName = action._clipName || 'swordAttack';
-    const ok = controller.player.animator?.playAction(clipName);
+    const ok = controller.player.animator?.playAction?.(clipName);
     if (!ok) return false;
 
     const clip = action.getClip?.() || null;
@@ -72,30 +66,29 @@ export class AttackStrategy {
     return true;
   }
 
-  // ---- Ciclo di vita attacco base: gestisce finestre hit ----
+  // ---- Update: hit-windows ----
   update(controller, dt) {
-    if (!this._attackState?.clip) return;
+    if (this._attackState?.clip) {
+      const { action, clip, windows, winApplied } = this._attackState;
+      const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
 
-    const { action, clip, windows, winApplied } = this._attackState;
-    const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
-
-    // 1) Applica i colpi nelle finestre attive (una sola volta per finestra)
-    for (let i = 0; i < windows.length; i++) {
-      const w = windows[i];
-      if (!winApplied[i] && frac >= w.start && frac <= w.end) {
-        this._applyHits?.(controller);
-        winApplied[i] = true;
+      // ⚠️ FIX: incrementare i, altrimenti loop infinito
+      for (let i = 0; i < windows.length; i++) {
+        const w = windows[i];
+        if (!winApplied[i] && frac >= w.start && frac <= w.end) {
+          this._applyHits?.(controller);
+          winApplied[i] = true;
+        }
       }
-    }
 
-    // 2) Fine animazione -> reset stato
-    const weight = controller.player.animator?._getActionWeight?.(this._attackState.clipName) ?? 0;
-    const ended = !action.isRunning?.() || weight <= 0.001 || frac >= 0.999;
+      const weight = controller.player.animator?._getActionWeight?.(this._attackState.clipName) ?? 0;
+      const ended = !action.isRunning?.() || weight <= 0.001 || frac >= 0.999;
 
-    if (ended) {
-      this._attackState = null;
-      controller.isAttacking = false;
-      if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+      if (ended) {
+        this._attackState = null;
+        controller.isAttacking = false;
+        if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+      }
     }
   }
 
@@ -121,7 +114,6 @@ export class AttackStrategy {
 
     const { reach, arcDeg, yOffset } = this._arc;
 
-    // origine del colpo leggermente sopra il terreno (altezza busto)
     const Pc = playerObj.position.clone();
     Pc.y += yOffset;
 
@@ -188,32 +180,42 @@ export class AttackStrategy {
     return mesh;
   }
 
-  // ================== BLOCCO COMUNE ==================
-  block(controller) {
-    if (controller.isAttacking) return false;
+  // ================== BLOCCO COMUNE (HOLD) ==================
+  blockStart(controller) {
+    if (controller.isAttacking || controller.isBlocking) return false;
 
     const animator = controller.player.animator;
-    if (!animator?.actions) return false;
-    const hasShield = gameManager.inventory?.equipment?.["shield"]!=null;
-    console.log("hasShield",hasShield);
-    const clipName = hasShield ? 'blockShield' : 'block';
-    const action = animator.actions[clipName];
-    if (!action) return false;
+    const actions  = animator?.actions;
+    if (!actions) return false;
 
-    const ok = animator.playAction(clipName);
+    const hasShield = !!gameManager.inventory?.equipment?.shield;
+    const name = hasShield ? 'blockShield' : 'block';
+    if (!actions[name]) { console.warn('[Block] action mancante:', name); return false; }
+
+    const ok = animator.playHold?.(name); // <— usa la nuova hold dell'Animator
     if (!ok) return false;
 
-    const clip = action.getClip?.() || null;
-    const dur = clip?.duration ?? 0.5;
-
-    controller.lockMovementFor(dur);
+    this._blockClipName = name;
     controller.isBlocking = true;
-
-    setTimeout(() => {
-      controller.isBlocking = false;
-    }, dur * 1000);
-
     return true;
+  }
+
+  blockEnd(controller) {
+    if (!controller.isBlocking) return false;
+
+    const animator = controller.player.animator;
+    const name = this._blockClipName || 'block';
+    animator.stopHold?.(name); // <— spegni la hold con fade-out
+
+    controller.isBlocking = false;
+    this._blockClipName = null;
+    return true;
+  }
+
+  // compat: toggle
+  block(controller) {
+    if (controller.isBlocking) return this.blockEnd(controller);
+    return this.blockStart(controller);
   }
 }
 

@@ -65,7 +65,7 @@ export class BaseFormController {
   }
 
   update(dt) {
-    const movementLocked = this._moveLockT > 0 || (this.attackFreezesMovement && this.isAttacking);
+    const movementLocked = this._moveLockT > 0 || this.isBlocking || (this.attackFreezesMovement && this.isAttacking);
     if (this._moveLockT > 0) this._moveLockT -= dt;
 
     // ----- Movimento orizzontale -----

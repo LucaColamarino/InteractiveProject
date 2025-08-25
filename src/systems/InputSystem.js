@@ -199,7 +199,7 @@ function _onMouseDown(e) {
     _controller?.attack?.();
   } else if (e.button === 2) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
-   _controller?.block?.();
+   _controller?.blockStart?.();
   }
 }
 
@@ -217,7 +217,12 @@ function _onMouseMove(e) {
     _pitchDeg = THREE.MathUtils.clamp(_pitchDeg - dy * _lookSensitivity, _pitchMin, _pitchMax);
   }
 }
-function _onMouseUp(_e) {}
+function _onMouseUp(_e) {
+  if (_e.button === 2) {
+    if (_suppressNextAttack) { _suppressNextAttack = false; return; }
+   _controller?.blockEnd?.();
+  }
+}
 
 // ======= Bootstrap =======
 export function setupInput() {

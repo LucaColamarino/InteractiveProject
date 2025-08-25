@@ -74,10 +74,17 @@ export class HumanFormController extends BaseFormController {
     if (!this._attackStrategy) return;
     this._attackStrategy.attack?.(this);
   }
-  block() {
+  blockStart() {
     if (!this._attackStrategy) return;
-    this._attackStrategy.block?.(this);
+    this._attackStrategy.blockStart?.(this);
   }
+
+  blockEnd() {
+    console.log("BLOCK ENDING");
+    if (!this._attackStrategy) return;
+    this._attackStrategy.blockEnd?.(this);
+  }
+
   specialAttack() {
     if (!this._attackStrategy) return;
     this._attackStrategy.specialAttack?.(this);
