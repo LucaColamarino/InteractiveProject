@@ -19,6 +19,7 @@ import { allItems } from './utils/items.js';
 import { preloadAllEntities } from './utils/entityFactory.js';
 import { abilitiesByForm, spawnPlayer } from './player/Player.js';
 import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";
+import { ironShield, ironSword,magicWand,ironHelmet } from './utils/items.js';
 
 // =====================
 // SETTINGS
@@ -97,7 +98,9 @@ async function init() {
     spawntorchAt(30, 15);
     spawntorchAt(17, 20);
     spawntorchAt(-20, -15);
-    spawnChestAt(6, 6);
+    spawnChestAt(6, 6,ironShield);
+
+    spawnChestAt(-6, -6, ironSword);
 
     updateLoadingProgress(95, 'Player initialization...');
     gameManager.controller = await spawnPlayer();

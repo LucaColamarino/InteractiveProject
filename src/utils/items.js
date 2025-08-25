@@ -42,5 +42,5 @@ export function getRandomItem() {
   
   const index = Math.floor(Math.random() * allItems.length);
   console.log("getRandomItem:", allItems[index].name);
-  return allItems[0];
+  return allItems[index];
 }

@@ -1,13 +1,13 @@
 // controllers/forms/HumanFormController.js
 import { BaseFormController } from './BaseFormController.js';
 import { SwordMeleeStrategy } from '../../combat/strategies/SwordMeleeStrategy.js';
-import { BowRangedStrategy } from '../../combat/strategies/BowRangedStrategy.js';
+import { HandMeleeStrategy } from '../../combat/strategies/HandMeleeStrategy.js';
 import { WandMagicStrategy } from '../../combat/strategies/WandMagicStrategy.js';
 
 const STRATEGY_REGISTRY = {
   sword: () => new SwordMeleeStrategy(),
   greatsword: () => new SwordMeleeStrategy(),
-  bow: () => new BowRangedStrategy(),
+  hand: () => new HandMeleeStrategy(),
   wand: () => new WandMagicStrategy(),
 };
 
@@ -34,7 +34,9 @@ export class HumanFormController extends BaseFormController {
   }
 
   setWeaponItem(item) {
-    if (!item) {
+    console.log("SETWEAPON ITEM",item);
+    /*
+        if (!item) {
       this._attackStrategy?.cancel?.(this);
       this._attackStrategy = null;
       this._equippedWeapon = null;
@@ -46,23 +48,27 @@ export class HumanFormController extends BaseFormController {
       this.isAttacking = false;
       return;
     }
+    */
+
     if (this._equippedWeaponId && item.id === this._equippedWeaponId) return;
 
     const kind = getWeaponKind(item);
-    const make = STRATEGY_REGISTRY[kind] || STRATEGY_REGISTRY['sword'];
+    const make = STRATEGY_REGISTRY[kind] || STRATEGY_REGISTRY['hand'];
 
     this._attackStrategy?.cancel?.(this);
     this._attackStrategy = make();
     this._attackStrategy.onEquip?.(this, item);
 
-    this._equippedWeapon = item;
-    this._equippedWeaponId = item.id || null;
+    this._equippedWeapon = item || null;
+    this._equippedWeaponId = item?.id || null;
   }
 
   syncWeaponFromInventory(inventory) {
+    console.log("syncWeaponFromInventory");
     const item = inventory?.equipment?.weapon || null;
     if (!item && this._equippedWeaponId !== null) { this.setWeaponItem(null); return; }
-    if (item && item.id !== this._equippedWeaponId) { this.setWeaponItem(item); }
+    if (item && item.id !== this._equippedWeaponId) { this.setWeaponItem(item);return; }
+    this.setWeaponItem(null); return; 
   }
 
   /** chiamata da InputSystem con click sinistro */

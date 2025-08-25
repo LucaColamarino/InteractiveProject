@@ -1,5 +1,6 @@
 // combat/strategies/AttackStrategy.js
 import * as THREE from 'three';
+import { gameManager } from '../../managers/gameManager';
 
 const HIT_WINDOWS = [{ start: 0.30, end: 0.55 }];
 
@@ -193,8 +194,8 @@ export class AttackStrategy {
 
     const animator = controller.player.animator;
     if (!animator?.actions) return false;
-
-    const hasShield = controller.player.equipment?.offhand?.type === 'shield';
+    const hasShield = gameManager.inventory?.equipment?.["shield"]!=null;
+    console.log("hasShield",hasShield);
     const clipName = hasShield ? 'blockShield' : 'block';
     const action = animator.actions[clipName];
     if (!action) return false;

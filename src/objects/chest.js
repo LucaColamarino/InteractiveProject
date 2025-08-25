@@ -253,7 +253,7 @@ export class Chest {
 }
 Chest._fx = []; // contenitore per FX temporanei
 
-export async function spawnChestAt(x, z) {
+export async function spawnChestAt(x, z,dropItem=null) {
   const terrainY = getTerrainHeightAt(x, z);
   const pos = new THREE.Vector3(x, terrainY, z);
 
@@ -275,7 +275,7 @@ export async function spawnChestAt(x, z) {
 
       // definiamo come spawna l’oggetto quando la chest arriva al 60% dell’animazione
       const spawnLoot = (spawnPos) => {
-        const item = getRandomItem();
+        const item = dropItem??getRandomItem();
         const groundY = getTerrainHeightAt(spawnPos.x, spawnPos.z);
         const dropPos = new THREE.Vector3(spawnPos.x, Math.max(spawnPos.y, groundY + 0.1), spawnPos.z);
 
