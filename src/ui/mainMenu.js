@@ -1,44 +1,31 @@
-// ui/mainMenu.js
+// /src/ui/mainMenu.js – Menu principale/pausa ottimizzato
 export class MainMenu {
   /**
-   * @param {{
-   *  mode?: 'pause'|'full',
-   *  onPlay?: Function,
-   *  onResume?: Function,
-   *  onQuit?: Function,
-   *  getSettings?: Function,
-   *  applySettings?: Function,
-   * }} opts
+   * @param {{onPlay?: Function, onResume?: Function, onQuit?: Function, getSettings?: Function, applySettings?: Function }} opts
    */
   constructor({
-    mode = 'pause',
-    onPlay,
-    onResume,
-    onQuit,
-    getSettings,
-    applySettings,
+    onResume = () => {},
+    onQuit = () => {},
+    getSettings = () => ({}),
+    applySettings = () => {},
   } = {}) {
-    this.mode = mode;
-    this.onPlay = onPlay || (()=>{});
-    this.onResume = onResume || (()=>{});
-    this.onQuit = onQuit || (()=>{});
-    this.getSettings = getSettings || (()=>({}));
-    this.applySettings = applySettings || (()=>{});
-    this._hasPlayed = (mode === 'pause'); // in pausa è già stato avviato
+    this.onResume = onResume;
+    this.onQuit = onQuit;
+    this.getSettings = getSettings;
+    this.applySettings = applySettings;
     this._build();
   }
 
   _build() {
-    this.root = document.createElement('div');
-    this.root.id = 'main-menu';
-    this.root.innerHTML = `
+    const root = document.createElement('div');
+    root.id = 'main-menu';
+    root.innerHTML = `
       <div class="mm-backdrop"></div>
       <div class="mm-card">
         <h1 class="mm-title">My Game</h1>
 
         <div class="mm-section">
-          ${this.mode === 'full' ? `<button id="mm-play" class="mm-btn mm-primary">▶ Play</button>` : ``}
-          <button id="mm-resume" class="mm-btn" style="display:none">⏯ Resume</button>
+          <button id="mm-resume" class="mm-btn" style="display = 'inline-block'">⏯ Resume</button>
         </div>
 
         <div class="mm-section">
@@ -77,23 +64,21 @@ export class MainMenu {
         <p class="mm-hint">Tip: premi ESC per aprire/chiudere questo menu in gioco.</p>
       </div>
     `;
-    document.body.appendChild(this.root);
+    document.body.appendChild(root);
+    this.root = root;
 
-    // Refs
-    this.btnPlay = this.root.querySelector('#mm-play');
-    this.btnResume = this.root.querySelector('#mm-resume');
-    this.btnQuit = this.root.querySelector('#mm-quit');
-    this.selQuality = this.root.querySelector('#mm-quality');
-    this.chkShadows = this.root.querySelector('#mm-shadows');
-    this.rangeResScale = this.root.querySelector('#mm-res-scale');
-    this.rangeVolume = this.root.querySelector('#mm-volume');
 
-    // Wire
-    if (this.btnPlay) this.btnPlay.addEventListener('click', () => this._start());
+    this.btnResume    = root.querySelector('#mm-resume');
+    this.btnQuit      = root.querySelector('#mm-quit');
+    this.selQuality   = root.querySelector('#mm-quality');
+    this.chkShadows   = root.querySelector('#mm-shadows');
+    this.rangeResScale= root.querySelector('#mm-res-scale');
+    this.rangeVolume  = root.querySelector('#mm-volume');
+
+
     this.btnResume.addEventListener('click', () => this._resume());
     this.btnQuit.addEventListener('click', () => this.onQuit());
 
-    // Apply settings live
     const apply = () => {
       this.applySettings({
         quality: this.selQuality.value,
@@ -107,64 +92,36 @@ export class MainMenu {
     this.rangeResScale.addEventListener('input', apply);
     this.rangeVolume.addEventListener('input', apply);
 
-    // Init from settings
-    const s = this.getSettings();
+    // Init settings
+    const s = this.getSettings() || {};
     if (s.quality) this.selQuality.value = s.quality;
     if (typeof s.shadows === 'boolean') this.chkShadows.checked = s.shadows;
     if (s.resScale) this.rangeResScale.value = s.resScale;
     if (typeof s.volume === 'number') this.rangeVolume.value = s.volume;
-
-    // Parte nascosto (menu pausa)
+    // Start hidden
     this.show(false);
-    this._syncButtons();
+  }
+  show(v) {
+    this.root.style.display = v ? 'grid' : 'none';
   }
 
-  _syncButtons() {
-    if (this.mode === 'pause') {
-      this.btnResume.style.display = 'inline-block';
-      if (this.btnPlay) this.btnPlay.style.display = 'none';
-    } else {
-      this.btnResume.style.display = this._hasPlayed ? 'inline-block' : 'none';
-      if (this.btnPlay) this.btnPlay.style.display = 'inline-block';
+  toggleMenu() {
+    if(this.root.style.display=='grid'){
+      console.log("Closing Main Menu");
+      this._resume();
+    }else{
+      console.log("Opening Main Menu");
+      this.show(true);
     }
   }
 
-  setMode(mode='pause') {
-    this.mode = mode;
-    this._syncButtons();
-  }
-
-  show(v) {
-    this.root.style.display = v ? 'grid' : 'none';
-    if (v) this._syncButtons();
-  }
-
-  openPause() {
-    this._hasPlayed = true;
-    this.setMode('pause');
-    this.show(true);
-  }
-
-  _unlockAudioIfNeeded() {
-    try { if (window.__audioCtx?.state === 'suspended') window.__audioCtx.resume(); } catch {}
-  }
   async _requestPointerLockIfAny(canvas) {
     if (!canvas || document.pointerLockElement) return;
     try { await canvas.requestPointerLock(); } catch {}
   }
-  _start() {
-    this._unlockAudioIfNeeded();
-    this._hasPlayed = true;
-    window.dispatchEvent(new CustomEvent('mm:play'));
-    this.onPlay();
-    this._requestPointerLockIfAny(document.querySelector('canvas'));
-    this.show(false);
-  }
+
   _resume() {
-    this._unlockAudioIfNeeded();
-    window.dispatchEvent(new CustomEvent('mm:resume'));
     this.onResume();
-    this._requestPointerLockIfAny(document.querySelector('canvas'));
     this.show(false);
   }
 }
