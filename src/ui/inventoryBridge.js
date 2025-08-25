@@ -1,6 +1,6 @@
 // src/ui/inventoryBridge.js
 import {
-  getInventoryEls, setGold, setInventorySlot, setEquipment
+  getInventoryEls, setInventorySlot, setEquipment
 } from './inventoryUi.js';
 import { gameManager } from '../managers/gameManager.js';
 
@@ -13,11 +13,6 @@ function getGridSize() {
 export function refreshInventoryUI() {
   const inv = gameManager.inventory; // << tua reference già esistente
   if (!inv) return;
-
-  // (Se hai l'oro, qui puoi settarlo. Se non lo gestisci, commenta.)
-  // setGold(inv.gold ?? 0);
-
-  // Items → slot grid
   const n = getGridSize();
   const items = inv.items || [];
   for (let i = 0; i < n; i++) {
@@ -36,11 +31,6 @@ export function refreshInventoryUI() {
   setEquipment('weapon',    eq.weapon ? fmt(eq.weapon) : null);
   setEquipment('shield',    eq.shield ? fmt(eq.shield) : null);
   setEquipment('head',      eq.helmet ? fmt(eq.helmet) : null); // helmet→head
-  // gli altri slot della UI (chest, legs, boots, accessory) li lasciamo vuoti:
-  setEquipment('chest',     null);
-  setEquipment('legs',      null);
-  setEquipment('boots',     null);
-  setEquipment('accessory', null);
 }
 
 function fmt(item) {
