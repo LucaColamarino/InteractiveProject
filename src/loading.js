@@ -6,7 +6,7 @@ let loadingProgress = 0;
 let isGameStarted = false;
 // Elementi DOM
 const loadingScreen = document.getElementById('loading-screen');
-const progressBar = document.getElementById('loading-progress');
+const progressBar = document.getElementById('loading-percent');
 const loadingMessage = document.getElementById('loading-message');
 
 export function updateLoadingProgress(percent, message = '') {
@@ -18,7 +18,7 @@ export function updateLoadingProgress(percent, message = '') {
     
     // Aggiorna barra visualmente
     if (progressBar) {
-        progressBar.style.width = loadingProgress + '%';
+        progressBar.textContent = loadingProgress + '%';
     }
     
     // Aggiorna messaggio

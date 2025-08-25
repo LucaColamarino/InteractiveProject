@@ -1,69 +1,85 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Metamorphosis - Evolve Beyond</title>
-<meta content="#64c8ff" name="theme-color"/>
-<meta content="Un'esperienza di evoluzione biologica immersiva in 3D" name="description"/>
-<!-- Performance hints -->
-<link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap">
-</noscript>
-<link rel="stylesheet" href="./src/ui/css/design-system.css">
-<link rel="stylesheet" href="./src/ui/css/mainMenu.css">   <!-- pausa -->
-<link rel="stylesheet" href="./src/ui/css/startMenu.css">  <!-- avvio -->
-<link rel="stylesheet" href="./src/ui/css/hud.css">  <!-- avvio -->
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Metamorphosis - Evolve Beyond</title>
+  <meta content="#64c8ff" name="theme-color"/>
+  <meta content="Un'esperienza di evoluzione biologica immersiva in 3D" name="description"/>
 
+  <!-- Fonts -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap">
+  </noscript>
+
+  <!-- Design System + UI -->
+  <link rel="stylesheet" href="./src/ui/css/design-system.css">
+  <link rel="stylesheet" href="./src/ui/css/startMenu.css">  <!-- fog/ornamenti sm-* -->
+  <link rel="stylesheet" href="./src/ui/css/mainMenu.css">   <!-- menu pausa -->
+  <link rel="stylesheet" href="./src/ui/css/hud.css">        <!-- HUD ingame -->
+</head>
 <body>
 <!-- Loading Screen -->
 <div id="loading-screen">
-<div class="loading-logo">METAMORPHOSIS</div>
-<div class="loading-bar">
-    <div class="loading-progress" id="loading-progress"></div>
-</div>
-    <p class="loading-message" id="loading-message">Inizializzazione della simulazione biologica...</p>
-</div>
+  <div class="loading-logo">METAMORPHOSIS</div>
 
-<canvas id="three-canvas"></canvas>
-<!-- HUD Overlay -->
-<div id="hud-overlay">
-<!-- TOP CENTER - INTERACTION PROMPTS -->
-<div class="interaction-wrap">
-<div class="interaction-prompt" hidden="" id="interaction-prompts">
-<span aria-label="Tasto di interazione" id="interaction-key">E</span>
-<span id="interaction-text">Interagisci</span>
-</div>
-</div>
-<!-- TOP RIGHT - MINIMAP & INFO -->
-<div class="minimap-wrap" id="hud-map-container"></div>
-<!-- Pills informative -->
-<div class="minimap-hud" id="hud-pills-container"></div>
-
-<!-- BOTTOM CENTER - VITALS -->
-<div aria-label="Statistiche vitali" class="hud-vitals" role="region" id="hud-vitals-container">
-</div>
-</div>
-<!-- ACTION KEYS -->
-<div class="action-keys">
-  <div class="action-key">
-    <span class="key-label">RMB</span>
-    <span class="key-action">Azione</span>
+  <div class="sm-loader-plate">
+    <div class="sm-loader-groove">
+      <div class="sm-loader-fill" id="loading-progress"></div>
+      <div class="sm-loader-embers"></div>
+    </div>
   </div>
-  <div class="action-key">
-    <span class="key-label">Q</span>
-    <span class="key-action">Abilità</span>
-  </div>
+
+  <p class="loading-message" id="loading-message">Preparing the bonfire...</p>
+  <p class="loading-percent" id="loading-percent" aria-hidden="true">0%</p>
 </div>
 
-<!-- NOTIFICATIONS -->
-<div aria-label="Notifiche di gioco" aria-live="polite" class="notification-area" id="notifications" role="log">
-<!-- Le notifiche vengono aggiunte dinamicamente -->
-</div>
-</div>
-<!-- Scripts -->
-<script src="./src/loading.js" type="module"></script>
-<script src="./src/main.js" type="module"></script>
+
+  <!-- CANVAS -->
+  <canvas id="three-canvas"></canvas>
+
+  <!-- LAYER ESTETICI (solo grafica) -->
+  <div class="sm-backdrop" aria-hidden="true" style="pointer-events:none;">
+    <div class="sm-fog"></div>
+    <div class="sm-fog sm-fog-2"></div>
+  </div>
+  <div class="sm-corner-ornaments" aria-hidden="true" style="pointer-events:none;">
+    <div class="sm-ornament sm-ornament-tl"></div>
+    <div class="sm-ornament sm-ornament-tr"></div>
+    <div class="sm-ornament sm-ornament-bl"></div>
+    <div class="sm-ornament sm-ornament-br"></div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud-overlay">
+    <!-- PROMPTS -->
+    <div class="interaction-wrap">
+      <div class="interaction-prompt" hidden id="interaction-prompts">
+        <span id="interaction-key" aria-label="Tasto di interazione">E</span>
+        <span id="interaction-text">Interagisci</span>
+      </div>
+    </div>
+
+    <!-- MINIMAP + PILLS -->
+    <div class="minimap-wrap" id="hud-map-container"></div>
+    <div class="minimap-hud" id="hud-pills-container"></div>
+
+    <!-- VITALS -->
+    <div class="hud-vitals" id="hud-vitals-container" role="region" aria-label="Statistiche vitali"></div>
+
+    <!-- ACTION KEYS -->
+    <div class="action-keys">
+      <div class="action-key"><span class="key-label">RMB</span><span class="key-action">Azione</span></div>
+      <div class="action-key"><span class="key-label">Q</span><span class="key-action">Abilità</span></div>
+    </div>
+
+    <!-- NOTIFICHE -->
+    <div class="notification-area" id="notifications" role="log" aria-label="Notifiche di gioco"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="./src/loading.js" type="module"></script>
+  <script src="./src/main.js" type="module"></script>
 </body>
 </html>
