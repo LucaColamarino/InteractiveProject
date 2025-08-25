@@ -1,22 +1,34 @@
-// mainMenu.js
+// ui/mainMenu.js
 export class MainMenu {
+  /**
+   * @param {{
+   *  mode?: 'pause'|'full',
+   *  onPlay?: Function,
+   *  onResume?: Function,
+   *  onQuit?: Function,
+   *  getSettings?: Function,
+   *  applySettings?: Function,
+   * }} opts
+   */
   constructor({
+    mode = 'pause',
     onPlay,
     onResume,
     onQuit,
     getSettings,
     applySettings,
-  }) {
+  } = {}) {
+    this.mode = mode;
     this.onPlay = onPlay || (()=>{});
     this.onResume = onResume || (()=>{});
     this.onQuit = onQuit || (()=>{});
     this.getSettings = getSettings || (()=>({}));
     this.applySettings = applySettings || (()=>{});
+    this._hasPlayed = (mode === 'pause'); // in pausa è già stato avviato
     this._build();
   }
 
   _build() {
-    // Container overlay
     this.root = document.createElement('div');
     this.root.id = 'main-menu';
     this.root.innerHTML = `
@@ -25,7 +37,7 @@ export class MainMenu {
         <h1 class="mm-title">My Game</h1>
 
         <div class="mm-section">
-          <button id="mm-play" class="mm-btn mm-primary">▶ Play</button>
+          ${this.mode === 'full' ? `<button id="mm-play" class="mm-btn mm-primary">▶ Play</button>` : ``}
           <button id="mm-resume" class="mm-btn" style="display:none">⏯ Resume</button>
         </div>
 
@@ -62,7 +74,7 @@ export class MainMenu {
           <button id="mm-quit" class="mm-btn mm-danger">Quit</button>
         </div>
 
-        <p class="mm-hint">Tip: il puntatore verrà bloccato quando premi Play (Pointer Lock).</p>
+        <p class="mm-hint">Tip: premi ESC per aprire/chiudere questo menu in gioco.</p>
       </div>
     `;
     document.body.appendChild(this.root);
@@ -77,7 +89,7 @@ export class MainMenu {
     this.rangeVolume = this.root.querySelector('#mm-volume');
 
     // Wire
-    this.btnPlay.addEventListener('click', () => this._start());
+    if (this.btnPlay) this.btnPlay.addEventListener('click', () => this._start());
     this.btnResume.addEventListener('click', () => this._resume());
     this.btnQuit.addEventListener('click', () => this.onQuit());
 
@@ -95,71 +107,64 @@ export class MainMenu {
     this.rangeResScale.addEventListener('input', apply);
     this.rangeVolume.addEventListener('input', apply);
 
-    // Init from current settings
+    // Init from settings
     const s = this.getSettings();
     if (s.quality) this.selQuality.value = s.quality;
     if (typeof s.shadows === 'boolean') this.chkShadows.checked = s.shadows;
     if (s.resScale) this.rangeResScale.value = s.resScale;
     if (typeof s.volume === 'number') this.rangeVolume.value = s.volume;
 
-    // Start visible as main menu
-    this.show(true);
+    // Parte nascosto (menu pausa)
+    this.show(false);
+    this._syncButtons();
   }
 
-  // Show/hide overlay
+  _syncButtons() {
+    if (this.mode === 'pause') {
+      this.btnResume.style.display = 'inline-block';
+      if (this.btnPlay) this.btnPlay.style.display = 'none';
+    } else {
+      this.btnResume.style.display = this._hasPlayed ? 'inline-block' : 'none';
+      if (this.btnPlay) this.btnPlay.style.display = 'inline-block';
+    }
+  }
+
+  setMode(mode='pause') {
+    this.mode = mode;
+    this._syncButtons();
+  }
+
   show(v) {
-    console.log(`[MainMenu] ${v ? 'Showing' : 'Hiding'} main menu`);
     this.root.style.display = v ? 'grid' : 'none';
-    // Toggle Resume button after first Play
-    this.btnResume.style.display = v && this._hasPlayed ? 'inline-block' : 'none';
+    if (v) this._syncButtons();
   }
 
-  // Call when game is paused to bring menu back
   openPause() {
     this._hasPlayed = true;
+    this.setMode('pause');
     this.show(true);
   }
 
   _unlockAudioIfNeeded() {
-    // Sblocca AudioContext su gesture utente
-    try {
-      if (window.__audioCtx && window.__audioCtx.state === 'suspended') {
-        window.__audioCtx.resume();
-      }
-    } catch(e) {}
+    try { if (window.__audioCtx?.state === 'suspended') window.__audioCtx.resume(); } catch {}
   }
-
   async _requestPointerLockIfAny(canvas) {
-    if (!canvas) return;
-    if (document.pointerLockElement) return;
-    try {
-      await canvas.requestPointerLock();
-    } catch(e) {
-      // alcuni browser richiedono gesture esplicita; è ok se fallisce
-    }
+    if (!canvas || document.pointerLockElement) return;
+    try { await canvas.requestPointerLock(); } catch {}
   }
-
   _start() {
     this._unlockAudioIfNeeded();
     this._hasPlayed = true;
-    // app chiede il canvas tramite evento personalizzato,
-    // oppure passa il canvas nel costruttore se preferisci.
-    const ev = new CustomEvent('mm:play');
-    window.dispatchEvent(ev);
+    window.dispatchEvent(new CustomEvent('mm:play'));
     this.onPlay();
-    // tenta pointer lock sul primo canvas trovato
-    const canvas = document.querySelector('canvas');
-    this._requestPointerLockIfAny(canvas);
+    this._requestPointerLockIfAny(document.querySelector('canvas'));
     this.show(false);
   }
-
   _resume() {
     this._unlockAudioIfNeeded();
-    const ev = new CustomEvent('mm:resume');
-    window.dispatchEvent(ev);
+    window.dispatchEvent(new CustomEvent('mm:resume'));
     this.onResume();
-    const canvas = document.querySelector('canvas');
-    this._requestPointerLockIfAny(canvas);
+    this._requestPointerLockIfAny(document.querySelector('canvas'));
     this.show(false);
   }
 }

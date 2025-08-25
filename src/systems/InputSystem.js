@@ -176,10 +176,24 @@ function _requestPointerLock() {
 function _onPointerLockChange() {
   const c = _canvasEl();
   _pointerLocked = (document.pointerLockElement === c);
-  // se si esce con ESC: evita attacco al prossimo click
-  if (!_pointerLocked) _suppressNextAttack = true;
+
+  if (!_pointerLocked) {
+    // siamo usciti dal lock (ESC o exitPointerLock programmatico)
+    _suppressNextAttack = true;
+
+    // ⛔ se l'inventario è aperto NON aprire il menu
+    if (gameManager.running && !gameManager.paused && !isInventoryOpen?.()) {
+      // uscita col solo ESC → pausa e apri il menu subito
+      gameManager.paused = true;
+      gameManager.menu?.openPause();
+      window.dispatchEvent(new Event('game:pause'));
+    }
+  }
+
   if (c) c.style.cursor = _pointerLocked ? 'none' : 'crosshair';
 }
+
+
 function _onPointerLockError() {
   _pointerLocked = false;
 }

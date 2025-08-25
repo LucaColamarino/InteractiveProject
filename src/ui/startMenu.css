@@ -1,0 +1,82 @@
+/* startMenu.css — stile minimal per menu d'avvio */
+#start-menu {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 15000;
+  pointer-events: auto;
+  font-family: var(--font-primary, 'Exo 2', sans-serif);
+  background:
+    radial-gradient(60% 60% at 50% 50%, rgba(10,15,25,0.6), rgba(0,0,0,0.9)),
+    var(--hex-pattern);
+  animation: smFadeIn 600ms var(--ease-out-quart);
+}
+
+#start-menu .sm-backdrop {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(4px) brightness(0.8);
+  z-index: -1;
+}
+
+#start-menu .sm-card {
+  width: min(720px, 92vw);
+  min-height: 360px;
+  padding: var(--space-xxl, 32px);
+  border-radius: var(--radius-xl, 20px);
+  border: 1px solid rgba(100,200,255,0.22);
+  background: linear-gradient(135deg, rgba(14,20,34,0.95), rgba(18,28,48,0.92));
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(0,0,0,0.5)), var(--glow-subtle, 0 0 10px rgba(100,200,255,.2));
+  display: grid;
+  gap: var(--space-xl, 24px);
+  text-align: center;
+}
+
+.sm-title {
+  margin: 0;
+  font-family: var(--font-display, 'Orbitron', monospace);
+  font-size: clamp(28px, 5vw, 48px);
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, #fff, var(--primary-blue));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 20px rgba(100,200,255,0.25);
+}
+
+.sm-section { display: flex; gap: 12px; justify-content: center; }
+
+.sm-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 12px 22px; min-height: var(--btn-height-lg, 48px);
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid rgba(255,255,255,0.15);
+  font-family: var(--font-display, 'Orbitron', monospace);
+  font-weight: 600; font-size: 16px; letter-spacing: .2px;
+  cursor: pointer;
+  transition: all var(--timing-fast, 150ms) var(--ease-out-quart);
+  color: var(--text-inverse, #fff);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.25));
+}
+
+.sm-btn:hover { transform: translateY(-1px); box-shadow: var(--glow-subtle); }
+
+.sm-primary { 
+  background: linear-gradient(135deg, var(--primary-blue), var(--primary-blue-dark));
+  border-color: rgba(255,255,255,0.25);
+}
+.sm-primary:hover { filter: brightness(1.05); }
+
+.sm-danger {
+  background: linear-gradient(135deg, var(--danger-red), var(--danger-red-light));
+  border-color: rgba(255,255,255,0.25);
+}
+
+@keyframes smFadeIn {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 640px) {
+  #start-menu .sm-card { padding: var(--space-xl, 24px); }
+}
