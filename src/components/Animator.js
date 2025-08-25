@@ -21,6 +21,7 @@ export class Animator {
     this._fullFadeIn   = 0.16;
     this._fullFadeOut  = 0.16;
     this._isHoldFull = false;
+    this._holdReleasing = false;
     // Anticipo rientro loco PRIMA che la full finisca
     this._fullBackWindow = 0.20; // secondi finali in cui rientra la locomozione
 
@@ -91,48 +92,58 @@ export class Animator {
       this._targetW.sitIdle = 0;
     }
 
-// === Overlay full ===
+  // === Overlay full ===
 if (this._activeFull) {
   const a = this.actions[this._activeFull];
   const clip = a?.getClip?.();
   const dur = clip?.duration || 0;
   const t   = a?.time ?? 0;
 
-  // fail-safe se l'action non sta più girando o ha peso ~0
-  if (a && (!a.isRunning?.() || (a.getEffectiveWeight?.() ?? 0) <= 0.001)) {
+  // se l'action è ormai spenta, pulizia stati
+  const w = a?.getEffectiveWeight?.() ?? 0;
+  if (!a?.isRunning?.() || w <= 0.001) {
     this._activeFull = null;
     this._fullFading = false;
     this._isHoldFull = false;
+    this._holdReleasing = false;
     this._locoSupportT = this._locoHold;
-  }
+  } else {
+    // Mentre la full è attiva:
+    // - se è una HOLD attiva → sopprimi locomozione
+    // - se stiamo “rilasciando” la hold → NON sopprimere, lasciamo fondere
+    // - se è una full normale → applica antifade standard vicino alla fine clip
+    let suppressLoco = false;
 
-  // di default, mentre la full "corre", portiamo loco a 0
-  let suppressLoco = true;
-
-  if (!this._isHoldFull) {
-    // SOLO per le full normali (non hold): rientro e antifade negli ultimi secondi
-    if (dur > 0 && (dur - t) <= this._fullBackWindow) {
-      suppressLoco = false;
-      if (!_bool(a, '_antifadeTriggered')) {
-        a.fadeOut?.(this._fullFadeOut);
-        a._antifadeTriggered = true;
-        this._fullFading = true;
-        this._locoSupportT = Math.max(this._locoSupportT, this._locoHold);
+    if (this._isHoldFull) {
+      suppressLoco = true;
+    } else if (this._holdReleasing) {
+      suppressLoco = false; // rientro dolce durante la sfumatura
+    } else {
+      // full “normale” (non hold): rientro negli ultimi istanti
+      if (dur > 0 && (dur - t) <= this._fullBackWindow) {
+        suppressLoco = false;
+        if (!_bool(a, '_antifadeTriggered')) {
+          a.fadeOut?.(this._fullFadeOut);
+          a._antifadeTriggered = true;
+          this._fullFading = true;
+          this._locoSupportT = Math.max(this._locoSupportT, this._locoHold);
+        }
+      } else {
+        suppressLoco = true;
       }
     }
-  }
 
-  if (suppressLoco) {
-    this._targetW.idle = 0;
-    this._targetW.walk = 0;
-    this._targetW.run  = 0;
-    this._targetW.fly = 0;
-    this._targetW.sitIdle = 0;
-    if (this._locoSupportT <= 0) this._locoSupportT = this._locoHold;
+    if (suppressLoco) {
+      this._targetW.idle = 0;
+      this._targetW.walk = 0;
+      this._targetW.run  = 0;
+      this._targetW.fly = 0;
+      this._targetW.sitIdle = 0;
+      if (this._locoSupportT <= 0) this._locoSupportT = this._locoHold;
+    }
   }
-} else {
-  // nessuna full → i target restano quelli calcolati sopra
 }
+
 
 
     // === Interpola pesi verso target ===
@@ -248,19 +259,30 @@ playHold(name, { fadeIn = this._fullFadeIn } = {}) {
 }
 
 /** Ferma un'azione hold con fade-out pulito */
-stopHold(name, { fadeOut = this._fullFadeOut } = {}) {
+stopHold(name, { fadeOut = this._fullFadeOut, release = 0.20 } = {}) {
   const a = this.actions[name];
   if (!a) return;
-  a.fadeOut?.(fadeOut);
-  a.stop?.();
 
-  if (this._activeFull === name) {
-    this._activeFull = null;
-    this._fullFading = false;
-    this._isHoldFull = false;
-    this._locoSupportT = this._locoHold;
-  }
+  // sfuma ma NON stoppare subito: mantieni l’overlay finché il peso scende
+  a.fadeOut?.(fadeOut);
+
+  // durante il rilascio non sopprimiamo la locomozione
+  this._isHoldFull = false;       // <— disattiva soppressione loco
+  this._holdReleasing = true;     // <— siamo nella fase di uscita
+  this._fullFading = true;
+
+  // tieni attiva la full finché non scende di peso (chiuderemo in update)
+  this._activeFull = name;
+
+  // assicura che le loco siano in play per avere qualcosa su cui fondere
+  this._ensurePlayLoop('idle');
+  this._ensurePlayLoop('walk');
+  this._ensurePlayLoop('run');
+
+  // per un po' “aiuta” la locomozione a salire (rampa soft)
+  this._locoSupportT = Math.max(this._locoSupportT, release);
 }
+
 
 
   // ===== internals =====
