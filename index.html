@@ -11,10 +11,10 @@
 <noscript>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap">
 </noscript>
-<link rel="stylesheet" href="./src/ui/design-system.css">
-<link rel="stylesheet" href="./src/ui/mainMenu.css">   <!-- pausa -->
-<link rel="stylesheet" href="./src/ui/startMenu.css">  <!-- avvio -->
-<link rel="stylesheet" href="./hud.css">  <!-- avvio -->
+<link rel="stylesheet" href="./src/ui/css/design-system.css">
+<link rel="stylesheet" href="./src/ui/css/mainMenu.css">   <!-- pausa -->
+<link rel="stylesheet" href="./src/ui/css/startMenu.css">  <!-- avvio -->
+<link rel="stylesheet" href="./src/ui/css/hud.css">  <!-- avvio -->
 
 <body>
 <!-- Loading Screen -->
@@ -37,57 +37,15 @@
 </div>
 </div>
 <!-- TOP RIGHT - MINIMAP & INFO -->
-<div class="minimap-wrap">
-<div class="hud-minimap minimap-viewport" role="img">
-<div class="minimap-grid">
-<div aria-hidden="true" class="minimap-heading"></div>
-</div>
-</div>
+<div class="minimap-wrap" id="hud-map-container"></div>
 <!-- Pills informative -->
-<div class="minimap-hud">
-<div aria-label="Nemici nelle vicinanze" class="pill" id="mm-enemies">🎯 0</div>
-<div aria-label="Livello del giocatore" class="pill" id="mm-level">🧬 LVL 1</div>
-</div>
-</div>
+<div class="minimap-hud" id="hud-pills-container"></div>
+
 <!-- BOTTOM CENTER - VITALS -->
-<div aria-label="Statistiche vitali" class="hud-vitals" role="region">
-<!-- Health -->
-<div>
-<div class="hud-label">❤️ Salute</div>
-<div aria-label="Salute" aria-valuemax="100" aria-valuemin="0" aria-valuenow="85" class="progress-container" role="progressbar">
-<div class="progress-bar health-bar" id="health-bar" style="width: 85%;">
-<div class="progress-text" id="health-text">850 / 1000</div>
+<div aria-label="Statistiche vitali" class="hud-vitals" role="region" id="hud-vitals-container">
 </div>
 </div>
-</div>
-<!-- Mana -->
-<div>
-<div class="hud-label">💙 Mana</div>
-<div aria-label="Mana" aria-valuemax="100" aria-valuemin="0" aria-valuenow="60" class="progress-container" role="progressbar">
-<div class="progress-bar mana-bar" id="mana-bar" style="width: 60%;">
-<div class="progress-text" id="mana-text">300 / 500</div>
-</div>
-</div>
-</div>
-<!-- Stamina -->
-<div>
-<div class="hud-label">⚡ Stamina</div>
-<div aria-label="Stamina" aria-valuemax="100" aria-valuemin="0" aria-valuenow="40" class="progress-container" role="progressbar">
-<div class="progress-bar stamina-bar" id="stamina-bar" style="width: 40%;">
-<div class="progress-text" id="stamina-text">40 / 100</div>
-</div>
-</div>
-</div>
-<!-- Experience -->
-<div>
-<div class="hud-label">🧬 Esperienza</div>
-<div aria-label="Esperienza" aria-valuemax="100" aria-valuemin="0" aria-valuenow="0" class="progress-container" role="progressbar">
-<div class="progress-bar xp-bar" id="xp-bar" style="width: 0%;">
-<div class="progress-text" id="xp-text">0 / 100</div>
-</div>
-</div>
-</div>
-</div>
+
 <!-- NOTIFICATIONS -->
 <div aria-label="Notifiche di gioco" aria-live="polite" class="notification-area" id="notifications" role="log">
 <!-- Le notifiche vengono aggiunte dinamicamente -->

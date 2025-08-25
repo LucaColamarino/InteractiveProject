@@ -430,3 +430,20 @@ export const hudManager = {
   getRadarConfig: () => radar.config,
   setRadarRange: (range) => { radar.range = M.clamp(range, 50, 300); },
 };
+export async function loadHudVitals() {
+  const container = document.getElementById("hud-vitals-container");
+  const response = await fetch("./src/ui/vitals.html");
+  container.innerHTML = await response.text();
+}
+export async function loadHudMap() {
+  const container = document.getElementById("hud-map-container");
+  const response = await fetch("./src/ui/map.html");
+  container.innerHTML = await response.text();
+}
+export async function loadHudPills() {
+  const container = document.getElementById("hud-pills-container");
+  const response = await fetch("./src/ui/pills.html");
+  container.innerHTML = await response.text();
+}
+
+

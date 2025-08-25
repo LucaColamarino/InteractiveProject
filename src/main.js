@@ -18,6 +18,7 @@ import { scene } from './scene.js';
 import { allItems } from './utils/items.js';
 import { preloadAllEntities } from './utils/entityFactory.js';
 import { abilitiesByForm, spawnPlayer } from './player/Player.js';
+import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";
 
 // =====================
 // SETTINGS
@@ -39,7 +40,11 @@ function applyMenuSettings(s) {
   setFireShadowBudget(settings.shadows ? 3 : 0);
   window.dispatchEvent(new CustomEvent('settings:changed', { detail: { ...settings } }));
 }
-
+window.addEventListener("DOMContentLoaded", () => {
+  loadHudVitals();
+  loadHudMap();
+  loadHudPills();
+});
 // =====================
 // INIT GAME
 // =====================
