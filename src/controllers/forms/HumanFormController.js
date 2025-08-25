@@ -34,7 +34,6 @@ export class HumanFormController extends BaseFormController {
   }
 
   setWeaponItem(item) {
-    console.log("SETWEAPON ITEM",item);
     /*
         if (!item) {
       this._attackStrategy?.cancel?.(this);
@@ -64,7 +63,6 @@ export class HumanFormController extends BaseFormController {
   }
 
   syncWeaponFromInventory(inventory) {
-    console.log("syncWeaponFromInventory");
     const item = inventory?.equipment?.weapon || null;
     if (!item && this._equippedWeaponId !== null) { this.setWeaponItem(null); return; }
     if (item && item.id !== this._equippedWeaponId) { this.setWeaponItem(item);return; }
