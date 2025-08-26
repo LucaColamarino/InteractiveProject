@@ -47,7 +47,7 @@ async function spawnTrees() {
   updateThrottleMs: 16
 });
 
-  const area = { x: 30, z: 30, width: 150, depth: 150 };
+  const area = { x: 80, z: 80, width: 150, depth: 150 };
   await trees.spawn('/models/environment/TREE.fbx',200 , area); //200
 }
 

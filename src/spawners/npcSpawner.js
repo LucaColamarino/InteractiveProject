@@ -104,7 +104,7 @@ export function spawnWyvernNpc(pos) {
 // batch di test
 export function spawnEnemies() {
   const num_archers = 10, num_werewolves = 0, num_wyverns = 0;
-  const area = { x: 30, z: 30, width: 150, depth: 150 };
+  const area = { x: 80, z: 80, width: 150, depth: 150 };
   for (let i = 0; i < num_archers; i++) {
     spawnArcherNpc(new THREE.Vector3(
       area.x + Math.random() * area.width - area.width / 2,

@@ -21,7 +21,7 @@ export class ArcherEnemy extends BaseEnemy {
     this.backSpeed     = opt.backSpeed     ?? 4.0;  // arretramento “calmo”
     this.fleeRunSpeed  = opt.fleeRunSpeed  ?? 7.5;  // corsa di fuga
     this.turnSpeed     = opt.turnSpeed     ?? 7.0;
-
+    this.patrolSpeed   = opt.patrolSpeed   ?? this.walkSpeed;
     // --- Attacco ---
     this.shootCooldown = opt.shootCooldown ?? 1.6;
     this._coolT        = 0;
@@ -81,13 +81,17 @@ export class ArcherEnemy extends BaseEnemy {
   }
 
   // ====== Stati ======
-  _patrol(dt) {
-    // vaga lentamente
-    this.state.isSprinting = false;
-    this.state.isBacking = false;
-    this.state.speed = this.walkSpeed * 0.8;
-    this.wanderOnGround(dt, 0.6);
-  }
+_patrol(dt) {
+  this.state.isSprinting = false;
+  this.state.isBacking = false;
+
+  const v = this.patrolSpeed;   // es. 4.0 → dentro al plateau walk
+  this.speed = v;               // usata da wanderOnGround per muoversi
+  this.state.speed = v;         // letta dall'Animator per scegliere la clip
+
+  this.wanderOnGround(dt, 0.6); // angolo più “calmo”
+}
+
 
   _engage(dt, toTgt, dist) {
     // guarda il bersaglio
