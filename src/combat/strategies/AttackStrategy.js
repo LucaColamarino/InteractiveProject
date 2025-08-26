@@ -30,9 +30,9 @@ export class AttackStrategy {
   specialAttack(controller) { /* override */ }
 
   // ---- Attacco base comune (es. sword slash) ----
-  baseAttack(controller,clip = null) {
+  baseAttack(controller,cN = "") {
     const actions = controller.player.animator?.actions || {};
-    const primary = clip ||actions['swordAttack'] || actions['attack'] || null;
+    const primary = actions[cN] ||actions['swordAttack'] || actions['attack'] || null;
     if (!primary || this._attackState) return false;
 
     let action = primary;

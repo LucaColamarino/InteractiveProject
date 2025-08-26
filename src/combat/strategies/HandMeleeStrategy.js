@@ -25,7 +25,7 @@ export class HandMeleeStrategy extends AttackStrategy {
   }
 
   // Attacco base (slash su click sinistro)
-  attack(controller) { return this.baseAttack(controller); }
+  attack(controller) { return this.baseAttack(controller,"punch"); }
 
   // --- NUOVO: attacco speciale = SHOCKWAVE ---
   specialAttack(controller, clipName = 'shockwave') {

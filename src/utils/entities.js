@@ -15,7 +15,8 @@ export const ENTITY_CONFIG = {
       standUp: '/models/animations/StandingUp.fbx',
       swordAttack: '/models/animations/KnightSwordAttack.fbx',
       wandCast: '/models/animations/KnightWandAttack.fbx',
-      shockwave: '/models/animations/KnightShockwave.fbx'
+      shockwave: '/models/animations/KnightShockwave.fbx',
+      punch : '/models/animations/KnightPunch.fbx',
     },
     textures: {
       armor: {
