@@ -14,12 +14,9 @@ export class StartMenu {
     root.id = 'start-menu';
     root.innerHTML = `
       <canvas class="sm-particles"></canvas>
-      <div class="sm-backdrop">
-        <div class="sm-fog"></div>
-        <div class="sm-fog sm-fog-2"></div>
-      </div>
+      <div class="sm-fog"></div>
+      <div class="sm-fog sm-fog-2"></div>
       <div class="sm-card">
-        <div class="sm-flame-border"></div>
         <div class="sm-title-container">
           <h1 class="sm-title">
             <span class="sm-title-main">METAMORPHOSIS</span>
