@@ -70,6 +70,7 @@ export const ENTITY_CONFIG = {
       die: '/models/animations/ArcherDie.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
+    forwardYawOffsetDeg: 0,
   },
   werewolf: {
     modelPath: '/models/werewolf.fbx',

@@ -188,11 +188,11 @@ export class Campfire {
     const runeObj = await loader.loadAsync('/models/props/runestone.fbx');
     this.runestone = runeObj;
     this.runestone.scale.setScalar(0.01);
-    this.runestone.position.copy(this.model.position).add(new THREE.Vector3(0, 2, 0)); // sospesa sopra
+    this.runestone.position.copy(this.model.position).add(new THREE.Vector3(0, 2.5, 0)); // sospesa sopra
     this.runestone.traverse((c) => {
       if (c.isMesh) {
         c.material = this.runestoneMat;
-        c.castShadow = true;
+        c.castShadow = false;
         c.receiveShadow = true;
       }
     });
@@ -219,9 +219,9 @@ export class Campfire {
     }
     if (this.runestone) {
       this._floatTime += delta;
-      const bob = Math.sin(this._floatTime * 2.0) * 0.02;
-      this.runestone.position.y += + bob;
-      this.runestone.rotation.y += delta * 0.4; // rotazione lenta
+      const bob = Math.sin(this._floatTime * 2.0) * 0.01;
+      this.runestone.position.y += bob;
+      this.runestone.rotation.y += delta * 0.2; // rotazione lenta
     }
 
     //PlayerCollision

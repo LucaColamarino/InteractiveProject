@@ -2,17 +2,15 @@ import * as THREE from 'three';
 import { renderer, scene, camera } from './scene.js';
 import { updateCamera } from './player/cameraFollow.js';
 import { updateWater, terrainMaterial, updateSunPosition } from './map/map.js';
-import { updateEnemies, getEnemies } from './controllers/npcController.js';
+import { updateEnemies, getEnemies } from './enemies/EnemyManager.js';
 import { sun, moon } from './graphics/shadowManager.js';
 import Stats from 'stats.js';
 import { hudManager } from './ui/hudManager.js';
 import { updateCampfires } from './objects/campfire.js';
 import { pumpActions } from './systems/InputSystem.js';
-// ⬇️ RIMOSSO: AnimationSystem
-// import { AnimationSystem } from './systems/AnimationSystem.js';
 import { interactionManager } from './systems/interactionManager.js';
 import { updateChests } from './objects/chest.js';
-import { updateEnvironment, trees } from './spawners/vegetationSpawner.js'; // ⬅️ aggiunto 'trees'
+import { updateEnvironment, trees } from './spawners/vegetationSpawner.js';
 import { updatetorchs } from './objects/torch.js';
 import { updateFires } from './particles/FireParticleSystem.js';
 import { LevelSystem } from './systems/LevelSystem.js';

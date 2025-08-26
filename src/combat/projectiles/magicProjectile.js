@@ -1,6 +1,6 @@
 // combat/projectiles/magicProjectile.js
 import * as THREE from 'three';
-import { getEnemies } from '../../controllers/npcController.js';
+import { getEnemies } from '../../enemies/EnemyManager.js';
 
 const TAG = '[MagicProjectile]';
 const dlog = (...a) => {

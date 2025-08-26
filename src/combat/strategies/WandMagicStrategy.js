@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { AttackStrategy } from './AttackStrategy.js';
-import { getEnemies, killEnemy } from '../../controllers/npcController.js';
+import { getEnemies, killEnemy } from '../../enemies/EnemyManager.js';
 import { hudManager } from '../../ui/hudManager.js';
 import { MagicProjectile } from '../projectiles/magicProjectile.js';
 import { scene } from '../../scene.js';

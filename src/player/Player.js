@@ -12,7 +12,7 @@ export class Player {
     this.model = model;
     this.anim = new AnimationComponent(mixer, actions); // compatibilità
     // nuovo orchestratore centralizzato
-    this.animator = new Animator({ mixer, actions }, () => this.state);
+    this.animator = new Animator({ mixer, actions }, () => this.state,true);
 
     this.state = { speed:0, isFlying:false, isSitting:false, isAttacking:false, isSprinting:false };
 
