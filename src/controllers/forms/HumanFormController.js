@@ -72,7 +72,12 @@ export class HumanFormController extends BaseFormController {
   /** chiamata da InputSystem con click sinistro */
   attack() {
     if (!this._attackStrategy) return;
-    this._attackStrategy.attack?.(this);
+    
+    if (this.stats.useStamina(20)) {
+      this._attackStrategy.attack?.(this);
+    } else {
+      console.log("Not enough stamina!");
+    }
   }
   blockStart() {
     if (!this._attackStrategy) return;
@@ -80,14 +85,18 @@ export class HumanFormController extends BaseFormController {
   }
 
   blockEnd() {
-    console.log("BLOCK ENDING");
     if (!this._attackStrategy) return;
     this._attackStrategy.blockEnd?.(this);
   }
 
   specialAttack() {
     if (!this._attackStrategy) return;
-    this._attackStrategy.specialAttack?.(this);
+    if (this.stats.useMana(15)) {
+      this._attackStrategy.specialAttack?.(this);
+    } else {
+      console.log("Not enough mana!");
+    }
+    
   }
 
   update(dt) {

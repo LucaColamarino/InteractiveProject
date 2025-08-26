@@ -12,7 +12,7 @@ import { pumpActions } from './systems/InputSystem.js';
 // import { AnimationSystem } from './systems/AnimationSystem.js';
 import { interactionManager } from './systems/interactionManager.js';
 import { updateChests } from './objects/chest.js';
-import { updateEnvironment } from './spawners/vegetationSpawner.js';
+import { updateEnvironment, trees } from './spawners/vegetationSpawner.js'; // ⬅️ aggiunto 'trees'
 import { updatetorchs } from './objects/torch.js';
 import { updateFires } from './particles/FireParticleSystem.js';
 import { LevelSystem } from './systems/LevelSystem.js';
@@ -20,6 +20,10 @@ import { gameManager } from './managers/gameManager.js';
 import { initInventoryUI } from './ui/inventoryUi.js';
 import { refreshInventoryUI } from './ui/inventoryBridge.js';
 import { wireInventoryInteractions } from './ui/inventoryInteractions.js';
+import { tickTrees, drainOnce, TREE_ESSENCE_CFG, findDrainableTree, getLeafDensity } from './systems/TreeEssenceSystem.js';
+// ⬇️ RIMOSSO: applyLeafHole
+// import { applyLeafHole } from './objects/treeEssenceInteractable.js';
+import { registerTreeEssenceInteraction } from './objects/treeEssenceInteractable.js';
 
 const stats = new Stats();
 stats.showPanel(0);
@@ -81,7 +85,6 @@ function initXP() {
 }
 
 export function startLoop(c) {
-  console.log('[GameLoop] Starting main loop...');
   gameManager.controller = c;
 
   // ⬇️ Inventory UI
@@ -98,12 +101,15 @@ export function startLoop(c) {
   hudManager.init();
   initXP();
 
+  registerTreeEssenceInteraction();
+
   function animate() {
     stats.begin();
     requestAnimationFrame(animate);
 
     let delta = clock.getDelta();
     delta = Math.min(delta, 0.05);
+    tickTrees(delta);
 
     updateSunPosition();
     if (terrainMaterial?.userData?.shaderRef?.uniforms?.time) {
@@ -115,6 +121,44 @@ export function startLoop(c) {
         pumpActions(controller);    // input → controller.setInputState(...)
         controller.update(delta);   // movimento/stati (Base/HumanFormController)
         if (player) player.update(delta); // <-- ORA qui vive l’Animator
+      }
+
+      const ctrl = controller; // alias
+      if (ctrl?.isDraining) {
+        // Se per qualche motivo non ho più un “sito” valido, ricalcolo vicino al player
+        const playerPos = player?.model?.position;
+        if (playerPos && !ctrl._drainSite) {
+          ctrl._drainSite = findDrainableTree(playerPos);
+          if (!ctrl._drainSite) ctrl.stopDrain();
+        }
+
+        if (ctrl._drainSite) {
+          const ess = drainOnce(ctrl._drainSite, TREE_ESSENCE_CFG.drainPerSec, delta);
+
+          // 🔄 Opacità foglie proporzionale alla density (0..1)
+          const density = getLeafDensity(ctrl._drainSite); // 1=folto, 0=spoglio
+          // chiama sia l'istanza importata che l'eventuale fallback su window
+          trees?.setLeafGlobalOpacity?.(density);
+          window?.trees?.setLeafGlobalOpacity?.(density);
+
+          if (ess > 0) {
+            // mana gain
+            const stats = ctrl.stats;
+            if (stats && typeof stats.mana === 'number' && typeof stats.maxMana === 'number') {
+              const add = Math.min(ess, ctrl._manaPerSecFromTree * delta);
+              const newMana = Math.min(stats.maxMana, stats.mana + add);
+              if (newMana !== stats.mana) {
+                stats.mana = newMana;
+                stats._notify();
+              }
+            }
+          } else {
+            ctrl.stopDrain();
+            // ripristina opacità
+            trees?.setLeafGlobalOpacity?.(1);
+            window?.trees?.setLeafGlobalOpacity?.(1);
+          }
+        }
       }
 
       if (player?.model) {
@@ -131,6 +175,8 @@ export function startLoop(c) {
       updatetorchs(delta);
       updateCamera(player, delta);
       updateEnvironment();
+      gameManager.controller.stats.regenStamina(delta, 8);
+      //gameManager.controller.stats.regenMana(delta, 3);
       gameManager.pickableManager?.update(delta, player?.model?.position);
       interactionManager.update();
       hudManager.update(player, controller, camera, getEnemies());

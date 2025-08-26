@@ -131,6 +131,43 @@ canvas{ display:block; position:fixed; inset:0; z-index: var(--z-background); }
 
 /* Simple anims */
 @keyframes shimmerLine { 0%{left:-100%;} 100%{left:100%;} }
+/* Lampeggio generico per vitals basse */
+@keyframes pulse {
+  0%   { filter: brightness(1); }
+  50%  { filter: brightness(2) saturate(1.5); }
+  100% { filter: brightness(1); }
+}
+.low-vital { animation: pulse 0.6s infinite; }
+
+/* Il contenitore deve poter ospitare badge posizionati */
+.progress-container { position: relative; }
+
+/* Badge effimero che compare sopra la barra */
+.vital-badge {
+  position: absolute;
+  right: 0.25rem;
+  top: -1.8rem;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1;
+  border-radius: 0.4rem;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+  white-space: nowrap;
+}
+.vital-badge.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* (opzionali) tinte diverse per tipo di vital */
+.vital-badge.health { background: rgba(180, 30, 30, 0.85); }
+.vital-badge.mana   { background: rgba(40, 80, 190, 0.85); }
+.vital-badge.stamina{ background: rgba(220, 150, 20, 0.85); }
 
 
 /* Responsive */

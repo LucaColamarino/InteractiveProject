@@ -1,7 +1,6 @@
 // src/props/campfire.js
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-
 import { scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
 import { spawnFire } from '../particles/FireParticleSystem.js';
@@ -45,7 +44,27 @@ function makePBR({
   if (mat.normalMap) mat.normalMapType = THREE.TangentSpaceNormalMap;
   return mat;
 }
+function makeRunestoneMaterial() {
+  const base = texLoader.load('/textures/runestone/runestone_basecolor.jpg');
+  base.colorSpace = THREE.SRGBColorSpace;
+  const normal = texLoader.load('/textures/runestone/runestone_normal.jpg');
+  const rough = texLoader.load('/textures/runestone/runestone_roughness.jpg');
+  const metal = texLoader.load('/textures/runestone/runestone_metallic.jpg');
+  const emissive = texLoader.load('/textures/runestone/runestone_emissive.jpg');
 
+  const mat = new THREE.MeshStandardMaterial({
+    map: base,
+    normalMap: normal,
+    roughnessMap: rough,
+    metalnessMap: metal,
+    emissiveMap: emissive,
+    emissive: new THREE.Color(0x000000), // spento di default
+    emissiveIntensity: 0.0,
+    metalness: 1.0,
+    roughness: 1.0
+  });
+  return mat;
+}
 // ---------------
 // Campfire class
 // ---------------
@@ -59,6 +78,9 @@ export class Campfire {
     this.position = position.clone().add(new THREE.Vector3(0, this.yoffset ?? 0, 0)); // yOffset per allineare al terreno
     this.modelPath = opts.modelPath ?? '/models/props/campfire1.fbx';
     this.scale = opts.scale ?? 0.01;
+    this.runestone = null;
+    this.runestoneMat = makeRunestoneMaterial();
+    this._floatTime = 0;
      // per allineare al terreno
 
     // se il tuo FBX ha più materiali su singoli mesh, puoi usare indici
@@ -162,6 +184,20 @@ export class Campfire {
     // Spawna il sistema di fuoco (luci incluse)
     const firePos = this.model.position.clone().add(this.fireOffset);
     this.fireSystem = spawnFire(firePos, this.fireOptions);
+        // === RUNESTONE ===
+    const runeObj = await loader.loadAsync('/models/props/runestone.fbx');
+    this.runestone = runeObj;
+    this.runestone.scale.setScalar(0.01);
+    this.runestone.position.copy(this.model.position).add(new THREE.Vector3(0, 2, 0)); // sospesa sopra
+    this.runestone.traverse((c) => {
+      if (c.isMesh) {
+        c.material = this.runestoneMat;
+        c.castShadow = true;
+        c.receiveShadow = true;
+      }
+    });
+    console.log("runestone position", this.runestone.position);
+    scene.add(this.runestone);
 
     return this.model;
   }
@@ -181,6 +217,12 @@ export class Campfire {
       this.fireSystem.setWindDirection(windDir);
       this.fireSystem.setWindStrength(windStrength);
     }
+    if (this.runestone) {
+      this._floatTime += delta;
+      const bob = Math.sin(this._floatTime * 2.0) * 0.02;
+      this.runestone.position.y += + bob;
+      this.runestone.rotation.y += delta * 0.4; // rotazione lenta
+    }
   }
 
   // Controlli runtime
@@ -192,6 +234,30 @@ export class Campfire {
     if (this.fireSystem) {
       this.fireSystem.setWindDirection(direction);
       this.fireSystem.setWindStrength(strength);
+    }
+  }
+  setFlameBlue(on, smooth = true) {
+    if (!this.fireSystem) return;
+    if (smooth && typeof this.fireSystem.transitionPalette === 'function') {
+      this.fireSystem.transitionPalette(on ? 'blue' : 'normal', 0.35);
+    } else if (typeof this.fireSystem.setPalette === 'function') {
+      this.fireSystem.setPalette(on ? 'blue' : 'normal');
+    }
+
+    // === RUNESTONE illumina ===
+    if (this.runestoneMat) {
+      this.runestoneMat.emissive.setHex(on ? 0x2C74FF : 0x000000);
+      this.runestoneMat.emissiveIntensity = on ? 1.2 : 0.0;
+      this.runestoneMat.needsUpdate = true;
+    }
+  }
+
+  setRimEmissiveBlue(on) {
+    if (this.campfireMat && 'emissive' in this.campfireMat) {
+      // leggero glow blu sulla brace
+      this.campfireMat.emissive.setHex(on ? 0x2C74FF : 0x000000);
+      this.campfireMat.emissiveIntensity = on ? 0.15 : 0.0;
+      this.campfireMat.needsUpdate = true;
     }
   }
 
@@ -261,29 +327,39 @@ export async function spawnCampfireAt(x, z, opts = {}) {
       const campfirePos = cf.model?.position ?? cf.position;
 
       if (controller.isSitting) {
-        // Ti alzi
+        // --- TI ALZI ---
         gameManager.controller?.sitToggle();
         hudManager.showNotification?.('You stand up.');
         clearCameraFocus();
+
+        // palette normale
+        cf.setFlameBlue(false, true);
+        cf.setRimEmissiveBlue(false);
+
       } else {
-        // Ti siedi
+        // --- TI SIEDI ---
         gameManager.controller?.sitToggle();
         hudManager.showNotification?.('You sit by the fire.');
 
-        // 1) Sposta il player a distanza sicura dal falò (raggio configurabile)
-        const safeRadius = 2.0; // ~1.2–1.5m è confortevole
+        // 1) posiziona player
+        const safeRadius = 2.0;
         const targetPos = computeSitPosition(campfirePos, player.model.position, safeRadius);
         player.model.position.copy(targetPos);
 
-        // 2) Ruota il player verso il falò (solo yaw)
+        // 2) ruota verso il falò
         const dir = new THREE.Vector3().subVectors(campfirePos, player.model.position);
-        const yaw = Math.atan2(dir.x, dir.z); // rad
+        const yaw = Math.atan2(dir.x, dir.z);
         player.model.rotation.y = yaw;
 
-        // 3) Focus camera sul falò
+        // 3) focus camera
         setCameraFocus(campfirePos, { height: 0.8, stiffness: 8 });
+
+        // palette blu
+        cf.setFlameBlue(true, true);
+        cf.setRimEmissiveBlue(true);
       }
     }
+
 
 
 

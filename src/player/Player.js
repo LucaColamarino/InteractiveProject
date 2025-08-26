@@ -92,7 +92,7 @@ function getMeshByPrefix(root, prefix) {
   return out;
 }
 export const abilitiesByForm = {
-  human: createAbilities('human', { canFly:false, canJump:true, speed:4, jumpForce:12, gravity:-30 }),
+  human: createAbilities('human', { canFly:false, canJump:true, speed:5, jumpForce:12, gravity:-30 }),
   werewolf: createAbilities('werewolf', { canFly:false, canJump:true, speed:10, jumpForce:12, gravity:-30 }),
   wyvern: createAbilities('wyvern', { canFly:true, canJump:false, flyspeed:30, speed:8, jumpForce:10, gravity:-5,
     cameraOffset: new THREE.Vector3(0, 15, -20), yOffset: 5.2 })

@@ -2,17 +2,28 @@
 import * as THREE from 'three';
 import { getTerrainHeightAt } from '../../map/map.js';
 import { trees } from '../../spawners/vegetationSpawner.js';
+import { StatsSystem } from '../../systems/StatsSystem.js';
+import { updateVitalsHUD } from '../../ui/hudVitals.js';
 
 const PLAYER_RADIUS = 0.4;   // tweak
 const TREE_RADIUS   = 0.6;   // tweak
 const BROADPHASE_R  = 7.0;   // raggio ricerca alberi (più stretto = meno lavoro)
 const SEP_EPS       = 0.01;  // piccolo “margine” per evitare jitter sul bordo
+const SPRINT_COST_PER_SEC = 12; // stamina consumata al secondo durante sprint
+const STAMINA_REGEN_RATE  = 8;  // stamina al secondo quando non in cooldown
+const MANA_REGEN_RATE     = 0;  // mana al secondo
 
 export class BaseFormController {
   constructor(player, abilities) {
     this.player = player;
     this.abilities = abilities;
-
+    this.isDraining = false;
+    this._drainSite = null;
+    this._manaPerSecFromTree = 18;
+    this.stats = new StatsSystem(120,80,50);
+    this.stats.onChange((stats) => {
+      updateVitalsHUD(stats);  // funzione dal tuo file HUD
+    });
     // Dinamica orizzontale
     this.currentVelocity = new THREE.Vector3();
     this.accel = 30;
@@ -38,16 +49,28 @@ export class BaseFormController {
     this._prePos  = new THREE.Vector3();
     this._candPos = new THREE.Vector3();
     this._n2D     = new THREE.Vector2();
+    
+  }
+  tryStartDrain(site) {
+    if (!site) return false;
+    if (this.isAttacking) return false; // evita durante attacchi full-body
+    this.isDraining = true;
+    this._drainSite = site;
+    return true;
   }
 
+  stopDrain() {
+    this.isDraining = false;
+    this._drainSite = null;
+  }
   lockMovementFor(sec = 0) { this._moveLockT = Math.max(this._moveLockT, sec); }
 
   setInputState(st) {
     this._input.moveVec.copy(st.moveVec || this._zeroVec);
     this._input.isShiftPressed = !!st.isShiftPressed;
     this._input.isJumpPressed  = !!st.isJumpPressed;
-    this.isSprinting = this._input.isShiftPressed;
   }
+
 
   sitToggle() { this.isSitting = !this.isSitting; }
 
@@ -65,17 +88,42 @@ export class BaseFormController {
   }
 
   update(dt) {
-    const movementLocked = this._moveLockT > 0 || this.isBlocking || (this.attackFreezesMovement && this.isAttacking);
-    if (this._moveLockT > 0) this._moveLockT -= dt;
+  // --- DRain distance guard ---
+  if (this.isDraining && this._drainSite) {
+    const pos = this.player?.model?.position;
+    if (pos) {
+      const dx = pos.x - this._drainSite.x;
+      const dz = pos.z - this._drainSite.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 3.2) { // stessa soglia che avevi
+        this.stopDrain();
+      }
+    }
+  }
 
-    // ----- Movimento orizzontale -----
-    const baseSpeed   = this.abilities?.speed ?? 5;
-    const targetSpeed = this.isSprinting ? baseSpeed * 1.8 : baseSpeed;
+      const movementLocked = this._moveLockT > 0 || this.isBlocking || (this.attackFreezesMovement && this.isAttacking);
+  if (this._moveLockT > 0) this._moveLockT -= dt;
 
-    const inputVec = movementLocked ? this._zeroVec : this._input.moveVec;
-    this._desired.copy(inputVec).normalize().multiplyScalar(targetSpeed);
-    const a = (inputVec.lengthSq() > 0) ? this.accel : this.decel;
-    this.currentVelocity.lerp(this._desired, a * dt);
+  // --- Sprint con consumo stamina ---
+  const inputVec = movementLocked ? this._zeroVec : this._input.moveVec;
+  const moving = inputVec.lengthSq() > 0;
+  const wantsSprint = this._input.isShiftPressed && this.isOnGround && !this.isSitting && !this.isAttacking && moving;
+
+  if (wantsSprint) {
+    // tenta di drenare stamina per questo frame
+    this.isSprinting = this.stats.drainStaminaForSprint(dt, SPRINT_COST_PER_SEC);
+  } else {
+    this.isSprinting = false;
+  }
+
+  // ----- Movimento orizzontale -----
+  const baseSpeed   = this.abilities?.speed ?? 5;
+  const targetSpeed = this.isSprinting ? baseSpeed * 1.8 : baseSpeed;
+
+  this._desired.copy(inputVec).normalize().multiplyScalar(targetSpeed);
+  const a = moving ? this.accel : this.decel;
+  this.currentVelocity.lerp(this._desired, a * dt);
+
 
     // Step desiderato
     this._step.copy(this.currentVelocity).multiplyScalar(dt);
@@ -153,7 +201,8 @@ export class BaseFormController {
 
     // Colla al terreno e reset stati
     this._ensureAboveTerrain();
-
+    this.stats.regenStamina(dt, STAMINA_REGEN_RATE);
+    this.stats.regenMana(dt, MANA_REGEN_RATE);
     // Stato per Animator
     Object.assign(this.player.state, {
       speed: this.currentVelocity.length(),

@@ -77,7 +77,6 @@ export class Animator {
       this._setTargetSolo('fly');
     } else {
       // 1D blendspace: idle ↔ walk ↔ run
-      console.log("Velocity:",v);
       const iw = this._remapClamped(v, 0, this._tWalkOn, 1, 0);
       const wr = this._remapClamped(v, this._tWalkOn, this._tRunOn, 0, 1);
       const rr = this._remapClamped(v, this._tRunOn, this._tRunFull, 0, 1);

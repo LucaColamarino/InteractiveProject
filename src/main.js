@@ -20,7 +20,7 @@ import { preloadAllEntities } from './utils/entityFactory.js';
 import { abilitiesByForm, spawnPlayer } from './player/Player.js';
 import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";
 import { ironShield, ironSword,magicWand,ironHelmet } from './utils/items.js';
-
+import { updateVitalsHUD } from './ui/hudVitals.js';
 // =====================
 // SETTINGS
 // =====================
@@ -104,6 +104,7 @@ async function init() {
 
     updateLoadingProgress(95, 'Player initialization...');
     gameManager.controller = await spawnPlayer();
+    updateVitalsHUD(gameManager.controller.stats);
     gameManager.inventory.updateEquipmentVisibility();
     gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
     gameManager.inventory.onChange(() => {
