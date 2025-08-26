@@ -111,6 +111,7 @@ export class TreeSpawner {
     // opacità globale foglie (pilotata dal game)
     this._leafOpacity = 1.0;
     this.setLeafGlobalOpacity = (opacity) => {
+      console.log("SET LEAFT OPACITY", opacity);
       const o = Math.min(1, Math.max(0, opacity));
       if (o === this._leafOpacity) return;
       this._leafOpacity = o;
