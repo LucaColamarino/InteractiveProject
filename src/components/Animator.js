@@ -32,7 +32,7 @@ export class Animator {
     // Soglie velocità per blendspace
     this._tWalkOn  = 0.25;
     this._tRunOn   = 5.5;
-    this._tRunFull = 7.0;
+    this._tRunFull = 6.5;
 
     // Pesi correnti/target
     this._w = { idle: 1, walk: 0, run: 0, fly: 0, sitIdle: 0 };
@@ -77,6 +77,7 @@ export class Animator {
       this._setTargetSolo('fly');
     } else {
       // 1D blendspace: idle ↔ walk ↔ run
+      console.log("Velocity:",v);
       const iw = this._remapClamped(v, 0, this._tWalkOn, 1, 0);
       const wr = this._remapClamped(v, this._tWalkOn, this._tRunOn, 0, 1);
       const rr = this._remapClamped(v, this._tRunOn, this._tRunFull, 0, 1);

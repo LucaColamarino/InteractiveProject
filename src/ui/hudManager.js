@@ -113,6 +113,8 @@ function initializeRadarSystem() {
   elements.minimapGrid.querySelectorAll('.minimap-enemy').forEach(el => el.remove());
 
   radar.headingArrow = document.querySelector('.minimap-heading') || null;
+  // dopo: radar.headingArrow = document.querySelector('.minimap-heading') || null;
+
   if (elements.compass) {
     elements.compass.textContent = 'N';
     elements.compass.setAttribute('aria-label', 'Direzione: Nord');
@@ -208,9 +210,11 @@ function updateRadarSystem(player, enemies, camera) {
 
   // Freccia direzione
   if (radar.headingArrow) {
-    withBaseTransform(radar.headingArrow);
-    setTransform(radar.headingArrow, `translate(-7px, -5px) rotate(${-yawDeg}deg)`);
+    setTransform(radar.headingArrow, `translate(-85%,-30%) rotate(${-yawDeg}deg) scale(0.7)`);
+    // Freccia direzione
+
   }
+
 }
 
 // ---------- Notifiche ----------

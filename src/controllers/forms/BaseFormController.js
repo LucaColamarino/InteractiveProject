@@ -70,7 +70,7 @@ export class BaseFormController {
 
     // ----- Movimento orizzontale -----
     const baseSpeed   = this.abilities?.speed ?? 5;
-    const targetSpeed = this.isSprinting ? baseSpeed * 1.5 : baseSpeed;
+    const targetSpeed = this.isSprinting ? baseSpeed * 1.8 : baseSpeed;
 
     const inputVec = movementLocked ? this._zeroVec : this._input.moveVec;
     this._desired.copy(inputVec).normalize().multiplyScalar(targetSpeed);

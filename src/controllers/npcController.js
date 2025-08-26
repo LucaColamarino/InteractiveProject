@@ -140,7 +140,7 @@ export function updateEnemies(delta) {
       // walker / werewolf
       enemy.angle = (enemy.angle ?? Math.random() * Math.PI * 2) + delta * 0.2;
       const dir = new THREE.Vector3(Math.cos(enemy.angle), 0, Math.sin(enemy.angle));
-      const moveSpeed = enemy.speed ?? 1.0;
+      const moveSpeed = 0;//enemy.speed ?? 1.0;
 
       enemy.model.position.addScaledVector(dir, moveSpeed * delta);
       const x = enemy.model.position.x, z = enemy.model.position.z;
