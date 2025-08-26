@@ -193,7 +193,7 @@ export class Animator {
         maxName = key;
       }
     }
-    if (maxW > 0.6 && !this.isplayer) {
+    if (maxW > 0.6) {
       console.log(`[Animator] locomotion=${maxName} (${(maxW*100).toFixed(0)}%) full=${this._activeFull ?? 'none'}`);
     }
   }

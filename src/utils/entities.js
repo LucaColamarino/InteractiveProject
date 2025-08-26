@@ -84,6 +84,7 @@ export const ENTITY_CONFIG = {
       run: '/models/animations/WerewolfRun.fbx',
       jump: '/models/animations/WerewolfJump.fbx',
       die: '/models/animations/WerewolfDie.fbx',
+      attack: '/models/animations/WerewolfAttack.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
     yOffset: 0,
