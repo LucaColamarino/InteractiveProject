@@ -4,6 +4,7 @@ import { getTerrainHeightAt } from '../../map/map.js';
 import { trees } from '../../spawners/vegetationSpawner.js';
 import { StatsSystem } from '../../systems/StatsSystem.js';
 import { updateVitalsHUD } from '../../ui/hudVitals.js';
+import { PlayerBurnFX } from '../../particles/PlayerBurnFX.js';
 
 const PLAYER_RADIUS = 0.4;   // tweak
 const TREE_RADIUS   = 0.6;   // tweak
@@ -12,7 +13,8 @@ const SEP_EPS       = 0.01;  // piccolo “margine” per evitare jitter sul bor
 const SPRINT_COST_PER_SEC = 12; // stamina consumata al secondo durante sprint
 const STAMINA_REGEN_RATE  = 8;  // stamina al secondo quando non in cooldown
 const MANA_REGEN_RATE     = 0;  // mana al secondo
-
+const BURNING_TIME = 5;
+const BURN_DPS = 1;
 export class BaseFormController {
   constructor(player, abilities) {
     this.player = player;
@@ -49,7 +51,35 @@ export class BaseFormController {
     this._prePos  = new THREE.Vector3();
     this._candPos = new THREE.Vector3();
     this._n2D     = new THREE.Vector2();
+    this._isBurning = false;
+    this._burningLeft =0;
+    this._burnFx = null;
     
+  }
+  startBurning()
+  {
+    this._isBurning = true;
+    this._burningLeft = BURNING_TIME;
+    this.startBurningEffect();
+  }
+  stopBurning()
+  {
+    this._isBurning = false;
+    this._burningLeft = 0;
+    this.stopBurningEffect();
+  }
+  startBurningEffect(){
+  if (!this._burnFx) {
+    this._burnFx = new PlayerBurnFX(this.player.model);
+  }
+  this._burnFx.setEnabled(true);
+  }
+
+  stopBurningEffect(){
+    this._burnFx?.setEnabled(false);
+  }
+  takeDamage(damage){
+    this.stats.damage(damage);
   }
   tryStartDrain(site) {
     if (!site) return false;
@@ -89,6 +119,16 @@ export class BaseFormController {
 
   update(dt) {
   // --- DRain distance guard ---
+  if (this._burnFx) this._burnFx.update(dt);
+  if(this._isBurning)
+    {
+      if(this._burningLeft<=0){
+        this.stopBurning(); 
+      }else{
+        this.takeDamage(BURN_DPS * dt);
+        this._burningLeft-= dt;
+        }
+    }
   if (this.isDraining && this._drainSite) {
     const pos = this.player?.model?.position;
     if (pos) {

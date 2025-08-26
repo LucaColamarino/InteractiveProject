@@ -223,6 +223,15 @@ export class Campfire {
       this.runestone.position.y += + bob;
       this.runestone.rotation.y += delta * 0.4; // rotazione lenta
     }
+
+    //PlayerCollision
+    const dist = this.model.position.distanceTo(gameManager?.controller?.player?.model.position);
+    if(dist<0.95)
+      {
+        gameManager?.controller.startBurning?.();
+      }
+
+
   }
 
   // Controlli runtime
