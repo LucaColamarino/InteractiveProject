@@ -30,31 +30,40 @@ export class AttackStrategy {
   specialAttack(controller) { /* override */ }
 
   // ---- Attacco base comune (es. sword slash) ----
-  baseAttack(controller,cN = "") {
+  baseAttack(controller, cN = "swordAttack") {
+    console.log("BASE ATTACK");  
     const actions = controller.player.animator?.actions || {};
-    const primary = actions[cN] ||actions['swordAttack'] || actions['attack'] || null;
+    const hasRequested = !!cN && !!actions[cN];
+    const primary = hasRequested ? actions[cN]
+                                : (actions['swordAttack'] || actions['attack'] || null);
     if (!primary || this._attackState) return false;
 
-    let action = primary;
-    if (!action) {
-      const key = Object.keys(actions).find(k => k.toLowerCase().includes('attack'));
-      if (key) action = actions[key];
-    }
-    if (!action) return false;
+    // prova a recuperare il nome clip dall'action, altrimenti usa cN,
+    // altrimenti ultimo fallback 'attack'
+    const clipObj  = primary.getClip?.() || null;
+    const clipName =
+      (hasRequested ? cN : null) ||
+      primary._clipName ||
+      clipObj?.name ||
+      Object.keys(actions).find(k => k.toLowerCase() === 'attack') ||
+      'attack';
 
-    const clipName = action._clipName || 'swordAttack';
+    // suona la clip col nome risolto
     const ok = controller.player.animator?.playAction?.(clipName);
-    if (!ok) return false;
+    if (!ok) {
+      // fallback assoluto: riproduci direttamente l'action se supportato
+      primary.reset?.();
+      primary.play?.();
+    }
 
-    const clip = action.getClip?.() || null;
-    const dur  = clip?.duration ?? 0.8;
+    const dur = clipObj?.duration ?? 0.8;
 
     controller.lockMovementFor(dur);
     controller.isAttacking = true;
 
     this._attackState = {
-      action,
-      clip,
+      action: primary,
+      clip: clipObj,
       clipName,
       windows: HIT_WINDOWS,
       winApplied: HIT_WINDOWS.map(() => false),
@@ -65,6 +74,7 @@ export class AttackStrategy {
     if (this._arcDebugMesh) this._arcDebugMesh.visible = this.debug;
     return true;
   }
+
 
   // ---- Update: hit-windows ----
   update(controller, dt) {
