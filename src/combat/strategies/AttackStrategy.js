@@ -4,112 +4,139 @@ import { gameManager } from '../../managers/gameManager.js';
 
 const HIT_WINDOWS = [{ start: 0.30, end: 0.55 }];
 
-const DEFAULT_SWORD_ARC = {
-  reach: 2.7,
+// Base arc (verrà personalizzato nelle sottoclassi)
+const BASE_SWORD_ARC = {
+  reach: 2.6,
   arcDeg: 90,
-  // 0° = davanti al player (usa 180 per colpire anche dietro)
-  yawOffsetDeg: 180,
-  pitchOffsetDeg: -10,
-  yOffset: 1.3
+  yawOffsetDeg: 180,    // 0° = davanti al player
+  pitchOffsetDeg: -8,
+  yOffset: 1.2
 };
 
 export class AttackStrategy {
-  constructor() {
+  constructor(arcOverrides = {}) {
     this._arcDebugMesh = null;
-    // { action, clip, clipName, windows:[{start,end}], winApplied:Bool[], enemiesHit:Set }
-    this._attackState = null;
-    this._arc = { ...DEFAULT_SWORD_ARC };
-    this.debug = true;
 
-    // Stato parata
-    this._blockClipName = null;  // 'block' o 'blockShield'
+    // Stato attacco overlay
+    this._attackState = null;
+
+    // Arc corrente (può essere cambiato da onEquip/arma o da sottoclasse)
+    this._arc = { ...BASE_SWORD_ARC, ...arcOverrides };
+
+    this.debug = false;
+
+    // Stato parata (overlay looped)
+    this._blockClipName = null;
   }
 
-  onEquip(controller, weaponItem) { /* override se serve */ }
-  attack(controller) { /* override */ }
-  specialAttack(controller) { /* override */ }
+  onEquip(controller, weaponItem) {
+    // weaponItem?.meta può sovrascrivere reach/arcDeg ecc.
+    const m = weaponItem?.meta || {};
+    if (m.reach != null) this._arc.reach = m.reach;
+    if (m.arcDeg != null) this._arc.arcDeg = m.arcDeg;
+    if (m.yawOffsetDeg != null) this._arc.yawOffsetDeg = m.yawOffsetDeg;
+    if (m.pitchOffsetDeg != null) this._arc.pitchOffsetDeg = m.pitchOffsetDeg;
+    if (m.yOffset != null) this._arc.yOffset = m.yOffset;
+  }
 
-  // ---- Attacco base comune (es. sword slash) ----
-  baseAttack(controller, cN = "swordAttack") {
-    console.log("BASE ATTACK");  
-    const actions = controller.player.animator?.actions || {};
-    const hasRequested = !!cN && !!actions[cN];
-    const primary = hasRequested ? actions[cN]
-                                : (actions['swordAttack'] || actions['attack'] || null);
-    if (!primary || this._attackState) return false;
+  attack(_controller) { /* override */ }
+  specialAttack(_controller) { /* override */ }
 
-    // prova a recuperare il nome clip dall'action, altrimenti usa cN,
-    // altrimenti ultimo fallback 'attack'
-    const clipObj  = primary.getClip?.() || null;
-    const clipName =
-      (hasRequested ? cN : null) ||
-      primary._clipName ||
-      clipObj?.name ||
-      Object.keys(actions).find(k => k.toLowerCase() === 'attack') ||
-      'attack';
+  // ---- Attacco base comune (overlay) ----
+  // preferredNames: lista di possibili nomi clip (in ordine di preferenza)
+  baseAttack(controller, ...preferredNames) {
+    if (this._attackState) return false;
 
-    // suona la clip col nome risolto
-    const ok = controller.player.animator?.playAction?.(clipName);
-    if (!ok) {
-      // fallback assoluto: riproduci direttamente l'action se supportato
-      primary.reset?.();
-      primary.play?.();
+    const animator = controller.player.animator;
+    if (!animator) return false;
+
+    // Alias comuni: sword-attack / generic attack
+    const aliases = [
+      ...(preferredNames?.length ? preferredNames : []),
+      'swordAttack', 'SwordAttack', 'attack', 'Attack', 'Slash', 'Melee', 'Hit'
+    ];
+
+    // Prova ad avviare una clip overlay fra gli alias
+    let usedName = null;
+    for (const name of aliases) {
+      if (animator.playOverlay?.(name, { loop: 'once', mode: 'full' })){
+        usedName = name; break;
+      }
     }
+    if (!usedName) return false;  // nessuna clip trovata
 
-    const dur = clipObj?.duration ?? 0.8;
+    const dur = Math.max(0.15, animator.getClipDuration?.(usedName) || 0.8);
 
-    controller.lockMovementFor(dur);
+    // Blocca movimento per la durata della clip
+    controller.lockMovementFor?.(dur);
     controller.isAttacking = true;
 
     this._attackState = {
-      action: primary,
-      clip: clipObj,
-      clipName,
+      t: 0,
+      dur,
       windows: HIT_WINDOWS,
       winApplied: HIT_WINDOWS.map(() => false),
-      enemiesHit: new Set()
+      enemiesHit: new Set(),
+      clipName: usedName,
+      prevFrac: 0,
+      // Non servono action/clip: usiamo t/dur
     };
 
     this._updateArcDebug(controller);
     if (this._arcDebugMesh) this._arcDebugMesh.visible = this.debug;
+    // Colore iniziale blu
+    this._setDebugWindow(false);
     return true;
   }
 
-
-  // ---- Update: hit-windows ----
+  // ---- Update: gestione finestre e fine overlay ----
   update(controller, dt) {
-    if (this._attackState?.clip) {
-      const { action, clip, windows, winApplied } = this._attackState;
-      const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
+    if (!this._attackState) return;
 
-      // ⚠️ FIX: incrementare i, altrimenti loop infinito
-      for (let i = 0; i < windows.length; i++) {
-        const w = windows[i];
-        if (!winApplied[i] && frac >= w.start && frac <= w.end) {
-          this._applyHits?.(controller);
-          winApplied[i] = true;
-        }
-      }
+    const s = this._attackState;
+    const prev = s.prevFrac ?? 0;
+    s.t += dt;
+    const curr = s.dur > 0 ? THREE.MathUtils.clamp(s.t / s.dur, 0, 1) : 1;
 
-      const weight = controller.player.animator?._getActionWeight?.(this._attackState.clipName) ?? 0;
-      const ended = !action.isRunning?.() || weight <= 0.001 || frac >= 0.999;
-
-      if (ended) {
-        this._attackState = null;
-        controller.isAttacking = false;
-        if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
+    // finestre di hit (usa overlap tra [prev,curr] e [start,end])
+    for (let i = 0; i < s.windows.length; i++) {
+      const w = s.windows[i];
+      const a1 = Math.max(prev, w.start);
+      const a2 = Math.min(curr, w.end);
+      if (!s.winApplied[i] && a1 <= a2) {
+        this._applyHits?.(controller);
+        s.winApplied[i] = true;
       }
     }
+
+    s.prevFrac = curr;
+
+
+    // fine clip
+    if (s.t >= s.dur) {
+      this._attackState = null;
+      controller.isAttacking = false;
+      controller.player.animator?.stopOverlay?.();
+      if (this._arcDebugMesh) {
+        this._arcDebugMesh.visible = false;
+      }
+      return;
+    }
+
+    // aggiorna gizmo e colore
+    if (this._arcDebugMesh?.visible) this._updateArcDebug(controller);
+    this._setDebugWindow(this._isInHitWindow());
   }
 
   cancel(controller) {
     this._attackState = null;
     controller.isAttacking = false;
     controller.isBlocking = false;
+    controller.player.animator?.stopOverlay?.();
     if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
   }
 
-  // ================== ARCO DI COLPO (comune) ==================
+  // ================== ARCO DI COLPO ==================
   _setArc(reach, arcDeg) {
     if (typeof reach === 'number') this._arc.reach = reach;
     if (typeof arcDeg === 'number') this._arc.arcDeg = arcDeg;
@@ -120,24 +147,39 @@ export class AttackStrategy {
   }
 
   _inSwordArc(playerObj, enemyObj) {
+    console.log("IN SOWRD ARC",playerObj,enemyObj);
     if (!playerObj || !enemyObj) return false;
 
     const { reach, arcDeg, yOffset } = this._arc;
 
-    const Pc = playerObj.position.clone();
-    Pc.y += yOffset;
+    // WORLD positions
+    const Pw = playerObj.getWorldPosition(new THREE.Vector3());
+    Pw.y += yOffset;
+    const Ew = enemyObj.getWorldPosition(new THREE.Vector3());
 
-    const toEnemy = new THREE.Vector3().subVectors(enemyObj.position, Pc);
+    const toEnemy = new THREE.Vector3().subVectors(Ew, Pw);
     const dist = toEnemy.length();
+    console.log("DIST AND REACH",dist,reach);
     if (dist > reach) return false;
 
     toEnemy.normalize();
+
+    // WORLD slash dir
     const slashDirWorld = worldSlashDir(playerObj, this._arc);
 
     const dot = THREE.MathUtils.clamp(slashDirWorld.dot(toEnemy), -1, 1);
     const angle = THREE.MathUtils.radToDeg(Math.acos(dot));
+
+    // === DEBUG LOG ===
+    const dy = (Ew.y - Pw.y).toFixed(2);
+    console.log(
+      `[ARC TEST] enemy=${enemyObj.uuid} dist=${dist.toFixed(2)} ` +
+      `angle=${angle.toFixed(1)}° dy=${dy}`
+    );
+    // =================
     return angle <= arcDeg * 0.5;
   }
+
 
   _updateArcDebug(controller) {
     const m = this._ensureArcDebugMesh(controller);
@@ -170,9 +212,9 @@ export class AttackStrategy {
 
     const { reach, arcDeg } = this._arc;
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x00ffff,
+      color: 0x3AA7FF,               // blu di base
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.35,
       side: THREE.DoubleSide,
       depthWrite: false,
       depthTest: false
@@ -190,46 +232,60 @@ export class AttackStrategy {
     return mesh;
   }
 
-  // ================== BLOCCO COMUNE (HOLD) ==================
+  // ================== BLOCCO (Overlay looped) ==================
   blockStart(controller) {
     if (controller.isAttacking || controller.isBlocking) return false;
 
     const animator = controller.player.animator;
-    const actions  = animator?.actions;
-    if (!actions) return false;
+    if (!animator) return false;
 
     const hasShield = !!gameManager.inventory?.equipment?.shield;
-    const name = hasShield ? 'blockShield' : 'block';
-    if (!actions[name]) { console.warn('[Block] action mancante:', name); return false; }
+    const aliases = hasShield
+      ? ['blockShield', 'BlockShield', 'Shield', 'Guard']
+      : ['block', 'Block', 'Guard'];
 
-    const ok = animator.playHold?.(name); // <— usa la nuova hold dell'Animator
-    if (!ok) return false;
+    let used = null;
+    for (const n of aliases) {
+      // shield o non shield:
+      if (animator.playOverlay?.(n, { loop: 'repeat', mode: 'upper' })) { used = n; break; }
+    }
+    if (!used) return false;
 
-    this._blockClipName = name;
+    this._blockClipName = used;
     controller.isBlocking = true;
     return true;
   }
 
   blockEnd(controller) {
     if (!controller.isBlocking) return false;
-
-    const animator = controller.player.animator;
-    const name = this._blockClipName || 'block';
-    animator.stopHold?.(name); // <— spegni la hold con fade-out
-
+    controller.player.animator?.stopOverlay?.();
     controller.isBlocking = false;
     this._blockClipName = null;
     return true;
   }
 
-  // compat: toggle
-  block(controller) {
-    if (controller.isBlocking) return this.blockEnd(controller);
-    return this.blockStart(controller);
+  block(controller) { return controller.isBlocking ? this.blockEnd(controller) : this.blockStart(controller); }
+
+  // === helper: sei nella finestra di impatto? ===
+  _isInHitWindow() {
+    const s = this._attackState;
+    if (!s) return false;
+    const frac = s.dur > 0 ? THREE.MathUtils.clamp(s.t / s.dur, 0, 1) : 1;
+    const wins = s.windows || HIT_WINDOWS;
+    return wins.some(w => frac >= w.start && frac <= w.end);
+  }
+
+  // === helper: colora il gizmo in base allo stato ===
+  _setDebugWindow(on) {
+    const m = this._arcDebugMesh;
+    if (!m || !m.material) return;
+    // rosso in window, blu fuori
+    m.material.color.setHex(on ? 0xFF3B30 : 0x3AA7FF);
+    m.material.needsUpdate = true;
   }
 }
 
-// ---------------- helpers (file-local) ----------------
+// ---------------- helpers ----------------
 function makeArcGeometry(reach, arcDeg, segments = 32) {
   const verts = [0, 0, 0];
   const half = THREE.MathUtils.degToRad(arcDeg * 0.5);
@@ -260,5 +316,6 @@ function localSlashDir(arc) {
 }
 
 function worldSlashDir(playerObj, arc) {
-  return localSlashDir(arc).applyQuaternion(playerObj.quaternion).normalize();
+  const qWorld = playerObj.getWorldQuaternion(new THREE.Quaternion());
+  return localSlashDir(arc).applyQuaternion(qWorld).normalize();
 }

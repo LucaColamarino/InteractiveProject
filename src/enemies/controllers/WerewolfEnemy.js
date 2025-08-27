@@ -5,53 +5,49 @@ import { getTerrainHeightAt } from '../../map/map.js';
 
 /**
  * WerewolfEnemy — melee, extremely fast, aggressive.
- *
- * Structure inspired by ArcherEnemy but adapted for close‑quarters combat.
+ * Compatibile col nuovo Animator: overlay “attack” sopra locomotion con floor.
+ * Durante windup/attack il lupo NON si muove (nessun lunge).
  */
 export class WerewolfEnemy extends BaseEnemy {
   constructor(opt = {}) {
     super({ ...opt, type: 'werewolf' });
 
     // ===== Perception / ranges =====
-    this.visionRange = opt.visionRange ?? 32;      // awareness radius
-    this.attackRange = opt.attackRange ?? 2.4;     // claw distance
-    this.lungeRange  = opt.lungeRange  ?? 4.0;     // can start lunge from here
-    this.deadzone    = opt.deadzone    ?? 0.7;     // hysteresis for stability
+    this.visionRange = opt.visionRange ?? 32;
+    this.attackRange = opt.attackRange ?? 2.4;
+    this.lungeRange  = opt.lungeRange  ?? 4.0;   // (non usata ora per il movimento)
+    this.deadzone    = opt.deadzone    ?? 0.7;
 
     // ===== Locomotion (units / sec) =====
-    this.walkSpeed   = opt.walkSpeed   ?? 4.8;     // prowl
-    this.runSpeed    = opt.runSpeed    ?? 9.5;     // very fast
-    this.turnSpeed   = opt.turnSpeed   ?? 10.0;    // snappy turning
-    this.circleSpeed = opt.circleSpeed ?? 6.0;     // strafing speed when close
+    this.walkSpeed   = opt.walkSpeed   ?? 4.8;
+    this.runSpeed    = opt.runSpeed    ?? 9.5;
+    this.turnSpeed   = opt.turnSpeed   ?? 10.0;
+    this.circleSpeed = opt.circleSpeed ?? 6.0;
+    this.backSpeed   = opt.backSpeed   ?? 3.6;
 
     // ===== Attack timings =====
-    this.attackCooldown = opt.attackCooldown ?? 1.0;  // time between attacks
-    this.windupTime     = opt.windupTime     ?? 0.18; // short windup before lunge
-    this.recoveryTime   = opt.recoveryTime   ?? 0.25; // brief recovery after hit
-    this.lungeSpeed     = opt.lungeSpeed     ?? 14.0; // forward burst during attack
+    this.attackCooldown = opt.attackCooldown ?? 1.0;
+    this.windupTime     = opt.windupTime     ?? 0.18;
+    this.recoveryTime   = opt.recoveryTime   ?? 0.25;
 
-    // Animation clip names (adapt to rig)
-    this.clipNames = {
-      run:    opt.clipNames?.run    ?? 'run',
-      walk:   opt.clipNames?.walk   ?? 'walk',
-      idle:   opt.clipNames?.idle   ?? 'idle',
-      attack: opt.clipNames?.attack ?? 'attack',   // claw / bite
-      roar:   opt.clipNames?.roar   ?? 'roar',
-      hit:    opt.clipNames?.hit    ?? 'hit',
-      die:    opt.clipNames?.die    ?? 'die',
-    };
+    // Alias (l’Animator fa già auto-resolve, ma sotto usiamo un fallback aggressivo)
+    this.attackAliases = opt.attackAliases || [
+      'attack','Attack','ATTACK',
+      'Punch','Claw','Bite','Slash','Hit','Melee',
+      'Attack01','Attack_1','Attack_A','Strike','Swipe'
+    ];
 
-    // FSM: 'patrol' | 'hunt' | 'windup' | 'attack' | 'recover'
-    this._state = 'patrol';
-    this._coolT = 0;      // attack cooldown timer
-    this._timer = 0;      // generic state timer (windup/recovery/strafe switch)
+    // FSM
+    this._state = 'patrol';                 // 'patrol' | 'hunt' | 'windup' | 'attack' | 'recover'
+    this._coolT = 0;                        // cooldown globale
+    this._timer = 0;                        // timer stato corrente
+    this._circleDir = Math.random() < 0.5 ? -1 : 1;
 
-    // Small randomness for circling direction
-    this._circleDir = Math.random() < 0.5 ? -1 : 1; // -1 left, +1 right
-
-    // transient flags
+    // flags transienti
     this._didHit = false;
-    this._lungeDir = new THREE.Vector3(0, 0, -1);
+
+    // Importante: durante l’attacco non permettere locomotion-driven movement
+    this.state.allowLocomDuringAttack = false;
   }
 
   update(dt) {
@@ -62,32 +58,30 @@ export class WerewolfEnemy extends BaseEnemy {
       return;
     }
 
-    // Vector to target on XZ plane
+    // Direzione verso il target su XZ
     const pos = this.model.position;
     const toTgt3D = new THREE.Vector3().subVectors(playerObj.position, pos);
     const toTgt = new THREE.Vector3(toTgt3D.x, 0, toTgt3D.z);
     const dist = toTgt.length();
-    if (dist > 1e-4) toTgt.divideScalar(dist); // normalize safely
+    if (dist > 1e-4) toTgt.divideScalar(dist);
 
-    // Global cooldown countdown
+    // cooldown
     this._coolT = Math.max(0, this._coolT - dt);
 
-    // ===== State transitions based on distance & cooldown =====
+    // ===== Transizioni =====
     if (this._state === 'patrol') {
       if (dist <= this.visionRange) this._enterHunt();
     } else if (this._state === 'hunt') {
       if (dist > this.visionRange + this.deadzone) {
         this._enterPatrol();
       } else if (this._coolT <= 0 && dist <= this.attackRange + this.deadzone) {
-        // very close and ready → attack now
         this._enterWindup();
       } else if (this._coolT <= 0 && dist <= this.lungeRange) {
-        // a bit farther but lungeable
         this._enterWindup();
       }
     }
 
-    // ===== State logic =====
+    // ===== Logica stati =====
     switch (this._state) {
       case 'patrol':   this._patrol(dt); break;
       case 'hunt':     this._hunt(dt, toTgt, dist); break;
@@ -99,10 +93,11 @@ export class WerewolfEnemy extends BaseEnemy {
     this._afterUpdate(dt);
   }
 
-  // ---------- States ----------
+  // ---------- Stati ----------
   _enterPatrol() {
     this._state = 'patrol';
     this.state.isSprinting = false;
+    this.state.isBacking = false;
     this.state.speed = this.walkSpeed;
   }
 
@@ -114,108 +109,97 @@ export class WerewolfEnemy extends BaseEnemy {
     this._state = 'windup';
     this._timer = this.windupTime;
     this.state.isSprinting = false;
-    this.state.speed = 0;
-    // Optional animation cue before the leap
-    this._play(this.clipNames.roar) || this._play(this.clipNames.idle);
+    this.state.isBacking = false;
+    this.state.speed = 0;            // fermo
   }
 
-  _enterAttack(forwardDir) {
+  _enterAttack(faceDir) {
     this._state = 'attack';
-    this._timer = 0.12; // active frames window (short & deadly)
-    // Cache lunge direction at the start of the attack
-    this._lungeDir = (forwardDir && forwardDir.lengthSq() > 0)
-      ? forwardDir.clone().setY(0).normalize()
-      : new THREE.Vector3(0, 0, -1);
-    this._play(this.clipNames.attack);
+    // Durata = durata della clip attack (fallback 0.6s)
+    const dur = this._playAttackOverlay() || 0.6;
+    this._timer = dur;               // tieni l’overlay per tutta la clip
     this.state.isAttacking = true;
+    this.state.speed = 0;            // fermo
+    // orienta verso il target al momento dell’attacco
+    if (faceDir && faceDir.lengthSq() > 0) this.faceDirection(faceDir, this.turnSpeed);
   }
 
   _enterRecover() {
     this._state = 'recover';
     this._timer = this.recoveryTime;
     this.state.isAttacking = false;
-    this._coolT = this.attackCooldown; // set CD at start of recovery
+    this.state.speed = 0;            // ancora fermo per recovery breve
+    this._coolT = this.attackCooldown;
+    this.animator?.stopOverlay?.();  // l’Animator fa kick idle e mantiene il floor
   }
 
   _patrol(dt) {
     this.state.isSprinting = false;
-    this.state.speed = this.walkSpeed;
+    this.state.isBacking = false;
+    const v = this.walkSpeed;
+    this.state.speed = v;
     this.wanderOnGround(dt, 0.9);
   }
 
   _hunt(dt, toTgt, dist) {
-    // Always face target quickly
-    this.faceDirection(toTgt, this.turnSpeed);
+    this.faceDirection(toTgt, this.turnSpeed, dt);
 
-    // If cooldown ready and very close, transition to windup (guard, though already handled above)
     if (this._coolT <= 0 && dist <= this.attackRange + this.deadzone * 0.5) {
       this._enterWindup();
       return;
     }
 
-    // Close the gap aggressively
     if (dist > this.attackRange + this.deadzone) {
       const v = (dist > this.attackRange * 1.8) ? this.runSpeed : this.walkSpeed;
       this.state.isSprinting = v === this.runSpeed;
+      this.state.isBacking = false;
       this.state.speed = v;
       this.model.position.addScaledVector(toTgt, v * dt);
       return;
     }
 
-    // Within close range
+    // Dentro la close range ma in cooldown → circling
     if (this._coolT > 0) {
-      // circle/strafe only while waiting for cooldown
       this._timer -= dt;
       if (this._timer <= 0) {
-        this._timer = 0.6 + Math.random() * 0.6; // switch side occasionally
+        this._timer = 0.6 + Math.random() * 0.6;
         this._circleDir *= -1;
       }
-      // tangent = rotate toTgt by ±90° on Y
       const tangent = new THREE.Vector3(-toTgt.z * this._circleDir, 0, toTgt.x * this._circleDir).normalize();
       const v = this.circleSpeed;
       this.state.isSprinting = false;
+      this.state.isBacking = false;
       this.state.speed = v;
-      // small forward bias to keep pressure
       const forwardBias = toTgt.clone().multiplyScalar(0.25);
       const moveDir = tangent.add(forwardBias).normalize();
       this.model.position.addScaledVector(moveDir, v * dt);
     } else {
-      // cooldown ready but we're just at the edge → keep pressure frontally
+      // pronto ma al limite → pressione frontale lenta
       this.state.isSprinting = false;
+      this.state.isBacking = false;
       this.state.speed = this.walkSpeed;
     }
   }
 
   _windup(dt, toTgt) {
-    // Face target and wait a short moment, then lunge
-    this.faceDirection(toTgt, this.turnSpeed * 1.2);
+    // guarda il target ma resta fermo
+    this.faceDirection(toTgt, this.turnSpeed * 1.2, dt);
     this._timer -= dt;
     this.state.speed = 0;
     if (this._timer <= 0) {
-      // Capture current forward for the lunge
-      const forward = toTgt.clone();
-      this._enterAttack(forward);
+      this._enterAttack(toTgt.clone());
     }
   }
 
   _attackStep(dt) {
-    // Burst forward in the cached lunge direction
-    const dir = this._lungeDir || new THREE.Vector3(0, 0, -1);
-    this.model.position.addScaledVector(dir, this.lungeSpeed * dt);
-    this.state.speed = this.lungeSpeed;
+    // ATTENZIONE: nessun movimento durante l’attacco
+    this.state.speed = 0;
 
-    // Perform hit check during active window (one-shot per attack)
     if (!this._didHit) {
       this._didHit = true;
-      // TODO: integrate your melee overlap / arc system here
-      // Example:
-      // applyMeleeArcDamage(this, {
-      //   reach: this.attackRange + 0.8,
-      //   arcDeg: 110,
-      //   yOffset: 1.0,
-      //   damage: 14,
-      //   knockback: 6,
-      // });
+      // TODO: integrazione melee/overlap reale
+      // es:
+      // applyMeleeArcDamage(this, { reach: this.attackRange + 0.6, arcDeg: 110, yOffset: 1.0, damage: 14, knockback: 6 });
     }
 
     this._timer -= dt;
@@ -227,32 +211,37 @@ export class WerewolfEnemy extends BaseEnemy {
 
   _recover(dt) {
     this._timer -= dt;
-    // slow down slightly while recovering
-    this.state.speed = Math.max(0, (this.state.speed || 0) - 12 * dt);
+    this.state.speed = 0;
     if (this._timer <= 0) {
       this._enterHunt();
     }
   }
 
   _afterUpdate(dt) {
-    // Snap to terrain
+    // Snap terreno
     const p = this.model.position;
     const y = getTerrainHeightAt(p.x, p.z);
     p.y = THREE.MathUtils.lerp(p.y, y + this.yOffset, Math.min(1, dt * 10));
 
-    // Feed animator
+    // Animazioni
     this.updateAnimFromMove();
+    this.animator?.update?.(dt);
   }
 
-  // ---------- Anim helper ----------
-  _play(name) {
-    if (!name) return false;
-    if (this.animator?.playAction) {
-      this.animator.playAction(name);
-      return true;
+  // ---------- Overlay attack helper ----------
+  _playAttackOverlay() {
+    if (!this.animator) return 0;
+    // prova gli alias finché non parte
+    for (const name of this.attackAliases) {
+      const ok = this.animator.playOverlay?.(name, { loop: 'once' });
+      if (ok) {
+        // ritorna la durata corretta di quella clip
+        const d = this.animator.getClipDuration?.(name) || 0.6;
+        return d;
+      }
     }
-    const a = this.actions?.[name];
-    if (a?.reset) { a.reset().play?.(); return true; }
-    return false;
+    // fallback: prova “attack” comunque
+    const ok = this.animator.playOverlay?.('attack', { loop: 'once' });
+    return (ok ? (this.animator.getClipDuration?.('attack') || 0.6) : 0);
   }
 }

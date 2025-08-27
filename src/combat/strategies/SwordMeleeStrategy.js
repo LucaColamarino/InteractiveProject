@@ -7,115 +7,96 @@ import { scene } from '../../scene.js';
 
 export class SwordMeleeStrategy extends AttackStrategy {
   constructor() {
-    super();
-    // ---- shockwave params ----
-    this.shockCooldown = 2.0;      // secondi tra uno shockwave e l'altro
-    this.shockFireFrac = 0.35;     // frazione della clip a cui “parte” l'onda
-    this.shockMaxRadius = 12;      // raggio massimo dell'onda (m)
-    this.shockSpeed = 22;          // m/s (velocità di espansione)
-    this.shockThickness = 1.2;     // spessore del fronte (m)
-    this.shockDamageXP = 40;       // XP/“danno” dato a chi colpisci
-    this._shockCd = 0;             // timer cooldown
-    this._shockState = null;       // { action, clip, clipName, fired }
-    this._shockwaves = [];         // istanze attive dell'effetto
+    // Arc più ampio e un po' più lungo per la spada
+    super({
+      reach: 2.7,
+      arcDeg: 130,
+      pitchOffsetDeg: -6,
+      yOffset: 1.1
+    });
+    // shockwave params (opzionale speciale)
+    this.shockCooldown = 2.0;
+    this.shockFireFrac = 0.35;
+    this.shockMaxRadius = 12;
+    this.shockSpeed = 22;
+    this.shockThickness = 1.2;
+    this.shockDamageXP = 40;
+    this._shockCd = 0;
+    this._shockState = null; // { t, dur, clipName, fired }
+    this._shockwaves = [];
   }
 
   onEquip(controller, weaponItem) {
-    this._setArc(weaponItem?.meta?.reach, weaponItem?.meta?.arcDeg);
+    super.onEquip(controller, weaponItem); // consente override da arma
   }
 
-  // Attacco base (slash su click sinistro)
-  attack(controller) { return this.baseAttack(controller); }
+  // Attacco base (slash sinistro)
+  attack(controller) { return this.baseAttack(controller, 'swordAttack', 'Slash', 'attack'); }
 
-  // --- NUOVO: attacco speciale = SHOCKWAVE ---
+  // --- Attacco speciale: SHOCKWAVE (overlay) ---
   specialAttack(controller, clipName = 'shockwave') {
     if (controller.isAttacking || this._shockCd > 0) return false;
 
-    // prova ad ottenere l'azione "shockwave"
-    const actions = controller.player.animator?.actions || {};
-    console.log("actions",actions);
-    let action = actions[clipName] || null;
+    const animator = controller.player.animator;
+    if (!animator) return false;
 
-    // fallback: usa un'azione qualsiasi se non troviamo "shockwave"
-    if (!action) {
-      action = actions['attack'] || actions['swordAttack'] || null;
-      if (!action) {
-        const key = Object.keys(actions).find(k => k.toLowerCase().includes('attack'));
-        if (key) action = actions[key];
-      }
+    const aliases = [clipName, 'Shockwave', 'PowerSlash', 'attack'];
+    let used = null;
+    for (const n of aliases) {
+      if (animator.playOverlay?.(n, { loop: 'once', mode: 'full' })) { used = n; break; }
     }
-    if (!action) return false;
+    if (!used) return false;
 
-    const chosenName = action._clipName || clipName;
-    const ok = controller.player.animator?.playAction(chosenName);
-    if (!ok) return false;
-
-    const clip = action.getClip?.() || null;
-    const dur  = clip?.duration ?? 0.8;
-
-    controller.lockMovementFor(dur);
+    const dur = Math.max(0.2, animator.getClipDuration?.(used) || 0.8);
+    controller.lockMovementFor?.(dur);
     controller.isAttacking = true;
     this._shockCd = this.shockCooldown;
 
-    this._shockState = { action, clip, clipName: chosenName, fired: false };
+    this._shockState = { t: 0, dur, clipName: used, fired: false };
     return true;
   }
 
-  // Manteniamo gestione hit per lo slash nel base class, e aggiungiamo update shockwave
   update(controller, dt) {
-    // 1) slash base (finestre hit ecc.)
+    // 1) gestione slash base
     super.update(controller, dt);
 
     // 2) cooldown shockwave
     if (this._shockCd > 0) this._shockCd = Math.max(0, this._shockCd - dt);
 
-    // 3) stato della clip shockwave (quando “parte” generiamo l’onda)
-    if (this._shockState?.action && this._shockState.clip) {
-      const { action, clip } = this._shockState;
-      const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
+    // 3) stato clip shockwave
+    if (this._shockState) {
+      const s = this._shockState;
+      s.t += dt;
+      const frac = s.dur > 0 ? THREE.MathUtils.clamp(s.t / s.dur, 0, 1) : 1;
 
-      if (!this._shockState.fired && frac >= this.shockFireFrac) {
+      if (!s.fired && frac >= this.shockFireFrac) {
         this._spawnShockwave(controller);
-        this._shockState.fired = true;
+        s.fired = true;
       }
-
-      const weight = controller.player.animator?._getActionWeight?.(this._shockState.clipName) ?? 0;
-      const ended = !action.isRunning?.() || weight <= 0.001 || frac >= 0.999;
-      if (ended) {
+      if (s.t >= s.dur) {
         this._shockState = null;
         controller.isAttacking = false;
+        controller.player.animator?.stopOverlay?.();
       }
-    } else if (this._shockState && !this._shockState.fired) {
-      // clip non disponibile? comunque spara l’onda.
-      this._spawnShockwave(controller);
-      this._shockState.fired = true;
-      this._shockState = null;
-      controller.isAttacking = false;
     }
 
-    // 4) integrazione delle onde attive (espansione + collisioni)
+    // 4) integrazione delle onde
     for (let i = this._shockwaves.length - 1; i >= 0; i--) {
       const sw = this._shockwaves[i];
       sw.radius += this.shockSpeed * dt;
-
-      // effetto visivo: scala e dissolvenza
       if (sw.mesh) {
-        const s = Math.max(0.001, sw.radius * 2); // diametro ~ scala XY
+        const s = Math.max(0.001, sw.radius * 2);
         sw.mesh.scale.set(s, s, 1);
         const lifeFrac = THREE.MathUtils.clamp(sw.radius / this.shockMaxRadius, 0, 1);
         sw.mesh.material.opacity = 0.45 * (1.0 - lifeFrac);
       }
-
-      // colpisci i nemici attraversati dal “fronte”
       const enemies = getEnemies();
       const rMin = sw.radius - this.shockThickness * 0.5;
       const rMax = sw.radius + this.shockThickness * 0.5;
-
       for (const e of enemies) {
         if (!e.alive || !e.model) continue;
         const key = e.model.uuid || String(e);
         if (sw.hit.has(key)) continue;
-
         const dist = e.model.position.distanceTo(sw.origin);
         if (dist >= rMin && dist <= rMax) {
           sw.hit.add(key);
@@ -126,8 +107,6 @@ export class SwordMeleeStrategy extends AttackStrategy {
           hudManager.showNotification('Shockwave Hit!');
         }
       }
-
-      // fine onda
       if (sw.radius >= this.shockMaxRadius) {
         if (sw.mesh) sw.mesh.parent?.remove(sw.mesh);
         this._shockwaves.splice(i, 1);
@@ -138,19 +117,24 @@ export class SwordMeleeStrategy extends AttackStrategy {
   cancel(controller) {
     super.cancel(controller);
     this._shockState = null;
-    // rimuovi eventuali onde visive ancora in scena
     for (const sw of this._shockwaves) sw.mesh?.parent?.remove(sw.mesh);
     this._shockwaves.length = 0;
   }
-
-  // Cosa succede nella finestra "attiva" dello slash (click sinistro)
+  // ---- applica danni in finestra ----
   _applyHits(controller) {
-    console.log("apply hits");
     const playerObj = controller.player.model;
-    const p = playerObj.position;
-    const near = getEnemies().filter(
-      (e) => e.alive && e.model?.position?.distanceTo(p) < 8
-    );
+    if (!playerObj) return;
+
+    // world pos del player
+    const Pw = playerObj.getWorldPosition(new THREE.Vector3());
+
+    // prendi solo nemici “ragionevolmente vicini” in world-space
+    const NEAR_R = Math.max( this._arc?.reach + 1.0, 6 );
+    const near = getEnemies().filter(e => {
+      if (!e.alive || !e.model) return false;
+      const Ew = e.model.getWorldPosition(new THREE.Vector3());
+      return Ew.distanceTo(Pw) < NEAR_R;
+    });
 
     for (const enemy of near) {
       const key = enemy.model?.uuid || String(enemy);
@@ -160,41 +144,28 @@ export class SwordMeleeStrategy extends AttackStrategy {
         this._attackState.enemiesHit.add(key);
         killEnemy(enemy);
         if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
-          window.giveXP(25);
+          window.giveXP(30);
         }
-        hudManager.showNotification('Enemy Killed!');
+        hudManager.showNotification('Sword Hit!');
       }
     }
   }
 
-  // ---- internals shockwave ----
   _spawnShockwave(controller) {
-    // posizione e rotazione world del player
     const model = controller.player.model;
     model.updateMatrixWorld(true);
     const origin = model.getWorldPosition(new THREE.Vector3());
-
-    // mesh effetto: anello piatto (disc) con additive blending
     const ringGeo = new THREE.RingGeometry(0.98, 1.02, 64);
     const ringMat = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0.45,
-      depthWrite: false,
-      depthTest: true,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide
+      transparent: true, opacity: 0.45, depthWrite: false, depthTest: true,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = -Math.PI / 2; // orizzontale
-    ring.position.copy(origin).add(new THREE.Vector3(0, 0.05, 0)); // leggermente sopra il terreno
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.copy(origin).add(new THREE.Vector3(0, 0.05, 0));
     ring.renderOrder = 999;
     scene.add(ring);
 
-    this._shockwaves.push({
-      origin: origin.clone(),
-      radius: 0.01,
-      hit: new Set(),
-      mesh: ring
-    });
+    this._shockwaves.push({ origin: origin.clone(), radius: 0.01, hit: new Set(), mesh: ring });
   }
 }

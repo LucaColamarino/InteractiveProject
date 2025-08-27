@@ -98,7 +98,7 @@ async function init() {
     spawntorchAt(30, 15);
     spawntorchAt(17, 20);
     spawntorchAt(-20, -15);
-    spawnChestAt(6, 6,ironShield);
+    spawnChestAt(6, 6,ironSword);
 
     spawnChestAt(-6, -6, magicWand);
 

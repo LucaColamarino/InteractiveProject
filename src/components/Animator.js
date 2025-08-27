@@ -1,322 +1,295 @@
-// components/Animator.js
+// Animator.js
 import * as THREE from 'three';
+import { AnimationComponent } from './AnimationComponent.js';
 
 export class Animator {
-  constructor(animComp, stateRefFn, isplayer=false) {
-    this.isplayer = isplayer;
-    this.mixer = animComp?.mixer || null;
-    this.actions = animComp?.actions || {};
-    this._getState = stateRefFn || (() => ({}));
+  /**
+   * @param {{mixer:THREE.AnimationMixer, actions:Object<string,THREE.AnimationAction>}} animCompRaw
+   * @param {( )=>Object} stateRefFn  // funzione che ritorna lo stato esterno (speed, isFlying, ecc.)
+   */
+  constructor(animCompRaw, stateRefFn = () => ({})) {
+    // Wrappa l'anim component
+    this.comp = (animCompRaw instanceof AnimationComponent)
+      ? animCompRaw
+      : new AnimationComponent(animCompRaw?.mixer, animCompRaw?.actions);
+    this._getState = stateRefFn;
 
-    // Overlay full-body (attack/jump/die...)
-    this._activeFull = null;
-    this._fullFading = false;
+    // Nomi standard (alias risolti automaticamente)
+    this.names = {
+      idle:    this._resolve(['idle','Idle','Idle_A','Idle_01','Breathing','DefaultIdle']),
+      walk:    this._resolve(['walk','Walk','Walk_A','Walking']),
+      run:     this._resolve(['run','Run','Run_A','Jog','Jogging']),
+      fly:     this._resolve(['fly','Fly','Flying','Glide']),
+      sitIdle: this._resolve(['sitIdle','Sit','Sitting','Sit_Idle']),
+      back:    this._resolve(['back','Back','WalkBack','Walk_Back']),
+      attack:  this._resolve(['attack','Attack','Shoot','Bow_Shoot','Punch','SwordAttack']),
+      die:     this._resolve(['die','Death','Die']),
+      jump:    this._resolve(['jump','Jump']),
+    };
 
-    // Config blending
-    this._blendSpeed   = 8.0;
-    this._flyBlend     = 10.0;
-    this._fullFadeIn   = 0.16;
-    this._fullFadeOut  = 0.16;
-    this._isHoldFull = false;
-    this._holdReleasing = false;
-    this._fullBackWindow = 0.20;
+    // Se proprio non c'è idle, prova il primo loopabile come fallback
+    if (!this.names.idle) this.names.idle = this._findAnyLoopable();
 
-    // Floor anti T-pose
-    this._weightFloor = 0.06;
-    this._locoHold    = 0.12;
+    // Parametri blending
+    this.kLocom = 8.0;        // velocità blending locomotion
+    this.kOverlay = 10.0;     // velocità quando c'è overlay
+    this.fadeIn = 0.14;
+    this.fadeOut = 0.16;
+    this.backWindow = 0.20;   // finestra di anti-pop a fine overlay
+    this.overlayCtx = { name: null, mode: 'full', once: true, dur: 0, t: 0 };
+    // Anti T-pose
+    this.floorTotal = 0.05;   // minimo totale
+    this.floorIdle  = 0.20;   // minimo idle durante overlay/uscita
+    this.keepBaseDuringOverlay = 0.20;  // quanto della base resta anche con overlay
 
-    // Soglie velocità
-    this._tWalkOn  = 0.25;
-    this._tRunOn   = 5.5;
-    this._tRunFull = 6.5;
+    // Stato pesi
+    this.w = { idle:1, walk:0, run:0, fly:0, sit:0, back:0, overlay:0 };
+    this.tgt = { ...this.w };
 
-    // ---- Plateau (per avere 100% clip a velocità stabili) ----
-    // Walk: fascia sotto alla soglia di run; Run: poco sopra la soglia di run
-    this._walkPlateauLow  = 0.60 * this._tRunOn;   // ~3.3
-    this._walkPlateauHigh = 0.95 * this._tRunOn;   // ~5.2
-    this._runPlateauLow   = this._tRunOn + 0.15;   // ~5.65
+    // Overlay correnti
+    this.overlayName = null;   // name clip overlay in corso
+    this.overlayOnce = true;
 
-    // Pesi correnti/target
-    this._w = { idle: 1, walk: 0, run: 0, fly: 0, sitIdle: 0 };
-    this._targetW = { ...this._w };
-    this._locoSupportT = 0;
+    // Soglie locomotion (m/s arbitrari; adatta in base al tuo gioco)
+    this.v_walk_on   = 0.25;
+    this.v_run_on    = 5.0;
+    this.v_run_full  = 6.5;
 
-    if (this.mixer) {
-      this.mixer.addEventListener('finished', (e) => {
-        const a = e?.action;
-        if (!a) return;
-        if (a && this._activeFull === a._clipName) {
-          this._activeFull = null;
-          this._fullFading = false;
-          this._locoSupportT = this._locoHold;
-        }
-      });
-    }
+    // Prepara loop base
+    this._ensureBaseLoops();
 
-    // Avvia le clip di base
-    this._ensurePlayLoop('idle', 1);
-    this._ensurePlayLoop('walk', 0);
-    this._ensurePlayLoop('run',  0);
-    this._ensurePlayLoop('fly',  0);
-    this._ensurePlayLoop('sitIdle', 0);
+    // Evento “finished” del mixer → sgancia overlay se è quello corrente
+    this.comp?.mixer?.addEventListener?.('finished', (e) => {
+      const act = e?.action;
+      const ended = act?._clipName || null;
+      if (ended && ended === this.overlayName) {
+        // Fine overlay → rientro morbido
+        this.stopOverlay();
+        // spingi subito un po' di idle
+        this._kickIdle(this.floorIdle);
+      }
+    });
   }
 
-  /** Call ogni frame */
+  // ---------- API PUBBLICA ----------
+
+  /** Aggiorna usando lo stato esterno e blend */
   update(dt) {
-    if (this.mixer) this.mixer.update(dt);
+    this.comp.update(dt);
+
+    // --- overlay ctx (compat) ---
+    const oc = this.overlayCtx || (this.overlayCtx = { name: null, mode: 'full', once: true, dur: 0, t: 0 });
+    if (oc.name) oc.t += dt; else oc.t = 0;
+    this.overlayName = oc.name; // compat con _applyOverlayWeight() esistente
+
+    // Stato esterno
     const s = this._getState() || {};
-    const v = s.speed ?? 0;
+    const speed       = +s.speed || 0;
+    const isFlying    = !!s.isFlying;
+    const isSitting   = !!s.isSitting;
+    const isBacking   = !!s.isBacking;
+    const isSprinting = !!s.isSprinting;
 
-    if (this._locoSupportT > 0) this._locoSupportT -= dt;
-
-    // === Target pesi locomozione ===
-    if (s.isSitting && this.actions.sitIdle) {
-      this._setTargetSolo('sitIdle');
-    } else if (s.isFlying && this.actions.fly) {
-      this._setTargetSolo('fly');
+    // 1) Calcola TARGET locomotion
+    if (isSitting && this.names.sitIdle) {
+      this._soloTarget('sit');
+    } else if (isFlying && this.names.fly) {
+      this._soloTarget('fly');
     } else {
-      const iw = this._remapClamped(v, 0, this._tWalkOn, 1, 0);
-      const wr = this._remapClamped(v, this._tWalkOn, this._tRunOn, 0, 1);
-      const rr = this._remapClamped(v, this._tRunOn, this._tRunFull, 0, 1);
-
-      const wRun  = rr;
-      const wWalk = Math.max(0, wr * (1 - wRun));
-      const wIdle = Math.max(0, 1 - (wWalk + wRun));
-
-      this._targetW.idle = wIdle;
-      this._targetW.walk = wWalk;
-      this._targetW.run  = wRun;
-      this._targetW.fly = 0;
-      this._targetW.sitIdle = 0;
-
-      // ---- Plateau: clip al 100% quando la velocità è stabile ----
-      // Walk piena quando NON stai sprintando e stai tra bassa/alta del plateau
-      if (!s.isSprinting && v >= this._walkPlateauLow && v <= this._walkPlateauHigh) {
-        this._targetW.idle = 0;
-        this._targetW.walk = 1;
-        this._targetW.run  = 0;
-      }
-      // Run piena quando superi la soglia alta (vale anche se sprinti)
-      if (v >= this._runPlateauLow) {
-        this._targetW.idle = 0;
-        this._targetW.walk = 0;
-        this._targetW.run  = 1;
-      }
+      this._calcGroundTargets(speed, isSprinting, isBacking);
     }
 
-    // === Overlay full ===
-    if (this._activeFull) {
-      const a = this.actions[this._activeFull];
-      const clip = a?.getClip?.();
-      const dur = clip?.duration || 0;
-      const t   = a?.time ?? 0;
-      const w = a?.getEffectiveWeight?.() ?? 0;
+    // 2) Regole overlay per evitare blend con IDLE
+    const hasOverlay = !!oc.name;
+    if (hasOverlay) {
+      const remaining = Math.max(0, (oc.dur || Infinity) - oc.t);
 
-      if (!a?.isRunning?.() || w <= 0.001) {
-        this._activeFull = null;
-        this._fullFading = false;
-        this._isHoldFull = false;
-        this._holdReleasing = false;
-        this._locoSupportT = this._locoHold;
-      } else {
-        let suppressLoco = false;
-        if (this._isHoldFull) {
-          suppressLoco = true;
-        } else if (this._holdReleasing) {
-          suppressLoco = false;
+      if (oc.mode === 'full') {
+        if (remaining > this.backWindow) {
+          // Corpo dell'overlay: base a ZERO → niente deformazioni da somma con idle
+          this.tgt.idle = 0; this.tgt.walk = 0; this.tgt.run = 0;
+          this.tgt.fly  = 0; this.tgt.sit  = 0; this.tgt.back = 0;
         } else {
-          if (dur > 0 && (dur - t) <= this._fullBackWindow) {
-            suppressLoco = false;
-            if (!_bool(a, '_antifadeTriggered')) {
-              a.fadeOut?.(this._fullFadeOut);
-              a._antifadeTriggered = true;
-              this._fullFading = true;
-              this._locoSupportT = Math.max(this._locoSupportT, this._locoHold);
-            }
-          } else {
-            suppressLoco = true;
-          }
+          // Back window: prepara rientro morbido senza T-pose
+          this.tgt.idle = Math.max(this.tgt.idle, 0.35);
         }
-
-        if (suppressLoco) {
-          this._targetW.idle = 0;
-          this._targetW.walk = 0;
-          this._targetW.run  = 0;
-          this._targetW.fly = 0;
-          this._targetW.sitIdle = 0;
-          if (this._locoSupportT <= 0) this._locoSupportT = this._locoHold;
-        }
+      } else if (oc.mode === 'upper') {
+        // Overlay "upper-body" (es. block): tieni le gambe vive ma leggere
+        this.tgt.idle = Math.max(this.tgt.idle, 0.15);
       }
+
+      // opzionale: lerp di un canale "overlay" se lo usi per debug/metriche
+      this.w.overlay = this._lerp(this.w.overlay ?? 0, 1, this.kOverlay * dt);
+    } else {
+      this.w.overlay = this._lerp(this.w.overlay ?? 0, 0, this.kOverlay * dt);
     }
 
-    // === Interpola pesi ===
-    const k = (this._activeFull ? this._flyBlend : this._blendSpeed) * dt;
-    this._w.idle    = this._lerp(this._w.idle,    this._targetW.idle,    k);
-    this._w.walk    = this._lerp(this._w.walk,    this._targetW.walk,    k);
-    this._w.run     = this._lerp(this._w.run,     this._targetW.run,     k);
-    this._w.fly     = this._lerp(this._w.fly,     this._targetW.fly,     k);
-    this._w.sitIdle = this._lerp(this._w.sitIdle, this._targetW.sitIdle, k);
+    // 3) Interpolazione pesi BASE
+    const k = (hasOverlay ? this.kOverlay : this.kLocom) * dt;
+    this.w.idle = this._lerp(this.w.idle, this.tgt.idle, k);
+    this.w.walk = this._lerp(this.w.walk, this.tgt.walk, k);
+    this.w.run  = this._lerp(this.w.run,  this.tgt.run,  k);
+    this.w.fly  = this._lerp(this.w.fly,  this.tgt.fly,  k);
+    this.w.sit  = this._lerp(this.w.sit,  this.tgt.sit,  k);
+    this.w.back = this._lerp(this.w.back, this.tgt.back, k);
 
-    // === Floor anti T-pose ===
-    const fullW = this._getActionWeight(this._activeFull);
-    const locoSum = this._w.idle + this._w.walk + this._w.run + this._w.fly + this._w.sitIdle;
-    const total = (fullW || 0) + locoSum;
-
-    if (total < this._weightFloor) {
-      const prefer =
-        (this._targetW.run > 0.5) ? 'run' :
-        (this._targetW.walk > 0.5) ? 'walk' :
-        (this._targetW.fly  > 0.5) ? 'fly' :
-        (this._targetW.sitIdle > 0.5) ? 'sitIdle' : 'idle';
-      this._w[prefer] = Math.max(this._w[prefer], this._weightFloor);
+    // 4) Floors anti T-pose
+    const sumBase = this.w.idle + this.w.walk + this.w.run + this.w.fly + this.w.sit + this.w.back;
+    const total   = sumBase + (this.w.overlay ?? 0);
+    if (total < this.floorTotal) {
+      this.w.idle = Math.max(this.w.idle, this.floorTotal);
     }
 
-    if (this._locoSupportT > 0 && locoSum < 0.15) {
-      const prefer = (this._targetW.walk + this._targetW.run > 0.5)
-        ? (this._w.run > this._w.walk ? 'run' : 'walk')
-        : 'idle';
-      this._w[prefer] = Math.max(this._w[prefer], 0.15);
+    // Se overlay full è quasi a 0, rialza subito idle per evitare frame vuoto (fine clip)
+    if (hasOverlay && oc.mode === 'full') {
+      const a = this.comp.get(oc.name);
+      const ovW = a?.getEffectiveWeight?.();
+      if (ovW !== undefined && ovW < 0.02) this._kickIdle(0.30);
     }
 
-    // === Applica pesi ===
-    this._applyWeight('idle',    this._w.idle);
-    this._applyWeight('walk',    this._w.walk);
-    this._applyWeight('run',     this._w.run);
-    this._applyWeight('fly',     this._w.fly);
-    this._applyWeight('sitIdle', this._w.sitIdle);
-
-    // === DEBUG LOG ===
-    let maxName = null, maxW = 0;
-    for (const key of Object.keys(this._w)) {
-      if (this._w[key] > maxW) {
-        maxW = this._w[key];
-        maxName = key;
-      }
-    }
-    if (maxW > 0.6) {
-      console.log(`[Animator] locomotion=${maxName} (${(maxW*100).toFixed(0)}%) full=${this._activeFull ?? 'none'}`);
-    }
+    // 5) Applica pesi alle azioni
+    this._applyBaseWeights();
+    this._applyOverlayWeight();
   }
 
-  playAction(name, { fadeIn = this._fullFadeIn, fadeOut = this._fullFadeOut } = {}) {
-    const a = this.actions[name];
+
+  /** Avvia overlay (attack/jump/...) sopra la base */
+  playOverlay(name, { loop = 'once', mode = 'full', fadeIn = this.fadeIn } = {}) {
+    const clipName = this._resolve([name]) || name;
+    const a = this.comp.get(clipName);
     if (!a) return false;
-    if (this._activeFull && this._activeFull !== name) {
-      this.actions[this._activeFull]?.fadeOut?.(fadeOut);
-      this._fullFading = true;
+
+    // disattiva eventuale overlay corrente (crossfade out rapido)
+    if (this.overlayCtx.name && this.overlayCtx.name !== clipName) {
+      this.comp.get(this.overlayCtx.name)?.fadeOut?.(0.10);
     }
-    this._ensurePlayLoop('idle');
-    this._ensurePlayLoop('walk');
-    this._ensurePlayLoop('run');
-    this._safeEnable(a);
-    a.setLoop?.(THREE.LoopOnce, 1);
-    a.clampWhenFinished = true;
-    a.setEffectiveWeight?.(Math.max(0.05, a.getEffectiveWeight?.() ?? 0));
-    a.reset().fadeIn(fadeIn).play();
-    a._clipName = name;
-    this._activeFull = name;
-    this._fullFading = false;
-    this._locoSupportT = this._locoHold;
-    a._antifadeTriggered = false;
-    return true;
-  }
 
-  stopAction(name, { fadeOut = this._fullFadeOut } = {}) {
-    const a = this.actions[name];
-    if (!a) return;
-    a.fadeOut?.(fadeOut);
-    a.stop?.();
-    if (this._activeFull === name) {
-      this._activeFull = null;
-      this._fullFading = false;
-      this._locoSupportT = this._locoHold;
-    }
-  }
+    // assicurati che i loop base siano vivi (anche se poi li azzeriamo)
+    this._ensureBaseLoops();
 
-  playHold(name, { fadeIn = this._fullFadeIn } = {}) {
-    const a = this.actions[name];
-    if (!a) return false;
-    if (this._activeFull && this._activeFull !== name) {
-      this.actions[this._activeFull]?.fadeOut?.(this._fullFadeOut);
-      this._fullFading = true;
-    }
-    this._ensurePlayLoop('idle');
-    this._ensurePlayLoop('walk');
-    this._ensurePlayLoop('run');
-    this._safeEnable(a);
-    a.setLoop?.(THREE.LoopRepeat, Infinity);
-    a.clampWhenFinished = false;
-    a.setEffectiveWeight?.(Math.max(0.05, a.getEffectiveWeight?.() ?? 0));
-    a.reset().fadeIn(fadeIn).play();
-    a._clipName = name;
-    this._activeFull = name;
-    this._fullFading = false;
-    this._isHoldFull = true;
-    this._locoSupportT = this._locoHold;
-    return true;
-  }
+    // setup overlay
+    this.overlayCtx.name = clipName;
+    this.overlayCtx.mode = mode;                 // 'full' | 'upper'
+    this.overlayCtx.once = (loop === 'once');
+    this.overlayCtx.dur  = this.comp.duration(clipName) || 0; // può essere 0 se non disponibile
+    this.overlayCtx.t    = 0;
 
-  stopHold(name, { fadeOut = this._fullFadeOut, release = 0.20 } = {}) {
-    const a = this.actions[name];
-    if (!a) return;
-    a.fadeOut?.(fadeOut);
-    this._isHoldFull = false;
-    this._holdReleasing = true;
-    this._fullFading = true;
-    this._activeFull = name;
-    this._ensurePlayLoop('idle');
-    this._ensurePlayLoop('walk');
-    this._ensurePlayLoop('run');
-    this._locoSupportT = Math.max(this._locoSupportT, release);
-  }
-
-  _ensurePlayLoop(name, initialWeight = undefined) {
-    const a = this.actions[name];
-    if (!a) return;
     a.enabled = true;
-    a.setLoop?.(THREE.LoopRepeat, Infinity);
-    a.clampWhenFinished = false;
-    a.setEffectiveTimeScale?.(1);
-    if (!a.isRunning?.()) a.play();
-    if (initialWeight !== undefined) a.setEffectiveWeight?.(initialWeight);
-  }
-
-  _applyWeight(name, w) {
-    const a = this.actions[name];
-    if (!a) return;
-    a.enabled = true;
-    a.setEffectiveWeight?.(w);
-  }
-
-  _getActionWeight(name) {
-    const a = name ? this.actions[name] : null;
-    return a?.getEffectiveWeight ? a.getEffectiveWeight() : 0;
-  }
-
-  _safeEnable(a) {
-    a.enabled = true;
+    a.reset();
+    if (this.overlayCtx.once) { a.setLoop?.(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+    else { a.setLoop?.(THREE.LoopRepeat, Infinity); a.clampWhenFinished = false; }
     a.setEffectiveWeight?.(1);
-    a.setEffectiveTimeScale?.(1);
+    a.fadeIn?.(fadeIn).play();
+    a._clipName = clipName;
+
+    return true;
   }
 
-  _setTargetSolo(name) {
-    this._targetW.idle = this._targetW.walk = this._targetW.run = 0;
-    this._targetW.fly = this._targetW.sitIdle = 0;
-    if (name === 'fly') this._targetW.fly = 1;
-    else if (name === 'sitIdle') this._targetW.sitIdle = 1;
-    this._ensurePlayLoop('idle');
-    this._ensurePlayLoop('walk');
-    this._ensurePlayLoop('run');
-    this._ensurePlayLoop(name);
+
+  /** Ferma l’overlay corrente (fade out + rientro in idle) */
+  stopOverlay({ fadeOut = this.fadeOut } = {}) {
+    if (!this.overlayCtx.name) return;
+    this.comp.get(this.overlayCtx.name)?.fadeOut?.(fadeOut);
+    this.overlayCtx.name = null;
+    // kick di sicurezza per evitare buco al frame di rilascio
+    this._kickIdle(0.35);
   }
 
-  _remapClamped(x, a, b, y0, y1) {
-    if (b === a) return (x <= a) ? y0 : y1;
-    const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1);
-    return y0 + (y1 - y0) * t;
+
+  /** Ritorna durata clip */
+  getClipDuration(name) { return this.comp.duration(name); }
+
+  // ---------- PRIVATI ----------
+
+  _ensureBaseLoops() {
+    // idle deve sempre esistere (fallback già fatto in ctor)
+    this.comp.ensureLoop(this.names.idle, 1);
+    if (this.names.walk) this.comp.ensureLoop(this.names.walk, 0);
+    if (this.names.run)  this.comp.ensureLoop(this.names.run, 0);
+    if (this.names.fly)  this.comp.ensureLoop(this.names.fly, 0);
+    if (this.names.sitIdle) this.comp.ensureLoop(this.names.sitIdle, 0);
+    if (this.names.back) this.comp.ensureLoop(this.names.back, 0);
   }
 
-  _lerp(a, b, k) { return a + (b - a) * THREE.MathUtils.clamp(k, 0, 1); }
+  _applyBaseWeights() {
+    if (this.names.idle)    this.comp.setWeight(this.names.idle,    this.w.idle);
+    if (this.names.walk)    this.comp.setWeight(this.names.walk,    this.w.walk);
+    if (this.names.run)     this.comp.setWeight(this.names.run,     this.w.run);
+    if (this.names.fly)     this.comp.setWeight(this.names.fly,     this.w.fly);
+    if (this.names.sitIdle) this.comp.setWeight(this.names.sitIdle, this.w.sit);
+    if (this.names.back)    this.comp.setWeight(this.names.back,    this.w.back);
+  }
+
+  _applyOverlayWeight() {
+    if (!this.overlayName) return;
+    const a = this.comp.get(this.overlayName);
+    if (!a) return;
+    a.setEffectiveWeight?.(1); // overlay a pieno peso (la base ha già il floor)
+  }
+
+  _kickIdle(minW) {
+    if (!this.names.idle) return;
+    const idle = this.comp.ensureLoop(this.names.idle);
+    if (!idle) return;
+    // set immediato del peso azione + porta target coerente
+    idle.setEffectiveWeight?.(Math.max(minW, idle.getEffectiveWeight?.() ?? 0));
+    this.w.idle   = Math.max(this.w.idle,   minW);
+    this.tgt.idle = Math.max(this.tgt.idle, minW);
+  }
+
+  _soloTarget(which) {
+    this.tgt = { idle:0, walk:0, run:0, fly:0, sit:0, back:0, overlay:this.tgt.overlay };
+    if (which === 'sit') this.tgt.sit = 1;
+    else if (which === 'fly') this.tgt.fly = 1;
+    else this.tgt.idle = 1; // default
+  }
+
+  _calcGroundTargets(v, sprint, backing) {
+    // reset
+    this.tgt.idle = this.tgt.walk = this.tgt.run = this.tgt.fly = this.tgt.sit = this.tgt.back = 0;
+
+    if (backing && this.names.back) {
+      // semplice: retro marcia → usa clip back
+      const alpha = THREE.MathUtils.clamp(v / this.v_walk_on, 0, 1);
+      this.tgt.back = Math.max(0.35, alpha); // spingila un po'
+      this.tgt.idle = 1 - this.tgt.back;
+      return;
+    }
+
+    if (v < this.v_walk_on) {
+      this.tgt.idle = 1;
+      return;
+    }
+
+    if (v < this.v_run_on) {
+      // fascia walk
+      const t = (v - this.v_walk_on) / Math.max(1e-6, (this.v_run_on - this.v_walk_on));
+      this.tgt.walk = THREE.MathUtils.clamp(t, 0, 1);
+      this.tgt.idle = 1 - this.tgt.walk;
+      return;
+    }
+
+    // run
+    let r = (v - this.v_run_on) / Math.max(1e-6, (this.v_run_full - this.v_run_on));
+    r = THREE.MathUtils.clamp(r, 0, 1);
+    this.tgt.run  = Math.max(r, sprint ? 1 : r);
+    this.tgt.walk = 0;
+    this.tgt.idle = 1 - this.tgt.run;
+  }
+
+  _resolve(candidates) {
+    for (const n of candidates) if (this.comp.get(n)) return n;
+    return null;
+  }
+
+  _findAnyLoopable() {
+    // Prova a scegliere la prima action “non attacco” come idle di emergenza
+    const keys = Object.keys(this.comp.actions || {});
+    // Evita nomi tipici di overlay
+    const bad = /attack|shoot|punch|slash|die|death|hit|impact|jump/i;
+    const k = keys.find(k => !bad.test(k));
+    return k || keys[0] || null;
+  }
+
+  _lerp(a,b,k){ return a + (b-a) * THREE.MathUtils.clamp(k,0,1); }
 }
-
-function _bool(obj, key){ return !!(obj && obj[key]); }

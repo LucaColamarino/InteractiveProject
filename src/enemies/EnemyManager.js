@@ -83,6 +83,7 @@ export function updateEnemies(delta) {
 }
 
 export function killEnemy(enemyInstance) {
+  console.log("ENEMY KILLED");
   if (!enemyInstance || !enemyInstance.alive) return;
 
   // spegni eventuali loop (safety: se l’Animator non gestisce i pesi residui)

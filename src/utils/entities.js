@@ -69,6 +69,7 @@ export const ENTITY_CONFIG = {
       run: '/models/animations/ArcherRun.fbx',
       jump: '/models/animations/ArcherJump.fbx',
       die: '/models/animations/ArcherDie.fbx',
+      attack: '/models/animations/ArcherAttack1.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
     forwardYawOffsetDeg: 0,

@@ -1,3 +1,4 @@
+// combat/strategies/WandMagicStrategy.js
 import * as THREE from 'three';
 import { AttackStrategy } from './AttackStrategy.js';
 import { getEnemies, killEnemy } from '../../enemies/EnemyManager.js';
@@ -17,14 +18,22 @@ const DEFAULTS = {
   lockRange: 20, aimConeDeg: 18,
   muzzleOffset: new THREE.Vector3(0, 1.3, 0.5),
 };
+
 const isFiniteVec3 = (v) => v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
 
 export class WandMagicStrategy extends AttackStrategy {
   constructor() {
-    super();
+    // Arc stretto (gesto con bacchetta)
+    super({
+      reach: 2.2,
+      arcDeg: 130,
+      pitchOffsetDeg: -6,
+      yOffset: 1.2
+    });
+
     Object.assign(this, DEFAULTS);
     this._cd = 0;
-    this._castState = null; // { action, clip, clipName, fired }
+    this._castState = null; // { t, dur, clipName, fired }
     this._pool = [];
     this._poolSize = 24;
     this.debug = false;
@@ -38,6 +47,7 @@ export class WandMagicStrategy extends AttackStrategy {
   }
 
   onEquip(controller, weaponItem) {
+    super.onEquip(controller, weaponItem);
     const m = weaponItem?.meta || {};
     for (const k of Object.keys(DEFAULTS)) if (m[k] !== undefined) this[k] = m[k];
     if (m.muzzleOffset instanceof THREE.Vector3) this.muzzleOffset.copy(m.muzzleOffset);
@@ -46,34 +56,32 @@ export class WandMagicStrategy extends AttackStrategy {
     this._ensurePool();
   }
 
-  // Attacco base condiviso (slash) → click sinistro
-  attack(controller) { return this.baseAttack(controller); }
+  // Attacco base condiviso (slash) → click sinistro (fa un colpo ravvicinato “di bacchetta”)
+  attack(controller) { return this.baseAttack(controller, 'wandSlash', 'attack'); }
 
-  // Cast (proiettili) → tasto speciale
+  // Cast (proiettili) → tasto speciale (overlay)
   specialAttack(controller, clipName = 'wandCast') {
     if (controller.isAttacking || this._cd > 0) return false;
     if (!this._pool.length) this._ensurePool();
 
-    const actions = controller.player.animator?.actions || {};
-    let action = actions[clipName] || actions['attack'] || null;
-    if (!action) {
-      const key = Object.keys(actions).find(k => k.toLowerCase().includes('attack'));
-      if (key) action = actions[key];
+    const animator = controller.player.animator;
+    if (!animator) return false;
+
+    const aliases = [clipName, 'Cast', 'Magic', 'attack'];
+    let used = null;
+    for (const n of aliases) {
+      if (animator.playOverlay?.(n, { loop: 'once', mode: 'full' })) { used = n; break; }
     }
-    if (!action) return false;
 
-    const chosenName = action._clipName || clipName;
-    const ok = controller.player.animator?.playAction(chosenName);
-    if (!ok) return false;
+    if (!used) return false;
 
-    const clip = action.getClip?.() || null;
-    const dur  = clip?.duration ?? 0.35;
-    controller.lockMovementFor(dur);
+    const dur = Math.max(0.2, animator.getClipDuration?.(used) || 0.35);
+    controller.lockMovementFor?.(dur);
     controller.isAttacking = true;
     this._cd = this.cooldown;
 
-    this._castState = { action, clip, clipName: chosenName, fired: false };
-    dlog('attack start', { chosenName, dur, cooldown: this._cd });
+    this._castState = { t: 0, dur, clipName: used, fired: false };
+    dlog('attack start', { used, dur, cooldown: this._cd });
     return true;
   }
 
@@ -84,25 +92,20 @@ export class WandMagicStrategy extends AttackStrategy {
     // 2) gestione cooldown e clip del cast
     if (this._cd > 0) this._cd = Math.max(0, this._cd - dt);
 
-    if (this._castState?.action && this._castState.clip) {
-      const { action, clip } = this._castState;
-      const frac = clip.duration > 0 ? (action.time / clip.duration) : 1;
-      if (!this._castState.fired && frac >= 0.35) {
+    if (this._castState) {
+      const s = this._castState;
+      s.t += dt;
+      const frac = s.dur > 0 ? THREE.MathUtils.clamp(s.t / s.dur, 0, 1) : 1;
+      if (!s.fired && frac >= 0.35) {
         dlog('fire at frac', frac.toFixed(3));
         this._fireBoltsNow(controller);
-        this._castState.fired = true;
+        s.fired = true;
       }
-      const weight = controller.player.animator?._getActionWeight?.(this._castState.clipName) ?? 0;
-      const ended = !action.isRunning?.() || weight <= 0.001 || frac >= 0.999;
-      if (ended) {
+      if (s.t >= s.dur) {
         this._castState = null;
         controller.isAttacking = false;
+        controller.player.animator?.stopOverlay?.();
       }
-    } else if (this._castState && !this._castState.fired) {
-      this._fireBoltsNow(controller);
-      this._castState.fired = true;
-      this._castState = null;
-      controller.isAttacking = false;
     }
 
     // 3) proiettili
@@ -125,7 +128,7 @@ export class WandMagicStrategy extends AttackStrategy {
   }
 
   cancel(controller) {
-    super.cancel(controller); // chiude eventuale slash
+    super.cancel(controller);
     this._castState = null;
     for (const p of this._pool) if (p.active) p.deactivate();
   }
@@ -169,8 +172,8 @@ export class WandMagicStrategy extends AttackStrategy {
     const p = this._acquire();
     if (!p) { console.warn(`${TAG} no free projectile in pool`); return; }
 
-    this._tmp.qYaw.setFromAxisAngle(upWorld, yawOffsetRad);
-    const dir = this._tmp.dir.copy(forward).applyQuaternion(this._tmp.qYaw).normalize();
+    const qYaw = this._tmp.qYaw.setFromAxisAngle(upWorld, yawOffsetRad);
+    const dir = this._tmp.dir.copy(forward).applyQuaternion(qYaw).normalize();
 
     const target = this._acquireTarget(origin, dir);
     p.radius = this.boltRadius;
@@ -220,27 +223,30 @@ export class WandMagicStrategy extends AttackStrategy {
     scene.add(pip);
     this._debugPips.push({ mesh: pip, life: 0.35 });
   }
-  // Dentro la classe WandMagicStrategy (stesso livello di specialAttack/update)
-_applyHits(controller) {
-  const playerObj = controller.player.model;
-  const p = playerObj.position;
-  const near = getEnemies().filter(
-    (e) => e.alive && e.model?.position?.distanceTo(p) < 8
-  );
 
-  for (const enemy of near) {
-    const key = enemy.model?.uuid || String(enemy);
-    if (this._attackState.enemiesHit.has(key)) continue;
+  // opzionale: colpo “melee” della bacchetta (usa stesso schema dello slash)
+  _applyHits(controller) {
+    const playerObj = controller.player.model;
+    const Pw = playerObj.getWorldPosition(new THREE.Vector3());
+    const NEAR_R = Math.max( this._arc?.reach + 1.0, 6 );
+    const near = getEnemies().filter(e => {
+      if (!e.alive || !e.model) return false;
+      const Ew = e.model.getWorldPosition(new THREE.Vector3());
+      return Ew.distanceTo(Pw) < NEAR_R;
+    });
 
-    if (this._inSwordArc(playerObj, enemy.model)) {
-      this._attackState.enemiesHit.add(key);
-      killEnemy(enemy);
-      if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
-        window.giveXP(this.damage ?? 20);
+    for (const enemy of near) {
+      const key = enemy.model?.uuid || String(enemy);
+      if (this._attackState.enemiesHit.has(key)) continue;
+
+      if (this._inSwordArc(playerObj, enemy.model)) {
+        this._attackState.enemiesHit.add(key);
+        killEnemy(enemy);
+        if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
+          window.giveXP(this.damage ?? 20);
+        }
+        hudManager.showNotification('Enemy Killed!');
       }
-      hudManager.showNotification('Enemy Killed!');
     }
   }
-}
-
 }
