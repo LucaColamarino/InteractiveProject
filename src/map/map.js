@@ -116,7 +116,7 @@ export function getTerrainHeightAt(x, z) {
   return finalHeight;
 }
 
-export function addWaterPlane() {
+export function addWaterPlane(waterY) {
   const waterGeometry = new THREE.PlaneGeometry(1000, 1000);
   const waterNormals = new THREE.TextureLoader().load('/textures/terrain/waternormals.jpg', texture => {
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -134,7 +134,7 @@ export function addWaterPlane() {
   });
 
   water.rotation.x = -Math.PI / 2;
-  water.position.y = 10;
+  water.position.y = waterY;
   scene.add(water);
 }
 

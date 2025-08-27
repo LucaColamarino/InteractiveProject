@@ -14,7 +14,7 @@ export class WerewolfEnemy extends BaseEnemy {
 
     // ===== Perception / ranges =====
     this.visionRange = opt.visionRange ?? 32;
-    this.attackRange = opt.attackRange ?? 1.6;
+    this.attackRange = opt.attackRange ?? 1.2;
     this.lungeRange  = opt.lungeRange  ?? 4.0;   // (non usata ora per il movimento)
     this.deadzone    = opt.deadzone    ?? 0.7;
 

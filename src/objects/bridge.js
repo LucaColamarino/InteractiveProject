@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { scene } from '../scene';
+import { registerWalkable } from '../systems/GroundSystem';
 
 // --- Cache semplice per le texture ---
 const _texCache = new Map();
@@ -142,5 +143,6 @@ export async function createBridge({
   group.name = 'BridgeRoot';
   group.add(root);
   scene.add(group);
+  registerWalkable(group, { padding: 0.75 }); // padding per coprire un filo i bordi
   return group;
 }

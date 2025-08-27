@@ -1,11 +1,12 @@
 // controllers/forms/BaseFormController.js
 import * as THREE from 'three';
-import { getTerrainHeightAt } from '../../map/map.js';
+// import { getTerrainHeightAt } from '../../map/map.js'; // <-- non serve più qui
 import { trees } from '../../spawners/vegetationSpawner.js';
 import { StatsSystem } from '../../systems/StatsSystem.js';
 import { updateVitalsHUD } from '../../ui/hudVitals.js';
 import { PlayerBurnFX } from '../../particles/PlayerBurnFX.js';
 import { resolveObstaclesXZ } from '../../systems/ObstacleSystem.js';
+import { getGroundHeightAtXZ, isBlockedByWater } from '../../systems/GroundSystem.js';
 
 const PLAYER_RADIUS = 0.4;   // tweak
 const TREE_RADIUS   = 0.6;   // tweak
@@ -16,6 +17,7 @@ const STAMINA_REGEN_RATE  = 8;  // stamina al secondo quando non in cooldown
 const MANA_REGEN_RATE     = 0;  // mana al secondo
 const BURNING_TIME = 5;
 const BURN_DPS = 1;
+
 export class BaseFormController {
   constructor(player, abilities) {
     this.player = player;
@@ -23,10 +25,12 @@ export class BaseFormController {
     this.isDraining = false;
     this._drainSite = null;
     this._manaPerSecFromTree = 18;
+
     this.stats = new StatsSystem(120,80,50);
     this.stats.onChange((stats) => {
-      updateVitalsHUD(stats);  // funzione dal tuo file HUD
+      updateVitalsHUD(stats);
     });
+
     // Dinamica orizzontale
     this.currentVelocity = new THREE.Vector3();
     this.accel = 30;
@@ -52,36 +56,31 @@ export class BaseFormController {
     this._prePos  = new THREE.Vector3();
     this._candPos = new THREE.Vector3();
     this._n2D     = new THREE.Vector2();
+
+    // FX burning
     this._isBurning = false;
-    this._burningLeft =0;
+    this._burningLeft = 0;
     this._burnFx = null;
-    
   }
-  startBurning()
-  {
+
+  startBurning() {
     this._isBurning = true;
     this._burningLeft = BURNING_TIME;
     this.startBurningEffect();
   }
-  stopBurning()
-  {
+  stopBurning() {
     this._isBurning = false;
     this._burningLeft = 0;
     this.stopBurningEffect();
   }
   startBurningEffect(){
-  if (!this._burnFx) {
-    this._burnFx = new PlayerBurnFX(this.player.model);
+    if (!this._burnFx) this._burnFx = new PlayerBurnFX(this.player.model);
+    this._burnFx.setEnabled(true);
   }
-  this._burnFx.setEnabled(true);
-  }
+  stopBurningEffect(){ this._burnFx?.setEnabled(false); }
 
-  stopBurningEffect(){
-    this._burnFx?.setEnabled(false);
-  }
-  takeDamage(damage){
-    this.stats.damage(damage);
-  }
+  takeDamage(damage){ this.stats.damage(damage); }
+
   tryStartDrain(site) {
     if (!site) return false;
     if (this.isAttacking) return false; // evita durante attacchi full-body
@@ -89,11 +88,11 @@ export class BaseFormController {
     this._drainSite = site;
     return true;
   }
-
   stopDrain() {
     this.isDraining = false;
     this._drainSite = null;
   }
+
   lockMovementFor(sec = 0) { this._moveLockT = Math.max(this._moveLockT, sec); }
 
   setInputState(st) {
@@ -102,14 +101,15 @@ export class BaseFormController {
     this._input.isJumpPressed  = !!st.isJumpPressed;
   }
 
-
   sitToggle() { this.isSitting = !this.isSitting; }
 
   jumpOrFly() {
     if (this._moveLockT > 0 || (this.attackFreezesMovement && this.isAttacking)) return;
+    const p = this.player.model.position;
+
     if (this.abilities?.canFly) {
-      const p = this.player.model.position;
-      const tY = getTerrainHeightAt(p.x, p.z);
+      // On-ground via GroundSystem (terrain + walkables se in AABB)
+      const tY = getGroundHeightAtXZ(p.x, p.z, { fromY: p.y + 2.0 });
       const onGround = p.y <= tY + 0.01;
       if (onGround) { this.isFlying = true; this.velY = 10; }
     } else if (this.isOnGround) {
@@ -119,52 +119,44 @@ export class BaseFormController {
   }
 
   update(dt) {
-  // --- DRain distance guard ---
-  if (this._burnFx) this._burnFx.update(dt);
-  if(this._isBurning)
-    {
-      if(this._burningLeft<=0){
-        this.stopBurning(); 
-      }else{
+    // --- FX burn ---
+    if (this._burnFx) this._burnFx.update(dt);
+    if (this._isBurning) {
+      if (this._burningLeft <= 0) this.stopBurning();
+      else {
         this.takeDamage(BURN_DPS * dt);
-        this._burningLeft-= dt;
-        }
-    }
-  if (this.isDraining && this._drainSite) {
-    const pos = this.player?.model?.position;
-    if (pos) {
-      const dx = pos.x - this._drainSite.x;
-      const dz = pos.z - this._drainSite.z;
-      const dist = Math.hypot(dx, dz);
-      if (dist > 3.2) { // stessa soglia che avevi
-        this.stopDrain();
+        this._burningLeft -= dt;
       }
     }
-  }
 
-      const movementLocked = this._moveLockT > 0 || this.isBlocking || (this.attackFreezesMovement && this.isAttacking);
-  if (this._moveLockT > 0) this._moveLockT -= dt;
+    // --- Drain distance guard ---
+    if (this.isDraining && this._drainSite) {
+      const posD = this.player?.model?.position;
+      if (posD) {
+        const dx = posD.x - this._drainSite.x;
+        const dz = posD.z - this._drainSite.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 3.2) this.stopDrain();
+      }
+    }
 
-  // --- Sprint con consumo stamina ---
-  const inputVec = movementLocked ? this._zeroVec : this._input.moveVec;
-  const moving = inputVec.lengthSq() > 0;
-  const wantsSprint = this._input.isShiftPressed && this.isOnGround && !this.isSitting && !this.isAttacking && moving;
+    const movementLocked = this._moveLockT > 0 || this.isBlocking || (this.attackFreezesMovement && this.isAttacking);
+    if (this._moveLockT > 0) this._moveLockT -= dt;
 
-  if (wantsSprint) {
-    // tenta di drenare stamina per questo frame
-    this.isSprinting = this.stats.drainStaminaForSprint(dt, SPRINT_COST_PER_SEC);
-  } else {
-    this.isSprinting = false;
-  }
+    // --- Sprint con consumo stamina ---
+    const inputVec = movementLocked ? this._zeroVec : this._input.moveVec;
+    const moving = inputVec.lengthSq() > 0;
+    const wantsSprint = this._input.isShiftPressed && this.isOnGround && !this.isSitting && !this.isAttacking && moving;
 
-  // ----- Movimento orizzontale -----
-  const baseSpeed   = this.abilities?.speed ?? 5;
-  const targetSpeed = this.isSprinting ? baseSpeed * 1.8 : baseSpeed;
+    this.isSprinting = wantsSprint ? this.stats.drainStaminaForSprint(dt, SPRINT_COST_PER_SEC) : false;
 
-  this._desired.copy(inputVec).normalize().multiplyScalar(targetSpeed);
-  const a = moving ? this.accel : this.decel;
-  this.currentVelocity.lerp(this._desired, a * dt);
+    // ----- Movimento orizzontale -----
+    const baseSpeed   = this.abilities?.speed ?? 5;
+    const targetSpeed = this.isSprinting ? baseSpeed * 1.8 : baseSpeed;
 
+    this._desired.copy(inputVec).normalize().multiplyScalar(targetSpeed);
+    const a = moving ? this.accel : this.decel;
+    this.currentVelocity.lerp(this._desired, a * dt);
 
     // Step desiderato
     this._step.copy(this.currentVelocity).multiplyScalar(dt);
@@ -174,13 +166,12 @@ export class BaseFormController {
     this._prePos.copy(pos);
     this._candPos.copy(pos).add(this._step);
 
-    // --- Collisione & scivolamento (risoluzione singola sul cand) ---
+    // --- Collisione con alberi & scivolamento (risoluzione singola sul cand) ---
     if (trees?.getNearbyTrees) {
       const nearby = trees.getNearbyTrees(this._prePos.x, this._prePos.z, BROADPHASE_R);
       const minDist = TREE_RADIUS + PLAYER_RADIUS;
       const minDistSq = minDist * minDist;
 
-      // Trova SOLO l’albero più penetrato rispetto alla posizione candidata
       let best = null;
       let bestPenetration = 0;
 
@@ -200,24 +191,51 @@ export class BaseFormController {
       }
 
       if (best) {
-        // Normal calcolata sulla posizione candidata
         const inv = 1 / (best.dist || 1e-6);
         this._n2D.set(best.dx * inv, best.dz * inv); // n = (cand - center)/|...|
-
-        // Scivolamento: elimina la componente inward dallo step
         const dot = this._step.x * this._n2D.x + this._step.z * this._n2D.y;
         if (dot < 0) {
           this._step.x -= dot * this._n2D.x;
           this._step.z -= dot * this._n2D.y;
         }
-
-        // Spingi la candidata leggermente fuori (penetrazione + epsilon)
         const push = bestPenetration + SEP_EPS;
         this._candPos.x += this._n2D.x * push;
         this._candPos.z += this._n2D.y * push;
       }
     }
+
     resolveObstaclesXZ(this._candPos, PLAYER_RADIUS);
+
+    // --- Water no-go: muro invisibile + slide lungo il bordo ---
+    {
+      const fromY = Math.max(this._prePos.y, this._candPos.y) + 2.0;
+
+      if (isBlockedByWater(this._candPos.x, this._candPos.z, { fromY })) {
+        const tryX = !isBlockedByWater(this._prePos.x + this._step.x, this._prePos.z, { fromY });
+        const tryZ = !isBlockedByWater(this._prePos.x, this._prePos.z + this._step.z, { fromY });
+
+        // reset alla posizione pre-move
+        this._candPos.copy(this._prePos);
+
+        if (tryX && !tryZ) {
+          this._candPos.x = this._prePos.x + this._step.x;
+          this.currentVelocity.z = 0;
+        } else if (!tryX && tryZ) {
+          this._candPos.z = this._prePos.z + this._step.z;
+          this.currentVelocity.x = 0;
+        } else if (tryX && tryZ) {
+          if (Math.abs(this._step.x) > Math.abs(this._step.z)) {
+            this._candPos.x = this._prePos.x + this._step.x; this.currentVelocity.z = 0;
+          } else {
+            this._candPos.z = this._prePos.z + this._step.z; this.currentVelocity.x = 0;
+          }
+        } else {
+          this.currentVelocity.x = 0;
+          this.currentVelocity.z = 0;
+        }
+      }
+    }
+
     // Applica la posizione finale UNA SOLA VOLTA
     pos.copy(this._candPos);
 
@@ -240,10 +258,12 @@ export class BaseFormController {
     }
     pos.y += this.velY * dt;
 
-    // Colla al terreno e reset stati
-    this._ensureAboveTerrain();
+    // Colla al suolo (terrain o ponte), e reset stati
+    this._ensureAboveGround();
+
     this.stats.regenStamina(dt, STAMINA_REGEN_RATE);
     this.stats.regenMana(dt, MANA_REGEN_RATE);
+
     // Stato per Animator
     Object.assign(this.player.state, {
       speed: this.currentVelocity.length(),
@@ -254,11 +274,12 @@ export class BaseFormController {
     });
   }
 
-  _ensureAboveTerrain() {
+  _ensureAboveGround() {
     const p = this.player.model.position;
-    const tY = getTerrainHeightAt(p.x, p.z);
-    if (p.y < tY) {
-      p.y = tY; this.velY = 0; this.isOnGround = true;
+    // Ray parte sopra la testa per evitare l’intradosso del ponte
+    const groundY = getGroundHeightAtXZ(p.x, p.z, { fromY: p.y + 2.0 });
+    if (p.y < groundY) {
+      p.y = groundY; this.velY = 0; this.isOnGround = true;
       if (this.isFlying) {
         this.isFlying = false;
         const e = new THREE.Euler().setFromQuaternion(this.player.model.quaternion);

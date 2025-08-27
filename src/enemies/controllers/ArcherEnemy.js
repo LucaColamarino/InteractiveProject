@@ -19,7 +19,7 @@ export class ArcherEnemy extends BaseEnemy {
     this.walkSpeed     = opt.walkSpeed     ?? 4.0;
     this.runSpeed      = opt.runSpeed      ?? 6.5;
     this.backSpeed     = opt.backSpeed     ?? 4.0;
-    this.fleeRunSpeed  = opt.fleeRunSpeed  ?? 0;//4.0;
+    this.fleeRunSpeed  = opt.fleeRunSpeed  ?? 4.0;
     this.turnSpeed     = opt.turnSpeed     ?? 5.0;
     this.patrolSpeed   = opt.patrolSpeed   ?? this.walkSpeed;
 

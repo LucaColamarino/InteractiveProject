@@ -23,6 +23,7 @@ import { ironShield, ironSword,magicWand,ironHelmet } from './utils/items.js';
 import { updateVitalsHUD } from './ui/hudVitals.js';
 import { createBridge } from './objects/bridge.js';
 import * as THREE from 'three';
+import { setNoGoLevel } from './systems/GroundSystem.js';
 // =====================
 // SETTINGS
 // =====================
@@ -85,7 +86,9 @@ async function init() {
 
     updateLoadingProgress(55, 'Creating sky and water...');
     createSky();
-    addWaterPlane();
+    const waterY = 8;
+    addWaterPlane(waterY);
+    setNoGoLevel(waterY, 0.06); // 6 cm di margine sopra
     await wait(120);
 
     updateLoadingProgress(70, 'Populate vegetation...');
