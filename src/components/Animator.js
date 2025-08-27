@@ -31,19 +31,19 @@ export class Animator {
     if (!this.names.idle) this.names.idle = this._findAnyLoopable();
 
     // Parametri blending
-    this.kLocom = 8.0;        // velocità blending locomotion
+    this.kLocom  = 8.0;       // velocità blending locomotion
     this.kOverlay = 10.0;     // velocità quando c'è overlay
-    this.fadeIn = 0.14;
+    this.fadeIn  = 0.14;
     this.fadeOut = 0.16;
     this.backWindow = 0.20;   // finestra di anti-pop a fine overlay
     this.overlayCtx = { name: null, mode: 'full', once: true, dur: 0, t: 0 };
     // Anti T-pose
     this.floorTotal = 0.05;   // minimo totale
     this.floorIdle  = 0.20;   // minimo idle durante overlay/uscita
-    this.keepBaseDuringOverlay = 0.20;  // quanto della base resta anche con overlay
+    this.keepBaseDuringOverlay = 0.20;  // quanto della base resta anche con overlay (non usato qui, lasciato per compat)
 
     // Stato pesi
-    this.w = { idle:1, walk:0, run:0, fly:0, sit:0, back:0, overlay:0 };
+    this.w   = { idle:1, walk:0, run:0, fly:0, sit:0, back:0, overlay:0 };
     this.tgt = { ...this.w };
 
     // Overlay correnti
@@ -60,13 +60,17 @@ export class Animator {
 
     // Evento “finished” del mixer → sgancia overlay se è quello corrente
     this.comp?.mixer?.addEventListener?.('finished', (e) => {
-      const act = e?.action;
+      const act   = e?.action;
       const ended = act?._clipName || null;
       if (ended && ended === this.overlayName) {
-        // Fine overlay → rientro morbido
-        this.stopOverlay();
-        // spingi subito un po' di idle
-        this._kickIdle(this.floorIdle);
+        // >>> BYPASS per la morte: non spegnere overlay e non kickare idle
+        const isDeath = ended === (this.names?.die || 'die');
+        if (!isDeath) {
+          // Fine overlay → rientro morbido
+          this.stopOverlay();
+          // spingi subito un po' di idle
+          this._kickIdle(this.floorIdle);
+        }
       }
     });
   }
@@ -101,16 +105,23 @@ export class Animator {
 
     // 2) Regole overlay per evitare blend con IDLE
     const hasOverlay = !!oc.name;
+    const dieName = this.names?.die || 'die';
+    const isDeath  = hasOverlay && oc.name === dieName;
+
     if (hasOverlay) {
       const remaining = Math.max(0, (oc.dur || Infinity) - oc.t);
 
       if (oc.mode === 'full') {
-        if (remaining > this.backWindow) {
-          // Corpo dell'overlay: base a ZERO → niente deformazioni da somma con idle
+        if (isDeath) {
+          // >>> Per la morte: base SEMPRE a zero, niente back-window
+          this.tgt.idle = 0; this.tgt.walk = 0; this.tgt.run = 0;
+          this.tgt.fly  = 0; this.tgt.sit  = 0; this.tgt.back = 0;
+        } else if (remaining > this.backWindow) {
+          // Corpo dell'overlay (non-morte): base a ZERO
           this.tgt.idle = 0; this.tgt.walk = 0; this.tgt.run = 0;
           this.tgt.fly  = 0; this.tgt.sit  = 0; this.tgt.back = 0;
         } else {
-          // Back window: prepara rientro morbido senza T-pose
+          // Back window (non-morte): rientro morbido senza T-pose
           this.tgt.idle = Math.max(this.tgt.idle, 0.35);
         }
       } else if (oc.mode === 'upper') {
@@ -133,15 +144,17 @@ export class Animator {
     this.w.sit  = this._lerp(this.w.sit,  this.tgt.sit,  k);
     this.w.back = this._lerp(this.w.back, this.tgt.back, k);
 
-    // 4) Floors anti T-pose
-    const sumBase = this.w.idle + this.w.walk + this.w.run + this.w.fly + this.w.sit + this.w.back;
-    const total   = sumBase + (this.w.overlay ?? 0);
-    if (total < this.floorTotal) {
-      this.w.idle = Math.max(this.w.idle, this.floorTotal);
+    // 4) Floors anti T-pose — >>> non rialzare idle in caso di death
+    if (!isDeath) {
+      const sumBase = this.w.idle + this.w.walk + this.w.run + this.w.fly + this.w.sit + this.w.back;
+      const total   = sumBase + (this.w.overlay ?? 0);
+      if (total < this.floorTotal) {
+        this.w.idle = Math.max(this.w.idle, this.floorTotal);
+      }
     }
 
-    // Se overlay full è quasi a 0, rialza subito idle per evitare frame vuoto (fine clip)
-    if (hasOverlay && oc.mode === 'full') {
+    // Se overlay full è quasi a 0, rialza idle per evitare frame vuoto (ma NON per death)
+    if (hasOverlay && oc.mode === 'full' && !isDeath) {
       const a = this.comp.get(oc.name);
       const ovW = a?.getEffectiveWeight?.();
       if (ovW !== undefined && ovW < 0.02) this._kickIdle(0.30);
@@ -189,6 +202,11 @@ export class Animator {
   /** Ferma l’overlay corrente (fade out + rientro in idle) */
   stopOverlay({ fadeOut = this.fadeOut } = {}) {
     if (!this.overlayCtx.name) return;
+
+    // >>> BYPASS per la morte: non spegnere l’overlay di death
+    const isDeath = this.overlayCtx.name === (this.names?.die || 'die');
+    if (isDeath) return;
+
     this.comp.get(this.overlayCtx.name)?.fadeOut?.(fadeOut);
     this.overlayCtx.name = null;
     // kick di sicurezza per evitare buco al frame di rilascio
@@ -204,11 +222,11 @@ export class Animator {
   _ensureBaseLoops() {
     // idle deve sempre esistere (fallback già fatto in ctor)
     this.comp.ensureLoop(this.names.idle, 1);
-    if (this.names.walk) this.comp.ensureLoop(this.names.walk, 0);
-    if (this.names.run)  this.comp.ensureLoop(this.names.run, 0);
-    if (this.names.fly)  this.comp.ensureLoop(this.names.fly, 0);
+    if (this.names.walk)    this.comp.ensureLoop(this.names.walk, 0);
+    if (this.names.run)     this.comp.ensureLoop(this.names.run, 0);
+    if (this.names.fly)     this.comp.ensureLoop(this.names.fly, 0);
     if (this.names.sitIdle) this.comp.ensureLoop(this.names.sitIdle, 0);
-    if (this.names.back) this.comp.ensureLoop(this.names.back, 0);
+    if (this.names.back)    this.comp.ensureLoop(this.names.back, 0);
   }
 
   _applyBaseWeights() {

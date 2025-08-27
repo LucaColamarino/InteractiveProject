@@ -5,7 +5,7 @@ import { gameManager } from '../managers/gameManager.js';
 
 const _enemies = [];
 const MAX_UPDATE_DISTANCE = 250;     // culling logico
-const MAX_STEP = 0.05;               // evita salti del mixer
+const MAX_STEP = 0.05;               // evita salti
 
 export function registerEnemy(enemyInstance) {
   if (!enemyInstance) return;
@@ -26,29 +26,44 @@ export function updateEnemies(delta) {
   if (!player?.model) return;
 
   for (const e of _enemies) {
-    // modello non pronto
     if (!e?.model) continue;
 
     // distance culling
     const dist = e.model.position.distanceTo(player.model.position);
     if (dist > (e.maxUpdateDistance ?? MAX_UPDATE_DISTANCE)) continue;
 
-    // clamp passo mixer/animator (stabilità)
+    // clamp passo (stabilità)
     const step = Math.min(delta, MAX_STEP);
 
-    // se sta morendo → lascia finire la clip poi passa al fade
+    // ---------- dying / dead ----------
     if (e._dying) {
+      // aggiorna ancora l’animator mentre sta morendo
       e.animator?.update(step);
-      const dieRunning = e.actions?.die?.isRunning?.() ?? false;
-      if (!dieRunning) {
-        e._dying = false;
-        e.alive = false;
-        _startFadeOut(e);
+
+      const dieName = e.animator?.names?.die || 'die';
+      const oc = e.animator?.overlayCtx;
+
+      // se l’overlay non è più "die", pinna comunque (tardi ma sicuro)
+      if (!oc || oc.name !== dieName) {
+        _pinDeathPose(e);
+        continue;
       }
+
+      // PRE-PIN: se mancano pochi ms alla fine, pinna PRIMA che finisca
+      const dur = oc.dur || 1;
+      const t   = oc.t  || 0;
+      const remaining = dur - t;
+      const EPS = Math.max(0.5 * step, 0.016); // ~1 frame a 60fps (alza a 0.033 se serve)
+
+      if (remaining <= EPS) {
+        _pinDeathPose(e);
+        continue;
+      }
+
+      // ancora in corso: lascia morire
       continue;
     }
 
-    // se già morto → gestisci fade e GC
     if (!e.alive) {
       if (e._fading) {
         const DURATION = e.fadeDuration ?? 1.5;
@@ -68,16 +83,17 @@ export function updateEnemies(delta) {
           unregisterEnemy(e);
         }
       }
-      // comunque tieni aggiornato l'animator (pulisce i pesi)
-      e.animator?.update(step);
+
+      // Mantieni la posa pinnata senza far avanzare il tempo del mixer
+      e.animator?.comp?.mixer?.update?.(0);
       continue;
     }
 
-    // nemico vivo → ciclo completo
+    // ---------- enemy vivo: ciclo completo ----------
     e.preUpdate?.(step);
-    e.mixer?.update(step);
-    e.update(step);                 // delega al controller specifico
-    e.animator?.update(step);
+    // (niente più e.mixer.update(step): lo fa l'Animator)
+    e.update?.(step);           // logica specifica nemico
+    e.animator?.update(step);   // blending/pesi + avanzamento mixer
     e.postUpdate?.(step);
   }
 }
@@ -85,20 +101,35 @@ export function updateEnemies(delta) {
 export function killEnemy(enemyInstance) {
   if (!enemyInstance || !enemyInstance.alive) return;
 
-  // spegni eventuali loop (safety: se l’Animator non gestisce i pesi residui)
+  // ferma subito motion/AI
+  enemyInstance.navAgent && (enemyInstance.navAgent.isStopped = true);
+  enemyInstance.velocity && (enemyInstance.velocity.set?.(0,0,0));
+
+  // spegni eventuali loop legacy
   for (const a of Object.values(enemyInstance.actions || {})) a?.stop?.();
 
-  // se c'è un'azione di morte usala come "full"
-  if (enemyInstance.animator && enemyInstance.actions?.die) {
+  const anim = enemyInstance.animator;
+  const dieName = anim?.names?.die || 'die';
+
+  if (anim && dieName) {
     enemyInstance._dying = true;
-    enemyInstance.animator.playAction('die'); // delega al tuo Animator
-  } else if (enemyInstance.actions?.die) {
-    // fallback senza Animator
+    const ok = anim.playOverlay(dieName, { loop: 'once', mode: 'full' });
+    if (ok) {
+      // prepara l’action per il clamp (il pin vero avviene dopo con _pinDeathPose)
+      const action = anim._activeFull;
+      if (action) {
+        action.clampWhenFinished = true;
+        action.setLoop(THREE.LoopOnce, 1);
+      }
+    }
+  } else if (enemyInstance.actions?.die && enemyInstance.mixer) {
+    // Fallback legacy (senza Animator)
     const dieAction = enemyInstance.actions.die;
     dieAction.reset().setLoop(THREE.LoopOnce, 1);
     dieAction.clampWhenFinished = true;
     dieAction.play();
-    enemyInstance.mixer?.addEventListener('finished', function onDieFinish(e) {
+
+    enemyInstance.mixer.addEventListener('finished', function onDieFinish(e) {
       if (e.action === dieAction) {
         enemyInstance.mixer.removeEventListener('finished', onDieFinish);
         enemyInstance.alive = false;
@@ -109,6 +140,60 @@ export function killEnemy(enemyInstance) {
     enemyInstance.alive = false;
     _startFadeOut(enemyInstance);
   }
+}
+
+/* ---------------- helpers ---------------- */
+
+function _pinDeathPose(e) {
+  const anim = e.animator;
+  const dieName = anim?.names?.die || 'die';
+  const mixer = anim?.mixer || e.mixer;
+
+  // azione di morte
+  const dieAction = anim?.comp?.get?.(dieName) || anim?._activeFull;
+  if (dieAction) {
+    const clip = dieAction.getClip?.();
+    if (clip) dieAction.time = Math.max(0, clip.duration - 1e-4); // ultimo frame
+    dieAction.paused = true;
+    dieAction.enabled = true;
+    dieAction.setLoop(THREE.LoopOnce, 1);
+    dieAction.clampWhenFinished = true;
+    dieAction.setEffectiveWeight?.(1);
+  }
+
+  // spegni tutte le altre action (nessun contributo della base)
+  if (mixer && mixer._actions) {
+    for (const a of mixer._actions) {
+      if (a === dieAction) continue;
+      try { a.stop(); } catch {}
+      a.enabled = false;
+      a.setEffectiveWeight?.(0);
+    }
+  }
+
+  // “pinna” l’overlay per tenere la base a 0
+  const oc = anim?.overlayCtx;
+  if (oc) {
+    oc.name = dieName;
+    oc.mode = 'full';
+    oc.once = true;
+    oc.dur  = Infinity; // base resta 0
+    oc.t    = 0;
+  }
+
+  // **Bake immediato della posa** senza avanzare il tempo
+  try { mixer?.update?.(0); } catch {}
+
+  // opzionale: blocca il tempo del mixer (non avanza più)
+  if (mixer) mixer.timeScale = 0;
+
+  // ferma motion/AI e avvia fade dalla posa congelata
+  e.navAgent && (e.navAgent.isStopped = true);
+  e.velocity && (e.velocity.set?.(0,0,0));
+  e._dying = false;
+  e.alive = false;
+  e._dieActionPinned = dieAction || null;
+  _startFadeOut(e);
 }
 
 function _startFadeOut(enemy) {
@@ -133,5 +218,4 @@ function _startFadeOut(enemy) {
 
   enemy._fade = 1.0;
   enemy._fading = { parts };
-  enemy.model.matrixAutoUpdate = false;
 }
