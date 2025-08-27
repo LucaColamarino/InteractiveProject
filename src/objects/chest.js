@@ -1,4 +1,3 @@
-// src/objects/chest.js
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -8,6 +7,7 @@ import { interactionManager } from '../systems/interactionManager.js';
 import { hudManager } from '../ui/hudManager.js';
 import { gameManager } from '../managers/gameManager.js';
 import { getRandomItem } from '../utils/items.js';
+import { registerObstacle, unregisterObstacle /*, makeDebugHitbox*/ } from '../systems/ObstacleSystem.js';
 
 const loader = new FBXLoader();
 const texLoader = new THREE.TextureLoader();
@@ -66,7 +66,6 @@ function spawnPuffFX(worldPos) {
       sprite.userData._dead = true;
     }
   };
-  // registriamo in un array globale leggero
   Chest._fx.push(sprite);
 }
 
@@ -79,6 +78,11 @@ export class Chest {
 
     this.modelPath = '/models/props/chest.fbx';
     this.scale = 0.01;
+
+    // hitbox (cylinder in XZ)
+    this.collider = null;
+    this.colliderRadius = 0.55;    // ← tweak: raggio di blocco
+    this.colliderHalfH = 0.35;     // solo per debug mesh (visivo)
 
     // set di mappe
     const camp = {
@@ -145,11 +149,9 @@ export class Chest {
       action.clampWhenFinished = true;
       this.actions.open = action;
 
-      // utile in caso volessimo sapere quando è finita
       this.mixer.addEventListener('finished', (e) => {
         if (e.action === this.actions.open) {
           this.isOpening = false;
-          // spegni luce lentamente
           this._fadeGlowOut = true;
         }
       });
@@ -172,17 +174,13 @@ export class Chest {
 
     if (this.actions.open) {
       const action = this.actions.open.reset();
-      // calcolo del momento di spawn (in secondi sulla clip)
       const duration = action.getClip().duration || 1.0;
       this._spawnAtTime = duration * this.spawnProgress;
-
       action.play();
     } else {
-      // fallback: nessuna animazione -> spawn immediato ma con FX
       this._spawnAtTime = 0;
     }
 
-    // accendi gradualmente la glow
     this.glowLight.intensity = 0.0;
     this._glowUp = true;
 
@@ -190,7 +188,6 @@ export class Chest {
   }
 
   update(delta) {
-    // update anim mixer
     if (this.mixer) this.mixer.update(delta);
 
     // gestione glow
@@ -202,33 +199,33 @@ export class Chest {
       if (this.glowLight.intensity === 0) this._fadeGlowOut = false;
     }
 
-    // trigger dello spawn al giusto timestamp dell’animazione
+    // trigger dello spawn al giusto timestamp
     if (this.isOpening && !this._lootSpawned && this._spawnAtTime != null) {
       const t = this.actions.open ? this.actions.open.time : this._spawnAtTime;
       if (t >= this._spawnAtTime) {
         this._lootSpawned = true;
-        // posizione di spawn: poco sopra la chest
         const spawnPos = new THREE.Vector3(0, 0.25, 0);
         this.model.localToWorld(spawnPos);
 
-        // FX "puff"
         spawnPuffFX(spawnPos);
-        // esegui callback reale di spawn item (pickable)
         if (this._spawnCallback) this._spawnCallback(spawnPos);
 
-        // leggera onda iniziale, poi spegnimento graduale del bagliore
         if (this.glowLight) {
           this.glowLight.intensity = Math.max(this.glowLight.intensity, 2.8);
-          this._glowUp = false;       // interrompi aumento
-          this._fadeGlowOut = true;   // inizia a spegnere
+          this._glowUp = false;
+          this._fadeGlowOut = true;
         }
 
         hudManager.showNotification?.('You found something!');
-
       }
     }
 
-    // aggiorna FX transienti (puff sprite)
+    // tick debug mesh (se creata)
+    if (this.collider?._debugMesh?.userData?._tick) {
+      this.collider._debugMesh.userData._tick();
+    }
+
+    // FX transienti
     if (Chest._fx.length) {
       for (let i = Chest._fx.length - 1; i >= 0; --i) {
         const fx = Chest._fx[i];
@@ -239,21 +236,24 @@ export class Chest {
   }
 
   dispose() {
+    if (this.collider) {
+      unregisterObstacle(this.collider);
+      this.collider = null;
+    }
     if (this.model) {
       scene.remove(this.model);
       this.model.traverse((child) => {
         if (child.isMesh) {
           child.geometry?.dispose();
-          // materiale condiviso: non dispose qui
         }
       });
       this.model = null;
     }
   }
 }
-Chest._fx = []; // contenitore per FX temporanei
+Chest._fx = [];
 
-export async function spawnChestAt(x, z,dropItem=null) {
+export async function spawnChestAt(x, z, dropItem = null) {
   const terrainY = getTerrainHeightAt(x, z);
   const pos = new THREE.Vector3(x, terrainY, z);
 
@@ -261,6 +261,17 @@ export async function spawnChestAt(x, z,dropItem=null) {
   await chest.load();
   scene.add(chest.model);
   chests.push(chest);
+
+  // ==== Collider registrato (cylinder in XZ) ====
+  chest.collider = registerObstacle({
+    type: 'cylinder',
+    positionRef: chest.model.position,     // riferimento vivo
+    radius: chest.colliderRadius,
+    halfHeight: chest.colliderHalfH,
+    userData: { kind: 'chest', chest },
+  });
+  // Debug (facoltativo):
+  // makeDebugHitbox(chest.collider, scene);
 
   // ==== Interaction ====
   interactionManager.register({
@@ -273,22 +284,15 @@ export async function spawnChestAt(x, z,dropItem=null) {
     onInteract: () => {
       if (chest.isOpen || chest.isOpening) return;
 
-      // definiamo come spawna l’oggetto quando la chest arriva al 60% dell’animazione
       const spawnLoot = (spawnPos) => {
-        const item = dropItem??getRandomItem();
+        const item = dropItem ?? getRandomItem();
         const groundY = getTerrainHeightAt(spawnPos.x, spawnPos.z);
         const dropPos = new THREE.Vector3(spawnPos.x, Math.max(spawnPos.y, groundY + 0.1), spawnPos.z);
 
         gameManager.pickableManager.spawnItem(
           item,
           dropPos,
-          {
-            autoPickup: false,
-            pickupRadius: 1.5,
-            enableRing: false,
-            // opzionale: se il tuo pickable supporta un piccolo “pop”
-            spawnImpulse: { up: 1.0 }, // ignorato se non supportato
-          }
+          { autoPickup: false, pickupRadius: 1.5, enableRing: false, spawnImpulse: { up: 1.0 } }
         );
       };
 

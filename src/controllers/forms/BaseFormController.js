@@ -5,6 +5,7 @@ import { trees } from '../../spawners/vegetationSpawner.js';
 import { StatsSystem } from '../../systems/StatsSystem.js';
 import { updateVitalsHUD } from '../../ui/hudVitals.js';
 import { PlayerBurnFX } from '../../particles/PlayerBurnFX.js';
+import { resolveObstaclesXZ } from '../../systems/ObstacleSystem.js';
 
 const PLAYER_RADIUS = 0.4;   // tweak
 const TREE_RADIUS   = 0.6;   // tweak
@@ -216,7 +217,7 @@ export class BaseFormController {
         this._candPos.z += this._n2D.y * push;
       }
     }
-
+    resolveObstaclesXZ(this._candPos, PLAYER_RADIUS);
     // Applica la posizione finale UNA SOLA VOLTA
     pos.copy(this._candPos);
 

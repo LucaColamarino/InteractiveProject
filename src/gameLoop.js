@@ -112,7 +112,7 @@ export function startLoop(c) {
     delta = Math.min(delta, 0.05);
     tickTrees(delta); // <-- gestisce rigenerazione essence dei siti
 
-    updateSunPosition();
+    updateSunPosition(delta);
     if (terrainMaterial?.userData?.shaderRef?.uniforms?.time) {
       terrainMaterial.userData.shaderRef.uniforms.time.value += delta;
     }

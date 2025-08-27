@@ -260,10 +260,10 @@ export function createSky() {
   skyUniforms['mieCoefficient'].value = 0.005;
   skyUniforms['mieDirectionalG'].value = 0.8;
 }
-
-export function updateSunPosition() {
-  sunAngle += 0.001;
-
+const DAY_LENGTH_SEC = 600;            // es. 5 minuti per un giro completo
+const ANGULAR_SPEED  = (Math.PI * 2) / DAY_LENGTH_SEC; // rad/sec
+export function updateSunPosition(delta) {
+  sunAngle = (sunAngle + ANGULAR_SPEED * (delta || 0)) % (Math.PI * 2);
   const sunElevation = 45 * Math.sin(sunAngle);
   const sunPhi = THREE.MathUtils.degToRad(90 - sunElevation);
   const theta = THREE.MathUtils.degToRad(180);
