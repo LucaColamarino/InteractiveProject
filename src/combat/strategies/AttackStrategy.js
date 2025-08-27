@@ -147,7 +147,6 @@ export class AttackStrategy {
   }
 
   _inSwordArc(playerObj, enemyObj) {
-    console.log("IN SOWRD ARC",playerObj,enemyObj);
     if (!playerObj || !enemyObj) return false;
 
     const { reach, arcDeg, yOffset } = this._arc;
@@ -159,7 +158,6 @@ export class AttackStrategy {
 
     const toEnemy = new THREE.Vector3().subVectors(Ew, Pw);
     const dist = toEnemy.length();
-    console.log("DIST AND REACH",dist,reach);
     if (dist > reach) return false;
 
     toEnemy.normalize();
@@ -172,10 +170,6 @@ export class AttackStrategy {
 
     // === DEBUG LOG ===
     const dy = (Ew.y - Pw.y).toFixed(2);
-    console.log(
-      `[ARC TEST] enemy=${enemyObj.uuid} dist=${dist.toFixed(2)} ` +
-      `angle=${angle.toFixed(1)}° dy=${dy}`
-    );
     // =================
     return angle <= arcDeg * 0.5;
   }

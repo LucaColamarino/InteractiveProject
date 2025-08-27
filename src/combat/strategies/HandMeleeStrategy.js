@@ -36,7 +36,6 @@ export class HandMeleeStrategy extends AttackStrategy {
       const Ew = e.model.getWorldPosition(new THREE.Vector3());
       return Ew.distanceTo(Pw) < NEAR_R;
     });
-    console.log("NEAR ENEMIES",near);
     for (const enemy of near) {
       const key = enemy.model?.uuid || String(enemy);
       if (this._attackState.enemiesHit.has(key)) continue;
