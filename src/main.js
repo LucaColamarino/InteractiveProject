@@ -1,7 +1,7 @@
 // main.js
 import { setupInput } from './systems/InputSystem.js';
 import { startLoop } from './gameLoop.js';
-import { createHeightmapTerrain, addWaterPlane, createSky } from './map/map.js';
+import { createHeightmapTerrain, addWaterPlane, createSky, getTerrainHeightAt } from './map/map.js';
 import { spawnEnemies } from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
 import { spawnCampfireAt } from './objects/campfire.js';
@@ -21,6 +21,8 @@ import { abilitiesByForm, spawnPlayer } from './player/Player.js';
 import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";
 import { ironShield, ironSword,magicWand,ironHelmet } from './utils/items.js';
 import { updateVitalsHUD } from './ui/hudVitals.js';
+import { createBridge } from './objects/bridge.js';
+import * as THREE from 'three';
 // =====================
 // SETTINGS
 // =====================
@@ -101,7 +103,14 @@ async function init() {
     spawnChestAt(6, 6,ironSword);
 
     spawnChestAt(-6, -6, magicWand);
-
+    await createBridge({
+      modelUrl: '/models/props/Bridge.fbx',
+      texturesPath: '/textures/bridge',
+      scale: 0.004,
+      position: new THREE.Vector3(-135,getTerrainHeightAt(-135,115),115),
+      rotationY: 10,
+      uvTile: 2,  // aumenta/riduci tiling
+    });
     updateLoadingProgress(95, 'Player initialization...');
     gameManager.controller = await spawnPlayer();
     updateVitalsHUD(gameManager.controller.stats);
