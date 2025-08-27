@@ -1,4 +1,4 @@
-// TreeSpawner.js — versione semplice: opacità foglie proporzionale alla density (senza shader hook)
+// TreeSpawner.js — versione con opacità per-istanza (aOpacity) sugli InstancedMesh foglie, LOD-safe
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -36,7 +36,7 @@ export class TreeSpawner {
     cellSize = 120,
     updateThrottleMs = 16,
     useSpatialHashing = true,
-    enableOcclusion = true,     // (placeholder per future occlusion)
+    enableOcclusion = true,
     maxVisibleInstances = 5000,
     shadowLODSettings = {
       castShadow: ['L1'],
@@ -99,7 +99,7 @@ export class TreeSpawner {
       opacity: 1.0,
       alphaTest,
       side: THREE.DoubleSide,
-      depthWrite: false,         // importante con alpha
+      depthWrite: false, // importante con alpha
       fog: true,
       dithering: true,
       premultipliedAlpha: false
@@ -108,10 +108,48 @@ export class TreeSpawner {
     if (this.barkMaterial.map) this.barkMaterial.map.colorSpace = THREE.SRGBColorSpace;
     if (this.leafMaterial.map) this.leafMaterial.map.colorSpace = THREE.SRGBColorSpace;
 
-    // opacità globale foglie (pilotata dal game)
+    // Hook shader per opacità per-istanza — applica PRIMA dell'alpha test
+    this._enablePerInstanceOpacityHook = () => {
+      this.leafMaterial.transparent = true;
+      this.leafMaterial.depthWrite = false;
+      this.leafMaterial.alphaTest = Math.min(this.leafMaterial.alphaTest ?? 0.5, 0.5);
+
+      this.leafMaterial.onBeforeCompile = (shader) => {
+        // vertex: aOpacity + varying
+        shader.vertexShader = shader.vertexShader
+          .replace(
+            '#include <common>',
+            `#include <common>
+             attribute float aOpacity;
+             varying float vOpacity;`
+          )
+          .replace(
+            '#include <begin_vertex>',
+            `#include <begin_vertex>
+             float aOp = max(aOpacity, 0.001);
+             vOpacity = aOp;`
+          );
+
+        // fragment: moltiplica alpha PRIMA dell'alpha test
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            '#include <common>',
+            `#include <common>
+             varying float vOpacity;`
+          )
+          .replace(
+            '#include <alphamap_fragment>',
+            `#include <alphamap_fragment>
+             diffuseColor.a *= max(vOpacity, 0.001);`
+          );
+      };
+      this.leafMaterial.needsUpdate = true;
+    };
+    this._enablePerInstanceOpacityHook();
+
+    // opacità globale foglie (legacy: evitalo per singolo albero)
     this._leafOpacity = 1.0;
     this.setLeafGlobalOpacity = (opacity) => {
-      console.log("SET LEAFT OPACITY", opacity);
       const o = Math.min(1, Math.max(0, opacity));
       if (o === this._leafOpacity) return;
       this._leafOpacity = o;
@@ -352,6 +390,27 @@ export class TreeSpawner {
     if (barkIMesh) this.scene.add(barkIMesh);
     if (leafIMesh) this.scene.add(leafIMesh);
 
+    // ===== opacityMap (Matrix4 -> opacity) e builder LOD-safe =====
+    const opacityMap = new Map();
+    for (const m of matrices) opacityMap.set(m, 1.0);
+
+    const rebuildOpacityFor = (batchRef, lodKey) => {
+      if (!batchRef?.leafIMesh) return;
+      const mats = batchRef.matrices[lodKey] || batchRef.matrices.L1;
+      const n = mats.length;
+      let attr = batchRef.leafIMesh.geometry.getAttribute('aOpacity');
+      if (!attr || attr.count < n) {
+        attr = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
+        batchRef.leafIMesh.geometry.setAttribute('aOpacity', attr);
+      }
+      for (let i = 0; i < n; i++) {
+        const m = mats[i];
+        const v = opacityMap.get(m) ?? 1.0;
+        attr.setX(i, v);
+      }
+      attr.needsUpdate = true;
+    };
+
     // batch bounds
     const box = new THREE.Box3().makeEmpty();
     for (const m of matrices) box.expandByPoint(this._tmp.setFromMatrixPosition(m));
@@ -383,7 +442,7 @@ export class TreeSpawner {
       L4: createLODLevel(matrices, 0.2)
     };
 
-    this._batches.push({
+    const batchObj = {
       barkIMesh, leafIMesh,
       matrices: lodMatrices,
       center, box,
@@ -392,8 +451,16 @@ export class TreeSpawner {
       visible: true,
       lastDistance: Infinity,
       debug: debugHelpers,
-      stats: { switches: 0, lastSwitch: 0 }
-    });
+      stats: { switches: 0, lastSwitch: 0 },
+      // NEW:
+      opacityMap,
+      rebuildOpacityFor,
+    };
+
+    this._batches.push(batchObj);
+
+    // inizializza buffer aOpacity coerente con L1
+    batchObj.rebuildOpacityFor(batchObj, 'L1');
 
     if (this._debug.enabled) {
       console.log('Batch created with LOD levels:', {
@@ -446,28 +513,16 @@ export class TreeSpawner {
 
   // ========= LOD =========
   updateLOD(camera) {
-    if (!this.enableLOD || !camera || !this._batches || this._batches.length === 0) {
-      if (this._debug.enabled) {
-        console.log('UpdateLOD: early return', { enableLOD: this.enableLOD, hasCamera: !!camera, batchCount: this._batches?.length });
-      }
-      return;
-    }
+    if (!this.enableLOD || !camera || !this._batches || this._batches.length === 0) return;
 
     const now = performance.now();
-    if (!this._debug.enabled && now - this._lastLODUpdate < this.updateThrottleMs) {
-      return;
-    }
+    if (!this._debug.enabled && now - this._lastLODUpdate < this.updateThrottleMs) return;
     this._lastLODUpdate = now;
 
     camera.getWorldPosition(this._camWorld);
 
-    // movimento camera (no reassign bug)
     const cameraMoved = this._camWorld.distanceTo(this._camPrevWorld) > 1.0;
     this._camPrevWorld.copy(this._camWorld);
-
-    if (this._debug.enabled) {
-      console.log('UpdateLOD called:', { now, lastUpdate: this._lastLODUpdate, cameraMoved, cameraPos: this._camWorld.toArray() });
-    }
 
     if (this.frustumCulling) {
       this._frustum.setFromProjectionMatrix(
@@ -583,6 +638,9 @@ export class TreeSpawner {
         batch.leafIMesh.castShadow = enableShadowCasting && this._castShadow;
         batch.leafIMesh.receiveShadow = enableShadowReceiving && this._receiveShadow;
       }
+
+      // NEW: riallinea buffer aOpacity all'ordine del nuovo LOD
+      batch.rebuildOpacityFor?.(batch, newLod);
     } else {
       this._setBatchVisibility(batch, false);
     }
@@ -792,6 +850,86 @@ export class TreeSpawner {
     }
   }
 
+  _combineBatches(batches) {
+    if (batches.length < 2) return;
+
+    const allMatrices = [];
+    let combinedBox = new THREE.Box3().makeEmpty();
+
+    for (const batch of batches) {
+      allMatrices.push(...(batch.matrices.L1 || []));
+      combinedBox.union(batch.box);
+
+      const index = this._batches.indexOf(batch);
+      if (index !== -1) this._batches.splice(index, 1);
+
+      batch.barkIMesh?.parent?.remove(batch.barkIMesh);
+      batch.leafIMesh?.parent?.remove(batch.leafIMesh);
+    }
+
+    if (allMatrices.length > 0) {
+      const firstBatch = batches[0];
+      this._createBatch(
+        allMatrices,
+        !!firstBatch.barkIMesh,
+        !!firstBatch.leafIMesh,
+        firstBatch.barkIMesh?.geometry,
+        firstBatch.leafIMesh?.geometry
+      );
+    }
+  }
+
+  // ========= Nuove utility: opacità per singola istanza =========
+
+  // Trova batch + indice (in L1) a partire dalla Matrix4 originale
+  _getHandleByMatrix(matrixRef) {
+    if (!matrixRef) return null;
+    for (const batch of this._batches) {
+      const arr = batch.matrices?.L1 || [];
+      const idx = arr.indexOf(matrixRef);
+      if (idx !== -1) return { batch, idx };
+    }
+    return null;
+  }
+
+  /** Setta l'opacità (0..1) foglie per UNA istanza, dato il riferimento Matrix4 originale */
+  setLeafOpacityForMatrix(matrixRef, opacity = 1) {
+    const h = this._getHandleByMatrix(matrixRef);
+    if (!h || !h.batch) return false;
+
+    const batch = h.batch;
+    const val = Math.max(0, Math.min(1, opacity));
+    // aggiorna la mappa master
+    batch.opacityMap.set(matrixRef, val);
+
+    // se visibile nel LOD corrente, aggiorna l'entry giusta
+    if (batch.leafIMesh) {
+      const mats = batch.matrices[batch._lod] || batch.matrices.L1;
+      const idxNow = mats.indexOf(matrixRef);
+      const attr = batch.leafIMesh.geometry.getAttribute('aOpacity');
+      if (idxNow !== -1 && attr && idxNow < attr.count) {
+        attr.setX(idxNow, val);
+        attr.needsUpdate = true;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Comodo: accetta un "site" (dalla tua logica drain) e prova a risalire alla matrix.
+   * Se manca, cerca l’albero più vicino alle coordinate note.
+   */
+  setLeafOpacityForSite(site, opacity = 1) {
+    const m = site?.matrix || site?.treeMatrix || site?.tree?.matrix;
+    if (m) return this.setLeafOpacityForMatrix(m, opacity);
+    const pos = site?.position || site?.pos || site;
+    if (pos?.x != null && pos?.z != null) {
+      const nearest = this.findClosestTree(pos.x, pos.z, 6);
+      if (nearest?.matrix) return this.setLeafOpacityForMatrix(nearest.matrix, opacity);
+    }
+    return false;
+  }
+
   forceUpdateLOD(camera) {
     const oldThrottle = this.updateThrottleMs;
     this.updateThrottleMs = 0;
@@ -827,34 +965,5 @@ export class TreeSpawner {
     }
 
     for (const group of groups) this._combineBatches(group);
-  }
-
-  _combineBatches(batches) {
-    if (batches.length < 2) return;
-
-    const allMatrices = [];
-    let combinedBox = new THREE.Box3().makeEmpty();
-
-    for (const batch of batches) {
-      allMatrices.push(...(batch.matrices.L1 || []));
-      combinedBox.union(batch.box);
-
-      const index = this._batches.indexOf(batch);
-      if (index !== -1) this._batches.splice(index, 1);
-
-      batch.barkIMesh?.parent?.remove(batch.barkIMesh);
-      batch.leafIMesh?.parent?.remove(batch.leafIMesh);
-    }
-
-    if (allMatrices.length > 0) {
-      const firstBatch = batches[0];
-      this._createBatch(
-        allMatrices,
-        !!firstBatch.barkIMesh,
-        !!firstBatch.leafIMesh,
-        firstBatch.barkIMesh?.geometry,
-        firstBatch.leafIMesh?.geometry
-      );
-    }
   }
 }

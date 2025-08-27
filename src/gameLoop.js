@@ -19,9 +19,8 @@ import { initInventoryUI } from './ui/inventoryUi.js';
 import { refreshInventoryUI } from './ui/inventoryBridge.js';
 import { wireInventoryInteractions } from './ui/inventoryInteractions.js';
 import { tickTrees, drainOnce, TREE_ESSENCE_CFG, findDrainableTree, getLeafDensity } from './systems/TreeEssenceSystem.js';
-// ⬇️ RIMOSSO: applyLeafHole
-// import { applyLeafHole } from './objects/treeEssenceInteractable.js';
 import { registerTreeEssenceInteraction } from './objects/treeEssenceInteractable.js';
+
 const LEAF_MIN_OPACITY_DURING_COOLDOWN = 0.25;
 
 const stats = new Stats();
@@ -138,10 +137,9 @@ export function startLoop(c) {
         if (ctrl._drainSite) {
           const ess = drainOnce(ctrl._drainSite, TREE_ESSENCE_CFG.drainPerSec, delta);
 
-          // 🔄 Opacità foglie proporzionale alla density (0..1)
+          // 🔄 Opacità foglie SOLO sull'albero drenato, proporzionale alla density (0..1)
           const density = getLeafDensity(ctrl._drainSite); // 1=folto, 0=spoglio
-          trees?.setLeafGlobalOpacity?.(density);
-          window?.trees?.setLeafGlobalOpacity?.(density);
+          trees?.setLeafOpacityForSite?.(ctrl._drainSite, density);
 
           // ricorda il sito corrente per la fase di rigenerazione
           lastRegenSite = ctrl._drainSite;
@@ -158,36 +156,29 @@ export function startLoop(c) {
               }
             }
           } else {
-            // sito esaurito: smetto di drenare, ma NON ripristino subito le foglie
-            // lascio che risalgano con la rigenerazione in base alla density
+            // sito esaurito: smetto di drenare, lascio le foglie “minime” sul SOLO albero
             const site = ctrl._drainSite;
             lastRegenSite = site;
             ctrl.stopDrain();
-              // durante il cooldown l'albero resta “spoglio” ma non invisibile totale
-            trees?.setLeafGlobalOpacity?.(LEAF_MIN_OPACITY_DURING_COOLDOWN);
-            window?.trees?.setLeafGlobalOpacity?.(LEAF_MIN_OPACITY_DURING_COOLDOWN);
+            trees?.setLeafOpacityForSite?.(site, LEAF_MIN_OPACITY_DURING_COOLDOWN);
           }
         }
-        } else if (lastRegenSite) {
-          // se è in cooldown, density resta 0: mantieni una opacità minima
-          const cd = lastRegenSite.cooldown ?? 0;
-          if (cd > 0) {
-            trees?.setLeafGlobalOpacity?.(LEAF_MIN_OPACITY_DURING_COOLDOWN);
-            window?.trees?.setLeafGlobalOpacity?.(LEAF_MIN_OPACITY_DURING_COOLDOWN);
-          } else {
-            // cooldown finito → la current ricomincia a salire in tickTrees
-            const density = getLeafDensity(lastRegenSite); // current / maxEssence
-            trees?.setLeafGlobalOpacity?.(density);
-            window?.trees?.setLeafGlobalOpacity?.(density);
+      } else if (lastRegenSite) {
+        // cooldown: mantieni opacità minima finché non risale la density
+        const cd = lastRegenSite.cooldown ?? 0;
+        if (cd > 0) {
+          trees?.setLeafOpacityForSite?.(lastRegenSite, LEAF_MIN_OPACITY_DURING_COOLDOWN);
+        } else {
+          // cooldown finito → density risale con tickTrees
+          const density = getLeafDensity(lastRegenSite); // current / maxEssence
+          trees?.setLeafOpacityForSite?.(lastRegenSite, density);
 
-            if (density >= 0.999) {
-              trees?.setLeafGlobalOpacity?.(1);
-              window?.trees?.setLeafGlobalOpacity?.(1);
-              lastRegenSite = null; // tracking finito
-            }
+          if (density >= 0.999) {
+            trees?.setLeafOpacityForSite?.(lastRegenSite, 1);
+            lastRegenSite = null; // tracking finito
           }
         }
-
+      }
 
       if (player?.model) {
         const pos = player.model.position;

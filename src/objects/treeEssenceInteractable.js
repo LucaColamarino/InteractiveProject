@@ -63,13 +63,3 @@ export function registerTreeEssenceInteraction() {
 
   interactionManager.register(interactable);
 }
-
-export function applyLeafHole(siteOrNull, strength = 0, radius = 5.2) {
-  console.log("[TREE] applyhole");
-  if (!trees?.setLeafHole) return;
-  if (!siteOrNull) {
-    //trees.setLeafHole(1e6, 1e6, 0, 0); // disattiva (fuori scena)
-  } else {
-    trees.setLeafHole(siteOrNull.x, siteOrNull.z, radius, strength);
-  }
-}
