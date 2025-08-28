@@ -20,6 +20,7 @@ import { refreshInventoryUI } from './ui/inventoryBridge.js';
 import { wireInventoryInteractions } from './ui/inventoryInteractions.js';
 import { tickTrees, drainOnce, TREE_ESSENCE_CFG, findDrainableTree, getLeafDensity } from './systems/TreeEssenceSystem.js';
 import { registerTreeEssenceInteraction } from './objects/treeEssenceInteractable.js';
+import { updateArrowProjectiles } from './combat/projectiles/ArrowProjectile.js';
 
 const LEAF_MIN_OPACITY_DURING_COOLDOWN = 0.25;
 
@@ -187,6 +188,7 @@ export function startLoop(c) {
       }
 
       updateEnemies(delta);
+      updateArrowProjectiles(delta);
       updateWater(delta);
       updateCampfires(delta);
       updateFires(delta);

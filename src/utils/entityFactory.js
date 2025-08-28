@@ -6,14 +6,12 @@ import { loadAnimations, fixAnimationLoop } from './AnimationLoader.js';
 import { ENTITY_CONFIG } from './entities.js';
 import { scene, camera, renderer } from '../scene.js';
 
-// ---------------- Singletons & caches ----------------
 const fbxLoader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
 
-const baseModelCache = new Map();   // key -> FBX (base)
-const cloneWarmCache = new Map();   // key -> FBX (materializzato pre-clone, opzionale)
+const baseModelCache = new Map();
+const cloneWarmCache = new Map();
 
-// --------------- Texture & material helpers ---------------
 function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   if (!path) return null;
   const t = textureLoader.load(path);
@@ -24,32 +22,19 @@ function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   return t;
 }
 
-/**
- * Crea un MeshStandardMaterial a partire da:
- *   { diffuse, normal, metallic, roughness, ao, opacity|alphaMap, emissive }
- *
- * Note:
- * - niente specular / reflection legacy
- * - niente heuristics basate sul nome del materiale/mesh
- * - se mancano le mappe metallic/roughness usiamo valori di fallback
- */
-function buildStandardMaterialFromMaps(
-  tex,
-  { skinning = false, nameHint = '' } = {}
-) {
+function buildStandardMaterialFromMaps(tex, { skinning = false, nameHint = '' } = {}) {
   const hasAlpha = !!(tex?.opacity || tex?.alphaMap);
 
-  // mappe
   const map          = loadTex(tex?.diffuse, { srgb: true });
   const normalMap    = loadTex(tex?.normal);
   const metalnessMap = loadTex(tex?.metallic);
   const roughnessMap = loadTex(tex?.roughness);
   const aoMap        = loadTex(tex?.ao);
   const alphaMap     = loadTex(tex?.opacity || tex?.alphaMap);
-  const emissiveMap  = loadTex(tex?.emissive); // tipicamente grayscale; tienila Linear
+  const emissiveMap  = loadTex(tex?.emissive);
 
   const metalness = tex?.metalnessValue ?? (metalnessMap ? 1.0 : 0.0);
-  const roughness = tex?.roughnessValue ?? (roughnessMap ? 0.7 : 0.45);
+  const roughness = tex?.roughnessValue ?? (roughnessMap ? 0.7 : 0.65);
 
   const mat = new THREE.MeshStandardMaterial({
     map,
@@ -76,27 +61,20 @@ function buildStandardMaterialFromMaps(
 
 function isSimpleTexRoot(root) {
   if (!root || typeof root !== 'object') return false;
-  // riconosci un root "semplice" (un solo set di mappe)
   return (
-    'diffuse'   in root || 'normal'   in root ||
-    'metallic'  in root || 'roughness' in root ||
-    'ao'        in root ||
-    'opacity'   in root || 'alphaMap' in root ||
-    'emissive'  in root
+    'diffuse' in root || 'normal' in root ||
+    'metallic' in root || 'roughness' in root ||
+    'ao' in root || 'opacity' in root || 'alphaMap' in root || 'emissive' in root
   );
 }
 
-/**
- * Matcha la voce di textures in base al nome materiale/mesh.
- * Supporta chiavi combinate tipo "armor,helmet|shield".
- */
 function resolveTexForNames(matName, meshName, root) {
   if (!root) return null;
   if (isSimpleTexRoot(root)) return { matchedKey: '(single)', texConfig: root };
 
   const m = (matName || '').toLowerCase();
   const n = (meshName || '').toLowerCase();
-  const keys = Object.keys(root).sort((a, b) => b.length - a.length); // match più specifici prima
+  const keys = Object.keys(root).sort((a, b) => b.length - a.length);
   for (const key of keys) {
     const tokens = key.toLowerCase().split(/[,|]/).map(s => s.trim()).filter(Boolean);
     if (tokens.some(tok => m.includes(tok) || n.includes(tok))) {
@@ -116,7 +94,6 @@ export function applyExternalMaterials(root, config) {
     if (!(isMesh || isSkinned)) return;
 
     if (Array.isArray(child.material)) {
-      // materiali multipli
       const oldArr = child.material;
       const newArr = oldArr.map((oldMat, i) => {
         const res = resolveTexForNames(oldMat?.name, child.name, rootTex);
@@ -138,7 +115,6 @@ export function applyExternalMaterials(root, config) {
       }
       child.material = newArr;
     } else {
-      // singolo materiale
       const res = resolveTexForNames(child.material?.name, child.name, rootTex);
       if (res?.texConfig) {
         child.material = buildStandardMaterialFromMaps(res.texConfig, {
@@ -150,11 +126,9 @@ export function applyExternalMaterials(root, config) {
       }
     }
 
-    // flag comuni
     if (isSkinned && child.material && !child.material.skinning) child.material.skinning = true;
     if (isSkinned) child.frustumCulled = false;
 
-    // se c'è aoMap ma manca uv2, riusa uv1 (fallback veloce)
     if ((child.isMesh || child.isSkinnedMesh) && child.material?.aoMap && !child.geometry.attributes.uv2) {
       child.geometry.setAttribute('uv2', child.geometry.attributes.uv);
     }
@@ -164,7 +138,18 @@ export function applyExternalMaterials(root, config) {
   });
 }
 
-// --------------- Preload & cloning ---------------
+// helper: trova child per nome (partial, case-insensitive)
+export function findChildByNameCI(root, search) {
+  const s = (search || '').toLowerCase();
+  let found = null;
+  root.traverse(c => {
+    if (found) return;
+    const n = (c.name || '').toLowerCase();
+    if (n.includes(s)) found = c;
+  });
+  return found;
+}
+
 export async function preloadEntity(key) {
   if (baseModelCache.has(key)) return baseModelCache.get(key);
   const cfg = ENTITY_CONFIG[key];
@@ -173,12 +158,10 @@ export async function preloadEntity(key) {
   const base = await fbxLoader.loadAsync(cfg.modelPath);
   baseModelCache.set(key, base);
 
-  // Prepara una versione materializzata (opzionale) per warm-up
   const cloned = SkeletonUtils.clone(base);
   applyExternalMaterials(cloned, cfg);
   cloneWarmCache.set(key, cloned);
 
-  // Warm-up GPU (facoltativo)
   const dummy = SkeletonUtils.clone(cloned);
   dummy.visible = false;
   if (cfg.scale) dummy.scale.copy(cfg.scale);
@@ -218,10 +201,35 @@ export function instantiateEntity(key) {
     }
   });
 
+  // --- Attachments specifici per tipo ---
+  fbx.userData.attachments = fbx.userData.attachments || {};
+
+  if (key === 'archer') {
+    // prova a rilevare la mesh "arrow" (mesh o skinnedMesh)
+    const arrowMesh = findChildByNameCI(fbx, 'arrow');
+    if (arrowMesh && (arrowMesh.isMesh || arrowMesh.isSkinnedMesh)) {
+      // Assicura corretti flag per alpha cutout (piume/coda freccia con alpha)
+      if (arrowMesh.material) {
+        const m = arrowMesh.material;
+        m.transparent = true;
+        m.alphaTest = Math.max(m.alphaTest ?? 0.0, 0.5);
+        m.depthWrite = false;
+        arrowMesh.renderOrder = 2; // dietro\avanti al bow se serve
+        if (m.aoMap && !arrowMesh.geometry.attributes.uv2) {
+          arrowMesh.geometry.setAttribute('uv2', arrowMesh.geometry.attributes.uv);
+        }
+      }
+      // tienila visibile nello stato base (freccia nell’arco)
+      arrowMesh.visible = true;
+
+      // esponi per i controller (per show/hide o per clonarci il proiettile)
+      fbx.userData.attachments.arrow = arrowMesh;
+    }
+  }
+
   return fbx;
 }
 
-// --------------- Animations (uniform API) ---------------
 export function buildMixerAndActions(targetFBX, cfg) {
   if (cfg?.animationIndices) {
     const mixer = new THREE.AnimationMixer(targetFBX);
@@ -233,7 +241,7 @@ export function buildMixerAndActions(targetFBX, cfg) {
     return { mixer, actions };
   }
   if (cfg?.animations) {
-    return loadAnimations(targetFBX, cfg.animations); // { mixer, actions }
+    return loadAnimations(targetFBX, cfg.animations);
   }
   return { mixer: null, actions: {} };
 }

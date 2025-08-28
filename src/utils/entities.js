@@ -33,73 +33,78 @@ export const ENTITY_CONFIG = {
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
   },
+
   archer: {
     modelPath: '/models/archer.fbx',
     textures: {
       clothes: {
         diffuse: '/textures/archer/clothes_diffuse.png',
-        normal: '/textures/archer/clothes_normal.png',
+        normal:  '/textures/archer/clothes_normal.png',
       },
       body: {
         diffuse: '/textures/archer/body_diffuse.png',
-        normal: '/textures/archer/body_normal.png'
+        normal:  '/textures/archer/body_normal.png'
       },
       eye: {
         diffuse: '/textures/archer/body_diffuse.png',
-        normal: '/textures/archer/body_normal.png'
+        normal:  '/textures/archer/body_normal.png'
       },
       lashes: {
-        diffuse: '/textures/archer/body_diffuse.png',
-        normal: '/textures/archer/body_normal.png',
+        diffuse:  '/textures/archer/body_diffuse.png',
+        normal:   '/textures/archer/body_normal.png',
         alphaMap: '/textures/archer/eyelash_alpha.png'
-      },
-      arrow: {
-        diffuse: '/textures/archer/arrow_diffuse.png',
-        normal: '/textures/archer/arrow_normal.jpg',
-        alphaMap: '/textures/archer/arrow_alpha.png'
       },
       bow: {
         diffuse: '/textures/archer/bow_diffuse.jpg',
-        normal: '/textures/archer/bow_normal.jpg'
+        normal:  '/textures/archer/bow_normal.jpg'
+      },
+      // unica definizione "arrow" (nessun duplicato)
+      arrow: {
+        diffuse:    '/textures/archer/arrow_diffuse.png',
+        normal:     '/textures/archer/arrow_normal.jpg',
+        roughnessValue: 0.7,
+        metalnessValue: 0.0
       }
     },
     animations: {
-      idle: '/models/animations/ArcherIdle.fbx',
-      walk: '/models/animations/ArcherWalk.fbx',
-      run: '/models/animations/ArcherRun.fbx',
-      jump: '/models/animations/ArcherJump.fbx',
-      die: '/models/animations/ArcherDie.fbx',
+      idle:   '/models/animations/ArcherIdle.fbx',
+      walk:   '/models/animations/ArcherWalk.fbx',
+      run:    '/models/animations/ArcherRun.fbx',
+      jump:   '/models/animations/ArcherJump.fbx',
+      die:    '/models/animations/ArcherDie.fbx',
       attack: '/models/animations/ArcherAttack1.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
     forwardYawOffsetDeg: 0,
   },
+
   werewolf: {
     modelPath: '/models/werewolf.fbx',
     textures: {
       diffuse: '/textures/werewolf/werewolf_diffuse.jpg',
-      normal: '/textures/werewolf/werewolf_normal.jpg'
+      normal:  '/textures/werewolf/werewolf_normal.jpg'
     },
     animations: {
-      idle: '/models/animations/WerewolfIdle.fbx',
-      walk: '/models/animations/WerewolfWalk.fbx',
-      run: '/models/animations/WerewolfRun.fbx',
-      jump: '/models/animations/WerewolfJump.fbx',
-      die: '/models/animations/WerewolfDie.fbx',
-      attack: '/models/animations/WerewolfAttack.fbx',
+      idle:  '/models/animations/WerewolfIdle.fbx',
+      walk:  '/models/animations/WerewolfWalk.fbx',
+      run:   '/models/animations/WerewolfRun.fbx',
+      jump:  '/models/animations/WerewolfJump.fbx',
+      die:   '/models/animations/WerewolfDie.fbx',
+      attack:'/models/animations/WerewolfAttack.fbx',
     },
     scale: new THREE.Vector3(0.01, 0.01, 0.01),
     yOffset: 0,
   },
+
   wyvern: {
     modelPath: '/models/wyvern.fbx',
     textures: {
       diffuse: '/textures/wyvern/wyvern_diffuse.png',
-      normal: '/textures/wyvern/wyvern_normal.png'
+      normal:  '/textures/wyvern/wyvern_normal.png'
     },
     animationIndices: {
       idle: 2,
-      fly: 0,
+      fly:  0,
       jump: 1,
       walk: 1,
     },
