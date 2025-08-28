@@ -100,6 +100,11 @@ export function updateEnemies(delta) {
 
 export function killEnemy(enemyInstance) {
   if (!enemyInstance || !enemyInstance.alive) return;
+  console.log("KILLED A ",enemyInstance.type);
+  if(enemyInstance.type=="werewolf")
+    gameManager.wolvesKilled+=1;
+  else if(enemyInstance.type=="archer")
+    gameManager.archersKilled+=1;
 
   // ferma subito motion/AI
   enemyInstance.navAgent && (enemyInstance.navAgent.isStopped = true);

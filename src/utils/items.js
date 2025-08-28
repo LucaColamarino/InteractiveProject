@@ -36,6 +36,14 @@ export const ironShield = new ShieldItem({
   meta: { armor: 5 }
 });
 
+export const dragonheart = new ShieldItem({
+  id: 'dragon_heart_01',
+  name: 'Dragon Heart',
+  modelPath: '/models/pickups/heart.fbx',
+  meshPrefix: 'shield',
+  meta: { armor: 5 }
+});
+
 export const allItems = [ironSword, magicWand, ironHelmet,ironShield];
 
 export function getRandomItem() {

@@ -14,7 +14,7 @@ import { createGameManager, gameManager } from './managers/gameManager.js';
 import { updateLoadingProgress, hideLoadingScreen, showLoadingScreen, suspendLoadingScreen } from './loading.js';
 import { PickableManager } from './managers/pickableManager.js';
 import { scene } from './scene.js';
-import { allItems } from './utils/items.js';
+import { allItems, dragonheart } from './utils/items.js';
 import { preloadAllEntities } from './utils/entityFactory.js';
 import { abilitiesByForm, spawnPlayer } from './player/Player.js';
 import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";

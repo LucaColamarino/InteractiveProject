@@ -169,15 +169,40 @@ export class WandMagicStrategy extends AttackStrategy {
   }
 
   _spawnProjectile(origin, forward, upWorld, yawOffsetRad = 0) {
-    const p = this._acquire();
-    if (!p) { console.warn(`${TAG} no free projectile in pool`); return; }
+          // dentro _spawnProjectile(origin, forward, upWorld, yawOffsetRad = 0)
+      const p = this._acquire();
+      if (!p) { console.warn('[WandMagicStrategy] no free projectile'); return; }
 
-    const qYaw = this._tmp.qYaw.setFromAxisAngle(upWorld, yawOffsetRad);
-    const dir = this._tmp.dir.copy(forward).applyQuaternion(qYaw).normalize();
+      // dir “piatta” con eventuale spread, come fallback
+      const qYaw = this._tmp.qYaw.setFromAxisAngle(upWorld, yawOffsetRad);
+      const flatDir = this._tmp.dir.copy(forward).applyQuaternion(qYaw).normalize();
 
-    const target = this._acquireTarget(origin, dir);
-    p.radius = this.boltRadius;
-    p.activate(origin, dir, this.speed, this.lifetime, target);
+      // prova a prendere un target col lock (usa già il cono che hai)
+      const target = this._acquireTarget(origin, flatDir);
+
+      // ➜ Se ho un target, calcolo la direzione **3D** verso di lui (inclusa Y);
+      //    altrimenti uso la flatDir di fallback.
+      let shotDir = flatDir;
+      if (target?.model?.position) {
+        // mira leggermente più in alto del pivot del modello
+        const aimPoint = target.model.position.clone();
+        aimPoint.y += 1.2; // offset verticale (regolabile)
+        shotDir = new THREE.Vector3()
+          .subVectors(aimPoint, origin)
+          .normalize();
+      }
+
+
+      // spawn
+      p.radius = this.boltRadius;
+      p.activate(
+        origin,
+        shotDir,            // ← ora ha componente Y se il target è in alto/basso
+        this.speed,
+        this.lifetime,
+        target || null      // passa anche il lock così l’homing segue lo stesso bersaglio
+      );
+
   }
 
   _ensurePool() {
@@ -195,17 +220,22 @@ export class WandMagicStrategy extends AttackStrategy {
     const enemies = getEnemies();
     const maxDist = this.lockRange;
     const coneCos = Math.cos(THREE.MathUtils.degToRad(this.aimConeDeg));
+
     let best = null, bestDot = coneCos, bestDist = maxDist;
 
     for (const e of enemies) {
+      if (!e?.alive || !e.model) continue;
       const to = this._tmp.to.subVectors(e.model.position, origin);
       const dist = to.length(); if (dist > maxDist) continue;
       to.normalize();
       const dot = dir.dot(to);
-      if (dot >= bestDot && dist <= bestDist) { bestDot = dot; bestDist = dist; best = e; }
+      if (dot >= bestDot && dist <= bestDist) {
+        bestDot = dot; bestDist = dist; best = e;
+      }
     }
     return best;
   }
+
 
   _onHitEnemy(enemy) {
     killEnemy(enemy);

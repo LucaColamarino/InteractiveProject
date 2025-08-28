@@ -4,12 +4,13 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
 import { interactionManager } from '../systems/interactionManager.js';
-import { gameManager } from '../managers/gameManager.js';
+import { archerObjective, gameManager } from '../managers/gameManager.js';
 import { hudManager } from '../ui/hudManager.js';
+import { createBridge } from './bridge.js';
 
 // --- Cache semplice per le texture ---
 const _texCache = new Map();
-const objective = 10;
+const objective = archerObjective;
 function loadColorTex(tl, url) {
   if (_texCache.has(url)) return _texCache.get(url);
   const t = tl.load(url);
@@ -180,6 +181,7 @@ export async function spawnarchersStone({
     _state.glowTarget = 1.0;
     gameManager.activatedStones+=1;
     if(gameManager.activatedStones>=2){
+      hudManager.showNotification("Bridge activated.");
       createBridge({
           modelUrl: '/models/props/Bridge.fbx',
           texturesPath: '/textures/bridge',
@@ -188,7 +190,7 @@ export async function spawnarchersStone({
           rotationY: 10,
           uvTile: 2,  // aumenta/riduci tiling
         });}
-        else{hudManager.showNotification("One stone left.")}
+        else{hudManager.showNotification("One stone left.");}
              },
   };
   interactionManager.register(_registered);

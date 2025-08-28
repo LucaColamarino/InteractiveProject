@@ -209,7 +209,6 @@ export function startLoop(c) {
       gameManager.controller.stats.regenStamina(delta, 8);
       //gameManager.controller.stats.regenMana(delta, 3);
       gameManager.pickableManager?.update(delta, player?.model?.position);
-      console.log("PLAYER POS",gameManager.controller.player.model.position);
       interactionManager.update();
       hudManager.update(player, controller, camera, getEnemies());
 
