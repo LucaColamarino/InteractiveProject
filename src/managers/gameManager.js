@@ -1,5 +1,4 @@
 
-import * as THREE from 'three';
 export let gameManager = null;
 export const archerArea = { x: -25, z: 190, width: 150, depth: 150 }; 
 export const wolfArea = { x: -95, z: -60, width: 150, depth: 150 };

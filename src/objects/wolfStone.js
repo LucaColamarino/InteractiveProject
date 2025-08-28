@@ -4,9 +4,11 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
 import { interactionManager } from '../systems/interactionManager.js';
-
+import { gameManager } from '../managers/gameManager.js';
+import { hudManager } from '../ui/hudManager.js';
 // ===== Texture cache =====
 const _texCache = new Map();
+const objective=5;
 function loadColorTex(tl, url) {
   if (_texCache.has(url)) return _texCache.get(url);
   const t = tl.load(url);
@@ -161,8 +163,11 @@ export async function spawnWolfStone({
   _registered = {
     getWorldPosition: (out = new THREE.Vector3()) => root.getWorldPosition(out),
     canInteract: () => !_state.activated,
-    getPrompt: () => ({ key: 'E', text: _state.activated ? 'Attivata' : 'Attiva la pietra' }),
-    onInteract: () => { _state.activated = true; _state.glowTarget = 1.0; },
+    getPrompt: () => ({ key: 'E', text:'Activate wolves stone' }),
+    onInteract: () => {
+      let left = objective -gameManager.wolvesKilled;
+      if(left>0){hudManager.showNotification("You need to kill "+left+" more wolves.");return;}
+        _state.activated = true; _state.glowTarget = 1.0; },
   };
   interactionManager.register(_registered);
 

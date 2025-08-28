@@ -4,9 +4,12 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
 import { interactionManager } from '../systems/interactionManager.js';
+import { gameManager } from '../managers/gameManager.js';
+import { hudManager } from '../ui/hudManager.js';
 
 // --- Cache semplice per le texture ---
 const _texCache = new Map();
+const objective = 10;
 function loadColorTex(tl, url) {
   if (_texCache.has(url)) return _texCache.get(url);
   const t = tl.load(url);
@@ -169,8 +172,12 @@ export async function spawnarchersStone({
   _registered = {
     getWorldPosition: (out = new THREE.Vector3()) => root.getWorldPosition(out),
     canInteract: () => !_state.activated,
-    getPrompt: () => ({ key: 'E', text: _state.activated ? 'Attivata' : 'Attiva la pietra' }),
-    onInteract: () => { _state.activated = true; _state.glowTarget = 1.0; },
+    getPrompt: () => ({ key: 'E', text: 'Activate archers stone' }),
+    onInteract: () => {
+      let left = objective -gameManager.archersKilled;
+      if(left>0){hudManager.showNotification("You need to kill "+left+" more archers.");return;}
+     _state.activated = true;
+      _state.glowTarget = 1.0; },
   };
   interactionManager.register(_registered);
 
