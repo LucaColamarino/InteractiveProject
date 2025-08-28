@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { renderer, scene, camera } from './scene.js';
-import { updateCamera } from './player/cameraFollow.js';
+import { updateCamera, updatePlayerFacingToLock } from './player/cameraFollow.js';
 import { updateWater, terrainMaterial, updateSunPosition } from './map/map.js';
 import { updateEnemies, getEnemies } from './enemies/EnemyManager.js';
 import { sun, moon } from './graphics/shadowManager.js';
@@ -120,9 +120,15 @@ export function startLoop(c) {
 
     try {
       if (controller) {
-        pumpActions(controller);    // input → controller.setInputState(...)
-        controller.update(delta);   // movimento/stati (Base/HumanFormController)
-        if (player) player.update(delta); // <-- ORA qui vive l’Animator
+        pumpActions(controller);           // input → controller.setInputState(...)
+        controller.update(delta);          // movimento/stati (Base/HumanFormController)
+        if (player) player.update(delta);  // <-- ORA qui vive l’Animator
+      }
+
+      // ➜ FACING verso il target quando lock-on attivo
+      if (player) {
+        // Se vedi 180° di errore, passa { yawOffset: Math.PI }
+        updatePlayerFacingToLock(player, delta /*, { turnSpeed: 12, yawOffset: 0 } */);
       }
 
       const ctrl = controller; // alias

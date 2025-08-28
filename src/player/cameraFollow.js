@@ -81,23 +81,17 @@ export function clearCameraFocus() {
   _lock.target = null;
 }
 
-// Cerca il nemico valido più vicino nel FOV davanti al player e attiva il lock
+// Cerca il nemico valido più vicino nel FOV davanti alla camera e attiva il lock
 export function focusNearestEnemy(player, maxRange = 25, fovDeg = 45) {
   if (!player?.model) return;
 
   const enemies = getEnemies() || [];
   let bestE = null, bestDist = Infinity;
 
-  const playerPos = player.model.position;
-  const yawRad = THREE.MathUtils.degToRad(getCameraAngles().yaw);
-
   for (const e of enemies) {
-    const pos = e?.model?.position;
-    if (!pos) continue;
-
-    const v = _visibleFrom(playerPos, yawRad, pos, maxRange, fovDeg);
-    if (!v.ok) continue;
-    if (v.dist < bestDist) { bestDist = v.dist; bestE = e; }
+    const okv = _visibleFrom(player, e, maxRange, fovDeg);
+    if (!okv.ok) continue;
+    if (okv.dist < bestDist) { bestDist = okv.dist; bestE = e; }
   }
 
   if (bestE) {
@@ -107,29 +101,60 @@ export function focusNearestEnemy(player, maxRange = 25, fovDeg = 45) {
   }
 }
 
+// === utils: ancestry check per filtrare player/nemico nel ray ===
+function _isDescendantOf(obj, root) {
+  for (let cur = obj; cur; cur = cur.parent) {
+    if (cur === root) return true;
+  }
+  return false;
+}
+
 // =============== VISIBILITÀ (FOV/RANGE/LOS) ===============
-function _visibleFrom(playerPos, _camYawRad_UNUSED, enemyPos, maxRange, fovDeg) {
-  // 1) Range: usa la distanza player→nemico (come prima)
-  const dist = new THREE.Vector3().subVectors(enemyPos, playerPos).length();
+// FOV 3D dalla camera; LOS con origine spostata avanti+alto e filtro di player/nemico
+function _visibleFrom(playerEntity, enemyEntity, maxRange, fovDeg) {
+  const playerObj = playerEntity?.model;
+  const enemyObj  = enemyEntity?.model;
+  if (!playerObj || !enemyObj) return { ok: false, dist: Infinity };
+
+  const playerPos = playerObj.position;
+  const enemyPos  = enemyObj.position;
+
+  // 1) Range (player→nemico)
+  const dist = _tmp.subVectors(enemyPos, playerPos).length();
   if (dist > maxRange) return { ok: false, dist };
 
-  // 2) FOV: usa il forward REALE della camera e il vettore camera→nemico
+  // 2) FOV (camera→nemico contro forward camera)
   const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-  const toEnemyFromCam = new THREE.Vector3().subVectors(enemyPos, camera.position).normalize();
 
+  // Origine del raggio leggermente avanti e un po' in alto per evitare il player
+  const rayOrigin = camera.position.clone()
+    .add(camFwd.clone().multiplyScalar(0.35))   // avanti ~35 cm
+    .add(new THREE.Vector3(0, 0.20, 0));        // su ~20 cm
+
+  const toEnemyFromCam = new THREE.Vector3().subVectors(enemyPos, rayOrigin).normalize();
   const dot = THREE.MathUtils.clamp(camFwd.dot(toEnemyFromCam), -1, 1);
-  const angle = Math.acos(dot) * 180 / Math.PI; // gradi
+  const angle = Math.acos(dot) * 180 / Math.PI;
   if (angle > fovDeg) return { ok: false, dist };
 
-  // 3) Line-of-sight: raggio dalla camera al nemico
-  const dir = new THREE.Vector3().subVectors(enemyPos, camera.position).normalize();
-  _ray.set(camera.position, dir);
+  // 3) Line-of-sight (camera → nemico) con filtro
+  const dir = new THREE.Vector3().subVectors(enemyPos, rayOrigin).normalize();
+  _ray.set(rayOrigin, dir);
+  _ray.far = rayOrigin.distanceTo(enemyPos) + 0.001;
 
-  // TODO: se vuoi, filtra i "blockers" invece di scene.children
   const hits = _ray.intersectObjects(scene.children, true);
 
-  const distToEnemy = camera.position.distanceTo(enemyPos);
-  const ok = (hits.length === 0) || (hits[0].distance >= distToEnemy - 0.25);
+  // Trova il primo "vero" ostacolo che non sia parte del player o del nemico
+  let firstBlock = null;
+  for (const h of hits) {
+    const o = h.object;
+    if (playerObj && _isDescendantOf(o, playerObj)) continue;
+    if (enemyObj  && _isDescendantOf(o, enemyObj))  continue;
+    firstBlock = h;
+    break;
+  }
+
+  const distToEnemy = rayOrigin.distanceTo(enemyPos);
+  const ok = !firstBlock || (firstBlock.distance >= distToEnemy - 0.25);
   return { ok, dist };
 }
 
@@ -189,8 +214,8 @@ export function updateCamera(player, delta = 0) {
     const mid = pHead.clone().lerp(eHead, _lock.midBias);
     targetLookAt.lerp(mid, 1 - Math.exp(-_lock.stiffness * delta));
 
-    // Controlli auto-clear: FOV/range/LOS
-    const vis = _visibleFrom(player.model.position, yawRad, enemyPosForLook, _lock.maxRange, _lock.fovDeg);
+    // Controlli auto-clear: FOV/range/LOS (usa la nuova versione che filtra player/enemy)
+    const vis = _visibleFrom(player, _lock.target, _lock.maxRange, _lock.fovDeg);
     if (!vis.ok) {
       _lock._noLosTimer += delta;
       if (_lock._noLosTimer > _lock.losGrace) clearLockOn();
@@ -226,4 +251,37 @@ export function getLockHeadingYaw(player) {
   const dz = e.z - p.z;
   // stessa convenzione del resto: sin(yaw)->X, cos(yaw)->Z
   return THREE.MathUtils.radToDeg(Math.atan2(dx, dz));
+}
+
+// =============== Facing del player verso il target (lock-on) ===============
+const _UP = new THREE.Vector3(0, 1, 0);
+const _QTMP = new THREE.Quaternion();
+
+/**
+ * Ruota dolcemente il player per guardare il nemico lockato.
+ * @param {*} player           entity con .model (THREE.Object3D)
+ * @param {number} delta       dt del frame
+ * @param {object} opts
+ * @param {number} opts.turnSpeed  velocità rotazione (rad/s "morbida"): 10 ~ 14 consigliato
+ * @param {number} opts.yawOffset  offset opzionale se il modello guarda +Z (usa Math.PI se vedi 180° di errore)
+ */
+export function updatePlayerFacingToLock(player, delta = 0, { turnSpeed = 12, yawOffset = 0 } = {}) {
+  if (!_lock.active || !_lock.target?.model?.position || !player?.model) return;
+
+  const p = player.model.position;
+  const e = _lock.target.model.position;
+
+  // Direzione orizzontale verso il target
+  const dx = e.x - p.x;
+  const dz = e.z - p.z;
+  if (dx * dx + dz * dz < 1e-6) return; // troppo vicino
+
+  const desiredYaw = Math.atan2(dx, dz) + yawOffset;
+
+  // Quaternion target: rotazione intorno a Y (yaw)
+  _QTMP.setFromAxisAngle(_UP, desiredYaw);
+
+  // Slerp "critically damped"
+  const t = 1 - Math.exp(-turnSpeed * delta);
+  player.model.quaternion.slerp(_QTMP, t);
 }
