@@ -74,7 +74,6 @@ export class ArcherEnemy extends BaseEnemy {
       // cintura e bretelle: propaga ai figli (utile col dual-pass)
       if (o.traverse) o.traverse(c => { if (c !== o) c.visible = v; });
     }
-    // if (window.DEBUG_ARROW_HAND) console.log('[Archer] Arrow in hand ->', v ? 'SHOW' : 'HIDE');
   }
 
   // ---------- Update ----------
@@ -205,10 +204,8 @@ _updateArrowInHand() {
     });
 
     if (found) {
-      console.log('[Archer] trovato bone:', found.name);
       this._arrowBone = found;
     } else {
-      console.warn('[Archer] bone non trovato:', this.arrowBoneName);
     }
     return this._arrowBone;
   }
@@ -237,9 +234,7 @@ _updateArrowInHand() {
     this.state.isAttacking = true;
 
 
-    this._setArrowVisible(true);
-
-    console.log('[Archer] startAttack: ok=', !!ok, 'hasAction=', !!action, 'dur=', dur.toFixed(3), 'fire@', fireTimeSec.toFixed(3));
+    this._setArrowVisible(true)
   }
 
   _updateAttack(dt, toTgt, _dist) {
@@ -251,7 +246,6 @@ _updateArrowInHand() {
     const d = S.dur;
 
     if (!S.didShoot && t >= S.fireTimeSec) {
-      console.log('[Archer] frame9 → shootNow()');
       S.didShoot = true;
       this._shootNow();
       // la visibilità post-scocco verrà gestita da _updateArrowInHand()
@@ -264,7 +258,6 @@ _updateArrowInHand() {
   }
 
   _endAttack() {
-    console.log('[Archer] endAttack');
     const S = this._atk;
     if (S?.action?.fadeOut) S.action.fadeOut(0.08);
     this._atk = null;
@@ -275,7 +268,6 @@ _updateArrowInHand() {
   }
 
   _cancelAttack() {
-    console.log('[Archer] cancelAttack');
     this._atk = null;
     this.state.isAttacking = false;
     this.animator?.stopOverlay?.();
@@ -313,13 +305,6 @@ _updateArrowInHand() {
 
     // freccia “in mano” si nasconde allo scocco
     this._setArrowVisible(false);
-
-
-    console.log('[Archer] SHOOT (AIM→PLAYER):',
-      'spawnPos=', pos.toArray().map(v=>+v.toFixed(3)),
-      'targetPos=', targetPos.toArray().map(v=>+v.toFixed(3)),
-      'dir=', dir.toArray().map(v=>+v.toFixed(3)));
-
     const speed  = 36;
     const damage = 10;
 
