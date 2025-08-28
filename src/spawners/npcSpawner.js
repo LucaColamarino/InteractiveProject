@@ -211,7 +211,5 @@ export function spawnEnemies() {
   for (let i = 0; i < num_werewolves; i++) {
     spawnWerewolfNpc(new THREE.Vector3(0, 0, 80));
   }
-  for (let i = 0; i < num_wyverns; i++) {
-    spawnWyvernNpc(new THREE.Vector3(250 + Math.random() * 150, 70, Math.random() * 150 - 75));
-  }
+    spawnWyvernNpc(new THREE.Vector3(-230,0, 170));
 }
