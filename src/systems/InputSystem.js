@@ -5,6 +5,15 @@ import { gameManager } from '../managers/gameManager.js';
 import { toggleInventory, isInventoryOpen } from '../ui/inventoryUi.js';
 import { refreshInventoryUI } from '../ui/inventoryBridge.js';
 
+import {
+  focusNearestEnemy,
+  isLockOn,
+  clearLockOn,
+  isCinematicFocus,
+  clearCameraFocus,
+  getLockHeadingYaw
+} from '../player/cameraFollow.js';
+
 // ======= State =======
 let _controller = null;
 let _isSetup = false;
@@ -21,7 +30,7 @@ let _suppressNextAttack = false; // evita attacco sul click dopo l'uscita dal lo
 let _plReqInFlight = false;      // evita SecurityError su richieste ravvicinate
 
 // Movimento
-const _moveVec = new THREE.Vector3();  // vettore input (relativo camera)
+const _moveVec = new THREE.Vector3();  // vettore input (relativo camera/lock)
 const _fwd = new THREE.Vector3();      // scratch
 const _right = new THREE.Vector3();    // scratch
 const _pressed = new Set();            // KeyW, KeyA, ...
@@ -33,8 +42,8 @@ let _moveDirty = true;  // ricomputa _moveVec
 let _yawDirty  = true;  // aggiorna basi fwd/right solo quando serve
 
 // ======= Helpers =======
-function _updateBasisFromYaw() {
-  const yawRad = THREE.MathUtils.degToRad(_yawDeg);
+function _updateBasisFromYaw(yawDeg = _yawDeg) {
+  const yawRad = THREE.MathUtils.degToRad(yawDeg);
   // forward lungo +Z (TPS)
   _fwd.set(Math.sin(yawRad), 0, Math.cos(yawRad));
   _right.set(Math.cos(yawRad), 0, -Math.sin(yawRad));
@@ -47,16 +56,39 @@ function _recomputeMoveVec() {
     _moveDirty = false;
     return;
   }
-  if (_yawDirty) _updateBasisFromYaw();
+
+  // yaw per il movimento: lock-on > camera
+  let yawForMove = _yawDeg;
+  if (isLockOn()) {
+    const y = getLockHeadingYaw(_controller?.player);
+    if (typeof y === 'number') yawForMove = y;
+  }
+
+  // aggiorna le basi con lo yaw scelto
+  _updateBasisFromYaw(yawForMove);
 
   _moveVec.set(0, 0, 0);
-  if (_pressed.has('KeyW')) _moveVec.sub(_fwd);
-  if (_pressed.has('KeyS')) _moveVec.add(_fwd);
-  if (_pressed.has('KeyD')) _moveVec.add(_right);
-  if (_pressed.has('KeyA')) _moveVec.sub(_right);
+
+  if (isLockOn()) {
+    // In lock-on: avanti = +fwd, indietro = -fwd
+    if (_pressed.has('KeyW')) _moveVec.add(_fwd);
+    if (_pressed.has('KeyS')) _moveVec.sub(_fwd);
+
+    // ⬇️ Inverti anche l'asse laterale per mantenere la stessa mano:
+    //     D deve restare “strafe right” → usa -right
+    if (_pressed.has('KeyD')) _moveVec.sub(_right);
+    if (_pressed.has('KeyA')) _moveVec.add(_right);
+  } else {
+    // Default: avanti = -fwd (come prima), laterale “normale”
+    if (_pressed.has('KeyW')) _moveVec.sub(_fwd);
+    if (_pressed.has('KeyS')) _moveVec.add(_fwd);
+    if (_pressed.has('KeyD')) _moveVec.add(_right);
+    if (_pressed.has('KeyA')) _moveVec.sub(_right);
+  }
 
   _moveDirty = false;
 }
+
 
 let _cachedCanvas = null;
 function _canvasEl() {
@@ -72,8 +104,6 @@ function _isCanvasFocused() {
   const c = _canvasEl();
   return !!(c && document.activeElement === c);
 }
-
-
 
 // ======= Pointer Lock =======
 function _requestPointerLock() {
@@ -199,7 +229,18 @@ function _onMouseDown(e) {
     _controller?.attack?.();
   } else if (e.button === 2) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
-   _controller?.blockStart?.();
+    _controller?.blockStart?.();
+  } else if (e.button === 1) {
+    // Tasto centrale: prima spegni eventuale focus cinematografico (falò)
+    if (isCinematicFocus()) {
+      clearCameraFocus();
+    }
+    // Poi toggle del lock-on
+    if (isLockOn()) {
+      clearLockOn();
+    } else {
+      focusNearestEnemy(_controller?.player);
+    }
   }
 }
 
@@ -220,7 +261,7 @@ function _onMouseMove(e) {
 function _onMouseUp(_e) {
   if (_e.button === 2) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
-   _controller?.blockEnd?.();
+    _controller?.blockEnd?.();
   }
 }
 
@@ -252,7 +293,7 @@ export function setupInput() {
     // libera RMB per secondAttack
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.style.cursor = 'crosshair';
-    c.title = 'Click per entrare in mouse‑lock (ESC per uscire)';
+    c.title = 'Click per entrare in mouse-lock (ESC per uscire)';
     c.addEventListener('mousedown', () => c.focus?.(), { passive: true });
     c.tabIndex = c.tabIndex || 0;
   }
