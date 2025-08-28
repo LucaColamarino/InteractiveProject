@@ -18,6 +18,7 @@ export const spawnPoint = {x:-57,z:62};
    pickableManager = null;
    wolvesKilled = 0;
    archersKilled =0;
+   activatedStones=0;
   }
 export function createGameManager() {
   

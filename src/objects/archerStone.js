@@ -177,7 +177,19 @@ export async function spawnarchersStone({
       let left = objective -gameManager.archersKilled;
       if(left>0){hudManager.showNotification("You need to kill "+left+" more archers.");return;}
      _state.activated = true;
-      _state.glowTarget = 1.0; },
+    _state.glowTarget = 1.0;
+    gameManager.activatedStones+=1;
+    if(gameManager.activatedStones>=2){
+      createBridge({
+          modelUrl: '/models/props/Bridge.fbx',
+          texturesPath: '/textures/bridge',
+          scale: 0.004,
+          position: new THREE.Vector3(-135,getTerrainHeightAt(-135,115),115),
+          rotationY: 10,
+          uvTile: 2,  // aumenta/riduci tiling
+        });}
+        else{hudManager.showNotification("One stone left.")}
+             },
   };
   interactionManager.register(_registered);
 

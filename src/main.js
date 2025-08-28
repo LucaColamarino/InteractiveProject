@@ -111,14 +111,7 @@ async function init() {
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
     
-    await createBridge({
-      modelUrl: '/models/props/Bridge.fbx',
-      texturesPath: '/textures/bridge',
-      scale: 0.004,
-      position: new THREE.Vector3(-135,getTerrainHeightAt(-135,115),115),
-      rotationY: 10,
-      uvTile: 2,  // aumenta/riduci tiling
-    });
+
     updateLoadingProgress(95, 'Player initialization...');
     gameManager.controller = await spawnPlayer();
     updateVitalsHUD(gameManager.controller.stats);
