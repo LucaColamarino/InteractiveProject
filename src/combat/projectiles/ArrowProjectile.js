@@ -37,13 +37,6 @@ export class ArrowProjectile {
     this._age = 0;
 
     scene.add(this.obj);
-
-    if (window.DEBUG_ARROW) {
-      console.log('[ArrowProjectile] spawn',
-        { pos: pos0.toArray().map(v=>+v.toFixed(3)),
-          speed, fwd: fwdWorld0.toArray().map(v=>+v.toFixed(3)),
-          roll: +this.roll.toFixed(3) });
-    }
   }
 
   _computeInitialRoll(q) {
