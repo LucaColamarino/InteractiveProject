@@ -21,6 +21,8 @@ import { wireInventoryInteractions } from './ui/inventoryInteractions.js';
 import { tickTrees, drainOnce, TREE_ESSENCE_CFG, findDrainableTree, getLeafDensity } from './systems/TreeEssenceSystem.js';
 import { registerTreeEssenceInteraction } from './objects/treeEssenceInteractable.js';
 import { updateArrowProjectiles } from './combat/projectiles/ArrowProjectile.js';
+import { updateWolfStone } from './objects/wolfStone.js';
+import { updatearchersStone } from './objects/archerStone.js';
 
 const LEAF_MIN_OPACITY_DURING_COOLDOWN = 0.25;
 
@@ -202,9 +204,12 @@ export function startLoop(c) {
       updatetorchs(delta);
       updateCamera(player, delta);
       updateEnvironment();
+      updateWolfStone(delta);
+      updatearchersStone(delta);
       gameManager.controller.stats.regenStamina(delta, 8);
       //gameManager.controller.stats.regenMana(delta, 3);
       gameManager.pickableManager?.update(delta, player?.model?.position);
+      console.log("PLAYER POS",gameManager.controller.player.model.position);
       interactionManager.update();
       hudManager.update(player, controller, camera, getEnemies());
 

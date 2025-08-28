@@ -5,7 +5,7 @@ export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa0a0a0);
 
 export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-gameManager.camera= camera;
+if(gameManager)gameManager.camera= camera;
 camera.position.set(0, 2, 5);
 
 

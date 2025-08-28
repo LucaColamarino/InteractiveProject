@@ -6,12 +6,11 @@ import { spawnEnemies } from './spawners/npcSpawner.js';
 import { populateVegetation } from './spawners/vegetationSpawner.js';
 import { spawnCampfireAt } from './objects/campfire.js';
 import { spawnChestAt } from './objects/chest.js';
-import { spawntorchAt } from './objects/torch.js';
 import { setFireShadowBudget } from './particles/FireParticleSystem.js';
 import { InventorySystem } from './systems/inventorySystem.js';
 import { MainMenu } from './ui/mainMenu.js';
 import { StartMenu } from './ui/startMenu.js';
-import { gameManager } from './managers/gameManager.js';
+import { createGameManager, gameManager } from './managers/gameManager.js';
 import { updateLoadingProgress, hideLoadingScreen, showLoadingScreen, suspendLoadingScreen } from './loading.js';
 import { PickableManager } from './managers/pickableManager.js';
 import { scene } from './scene.js';
@@ -24,6 +23,8 @@ import { updateVitalsHUD } from './ui/hudVitals.js';
 import { createBridge } from './objects/bridge.js';
 import * as THREE from 'three';
 import { setNoGoLevel } from './systems/GroundSystem.js';
+import { spawnarchersStone } from './objects/archerStone.js';
+import { spawnWolfStone } from './objects/wolfStone.js';
 // =====================
 // SETTINGS
 // =====================
@@ -99,13 +100,17 @@ async function init() {
     await wait(80);
 
     updateLoadingProgress(90, 'Placing objects...');
-    spawnCampfireAt(0, 0);
-    spawntorchAt(30, 15);
-    spawntorchAt(17, 20);
-    spawntorchAt(-20, -15);
-    spawnChestAt(6, 6,ironSword);
-
-    spawnChestAt(-6, -6, magicWand);
+    spawnCampfireAt(-60, 65);
+    //spawntorchAt(30, 15);
+    //spawntorchAt(17, 20);
+    //spawntorchAt(-20, -15);
+    spawnChestAt(-65, 60,ironSword);
+    spawnChestAt(-65, 70, magicWand);
+    spawnChestAt(-55, 60,ironShield);
+    spawnChestAt(-55, 70, ironHelmet);
+    await spawnarchersStone({x:-55,z:90});
+    await spawnWolfStone({x:-65,z:40});
+    
     await createBridge({
       modelUrl: '/models/props/Bridge.fbx',
       texturesPath: '/textures/bridge',

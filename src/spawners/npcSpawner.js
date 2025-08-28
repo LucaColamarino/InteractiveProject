@@ -12,6 +12,7 @@ import { WerewolfEnemy } from '../enemies/controllers/WerewolfEnemy.js';
 import { WyvernEnemy } from '../enemies/controllers/WyvernEnemy.js';
 
 import { spawnArrowProjectile } from '../combat/projectiles/ArrowProjectile.js';
+import { archerArea, wolfArea } from '../managers/gameManager.js';
 // -----------------------------------------------------
 
 function _chooseController(type, opts) {
@@ -192,24 +193,30 @@ async function spawnEnemy(configKey, position, typeOverride = null) {
 
 // -----------------------------------------------------
 
-export function spawnArcherNpc(pos) {
-  return spawnEnemy('archer', new THREE.Vector3(pos.x, pos.y ?? 0, pos.z), 'archer');
+export function spawnArcherNpc(x,y,z) {
+  return spawnEnemy('archer', new THREE.Vector3(x,y ?? 0, z), 'archer');
 }
-export function spawnWerewolfNpc(pos) {
-  return spawnEnemy('werewolf', new THREE.Vector3(pos.x, pos.y ?? 0, pos.z), 'werewolf');
+export function spawnWerewolfNpc(x,y,z) {
+  return spawnEnemy('werewolf', new THREE.Vector3(x, y ?? 0, z), 'werewolf');
 }
-export function spawnWyvernNpc(pos) {
-  return spawnEnemy('wyvern', new THREE.Vector3(pos.x, pos.y ?? 30, pos.z), 'wyvern');
+export function spawnWyvernNpc(x,y,z) {
+  return spawnEnemy('wyvern', new THREE.Vector3(x, y ?? 30, z), 'wyvern');
 }
 
 export function spawnEnemies() {
-  const num_archers = 1, num_werewolves = 1, num_wyverns = 0;
+  const num_archers = 15, num_werewolves = 8;
 
   for (let i = 0; i < num_archers; i++) {
-    spawnArcherNpc(new THREE.Vector3(1, 0, 1));
+    const area = archerArea;
+    const x = area.x + (Math.random() * area.width - area.width / 2)*0.7;
+    const z = area.z + (Math.random() * area.width - area.width / 2)*0.7;
+    spawnArcherNpc(x, 0, z);
   }
   for (let i = 0; i < num_werewolves; i++) {
-    spawnWerewolfNpc(new THREE.Vector3(0, 0, 80));
+    const area = wolfArea;
+    const x = area.x + (Math.random() * area.width - area.width / 2)*0.7;
+    const z = area.z + (Math.random() * area.width - area.width / 2)*0.7;
+    spawnWerewolfNpc(x, 0, z);
   }
-    spawnWyvernNpc(new THREE.Vector3(-230,0, 170));
+    spawnWyvernNpc(-230,0,170);
 }

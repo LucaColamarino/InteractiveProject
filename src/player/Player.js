@@ -7,6 +7,7 @@ import { getTerrainHeightAt } from '../map/map.js';
 import { HumanFormController } from '../controllers/forms/HumanFormController.js';
 import { scene } from '../scene.js';
 import { Animator } from '../components/Animator.js'; // <-- nuovo
+import { spawnPoint } from '../managers/gameManager.js';
 export class Player {
   constructor(model, mixer, actions) {
     this.model = model;
@@ -49,7 +50,7 @@ function createAbilities(formName, overrides = {}) {
     formName,
   };
 }
-export async function spawnPlayer(position = new THREE.Vector3(5,getTerrainHeightAt(5,5),5))
+export async function spawnPlayer(position = new THREE.Vector3(spawnPoint.x,getTerrainHeightAt(spawnPoint.x,spawnPoint.z),spawnPoint.z))
   {
       const formName = "human";
       const abilities = abilitiesByForm[formName];

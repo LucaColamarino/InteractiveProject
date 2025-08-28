@@ -4,6 +4,7 @@ import { TreeSpawner } from "../objects/tree.js";
 import { SmallRockSpawner } from "../objects/rock.js";
 import { scene, camera } from "../scene.js";
 import { getTerrainHeightAt } from "../map/map.js";
+import { archerArea, wolfArea } from "../managers/gameManager.js";
 
 let bushes = null;
 export let  trees  = null;
@@ -47,8 +48,10 @@ async function spawnTrees() {
   updateThrottleMs: 16
 });
 
-  const area = { x: 80, z: 80, width: 150, depth: 150 };
+  const area = archerArea;
+  const area1 = wolfArea;
   await trees.spawn('/models/environment/TREE.fbx',200 , area); //200
+  await trees.spawn('/models/environment/TREE.fbx',200 , area1); //200
 }
 
 async function spawnSmallRocks() {

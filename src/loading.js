@@ -1,5 +1,5 @@
 
-import { createGameManager, gameManager } from './managers/gameManager.js';
+import { createGameManager } from './managers/gameManager.js';
 createGameManager();
 console.log('[Loading] Inizializzazione sistema di caricamento...');
 let loadingProgress = 0;
