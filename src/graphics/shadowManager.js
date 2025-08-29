@@ -1,13 +1,17 @@
 import * as THREE from 'three';
 import { scene } from '../scene.js';
+
 export let sun;
 export let moon;
 
 export function createMoonLight() {
-  moon = new THREE.DirectionalLight(0xaaaaff, 0.2); // tenue ma visibile
+  // Luna fredda e appena percettibile
+  moon = new THREE.DirectionalLight(0x8899cc, 0.15);
   moon.castShadow = false;
-  moon.shadow.mapSize.set(1024, 1024); // meno risoluzione del sole
-  moon.shadow.bias = -0.0001;
+
+  // Parametri ombra (anche se disattivata, teniamo set coerenti)
+  moon.shadow.mapSize.set(1024, 1024);
+  moon.shadow.bias = -0.00005;
   moon.shadow.normalBias = 0.01;
 
   moon.shadow.camera.top = 150;
@@ -27,15 +31,17 @@ export function createMoonLight() {
 }
 
 export function createSunLight() {
-  sun = new THREE.DirectionalLight(0x88bbff, 0.8);
-
+  // Sole caldo/arancio (stile Souls), più intenso ma non bruciante
+  sun = new THREE.DirectionalLight(0xffe6cc, 0.95);
   sun.castShadow = true;
 
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.radius = 2;
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.02;
-  const box = 120;
+  // Ombre più dettagliate e stabili
+  sun.shadow.mapSize.set(4096, 4096);
+  sun.shadow.radius = 1;         // transizione molto netta
+  sun.shadow.bias = -0.0003;     // meno acne
+  sun.shadow.normalBias = 0.015; // meno peter-panning
+
+  const box = 140;
   sun.shadow.camera.top = box;
   sun.shadow.camera.bottom = -box;
   sun.shadow.camera.left = -box;
@@ -43,11 +49,12 @@ export function createSunLight() {
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 600;
   sun.shadow.camera.updateProjectionMatrix();
-  sun.position.set(100, 200, -100); 
+
+  sun.position.set(100, 200, -100);
   scene.add(sun);
+
   const target = new THREE.Object3D();
   target.position.set(0, 0, 0);
   scene.add(target);
   sun.target = target;
 }
-

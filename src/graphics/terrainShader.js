@@ -55,8 +55,27 @@ export function createTerrainMaterial(textureLoader) {
        varying vec3 vWorldPosition;
        varying vec2 vUv;
 
-       // porteremo qui il "normalMap" blended (tangent-like, approx)
+       // Normal compositata in tangent space (prima della trasformazione in world/view)
        vec3 blendedTangentNormal = vec3(0.0);
+
+       // ---- Util per TBN in WORLD space (cotangent frame) ----
+       // Basato su "Generating Tangent Space Basis Vectors from a Triangle Mesh"
+       // (usiamo dFdx/dFdy su posizione world e UV)
+       mat3 cotangentFrameWS( vec3 Nworld, vec3 posWorld, vec2 uv ) {
+         vec3 dp1 = dFdx( posWorld );
+         vec3 dp2 = dFdy( posWorld );
+         vec2 duv1 = dFdx( uv );
+         vec2 duv2 = dFdy( uv );
+
+         vec3 T = normalize( dp1 * duv2.t - dp2 * duv1.t );
+         vec3 B = normalize( -dp1 * duv2.s + dp2 * duv1.s );
+
+         // Ortonormalizza rispetto a Nworld
+         T = normalize( T - Nworld * dot(Nworld, T) );
+         B = normalize( cross( Nworld, T ) );
+
+         return mat3( T, B, Nworld );
+       }
       `
     );
 
@@ -95,22 +114,20 @@ export function createTerrainMaterial(textureLoader) {
         // blend colore base
         vec3 blended = clamp(grassBlend * gTex + rockBlend * rTex + snowBlend * sTex, 0.0, 1.0);
 
-        // ====== TINT giorno/notte (mantiene SEMPRE la texture) ======
-        // notte più scura e leggermente blu/grigia
-        vec3 nightTint = vec3(0.42, 0.48, 0.56);
-        float tintMix = smoothstep(0.28, 0.95, dayFactor); // notte piena applica di più la tinta
+        // ====== TINT giorno/notte (stile Souls) ======
+        vec3 nightTint = vec3(0.28, 0.34, 0.42); // blu/grigio sporco
+        float tintMix = smoothstep(0.28, 0.95, dayFactor);
         vec3 tint = mix(nightTint, vec3(1.0), tintMix);
         diffuseColor.rgb = blended * tint;
 
-
-        // AO (micro)
+        // AO micro più aggressivo per profondità
         float gAO = texture2D(grassAO, microUv).r;
         float rAO = texture2D(rockAO,  microUv).r;
         float sAO = texture2D(snowAO,  microUv).r;
         float aoBlend = clamp(grassBlend * gAO + rockBlend * rAO + snowBlend * sAO, 0.0, 1.0);
-        diffuseColor.rgb *= aoBlend;
+        diffuseColor.rgb *= (0.6 + 0.6 * aoBlend);
 
-        // Normali (tangent-like approx per migliorare risposta alle luci locali)
+        // Normali (campiona normal maps in TANgent space)
         vec3 gN = texture2D(grassNormal, microUv).rgb * 2.0 - 1.0;
         vec3 rN = texture2D(rockNormal,  microUv).rgb * 2.0 - 1.0;
         vec3 sN = texture2D(snowNormal,  microUv).rgb * 2.0 - 1.0;
@@ -118,17 +135,24 @@ export function createTerrainMaterial(textureLoader) {
       `
     );
 
-    // ==== FRAGMENT (inject blended normals into lighting pipeline) ====
-    // Sostituiamo il blocco normal maps con una approssimazione:
-    // spingiamo un po' la normal finale verso la tangent-normal blended.
+    // ==== FRAGMENT (inject blended normals using proper TBN) ====
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
       `
-      // Approx: in assenza di TBN esplicita, pieghiamo la normal geometrica verso la "tangent normal" blended.
-      // Questo è leggero ma sufficiente a recuperare micro-dettaglio vicino a luci locali (falò).
-      normal = normalize( normal + blendedTangentNormal * 0.5 );
+      // normal attuale è in VIEW space. Ricaviamo la normal in WORLD space:
+      vec3 Nview  = normalize( normal );
+      vec3 Nworld = normalize( inverseTransformDirection( Nview, viewMatrix ) );
 
-      // mantieni gli altri effetti standard (clearcoat, ecc) disattivati qui
+      // TBN in WORLD space usando derivate su posizione world e UV:
+      mat3 TBNw = cotangentFrameWS( Nworld, vWorldPosition, vUv );
+
+      // Converte la normal dei normal map: TANgent -> WORLD -> VIEW
+      vec3 nWorldFromMaps = normalize( TBNw * blendedTangentNormal );
+      vec3 nViewFromMaps  = normalize( transformDirection( nWorldFromMaps, viewMatrix ) );
+
+      // Blend con la normal geometrica per stabilità (niente view-dependency artefatta)
+      const float detailStrength = 0.5; // regola quanto “spinge” il dettaglio
+      normal = normalize( mix( Nview, nViewFromMaps, detailStrength ) );
       `
     );
 

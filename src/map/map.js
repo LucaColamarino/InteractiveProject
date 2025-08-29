@@ -30,7 +30,7 @@ const _foliage = new Set();
 const _rocks   = new Set();
 
 /** Chiama questa sui root dei tuoi alberi/cespugli:
- *  markAsFoliage(treeRoot)   // imposta userData.isFoliage = true su tutte le mesh figlie
+ *  markAsFoliage(treeRoot)
  *  markAsRock(rockRoot)
  *  Verranno modulati di notte per non “sparare”.
  */
@@ -128,7 +128,7 @@ export function addWaterPlane(waterY) {
     waterNormals: waterNormals,
     sunDirection: (sun?.position.clone().normalize()) ?? new THREE.Vector3(1, 1, 1),
     sunColor: 0xffffff,
-    waterColor: 0x001e0f,
+    waterColor: 0x001a12,  // appena più scura
     distortionScale: 5.0,
     fog: scene.fog !== undefined
   });
@@ -149,8 +149,11 @@ export function updateWater(delta) {
 export async function createHeightmapTerrain() {
   return new Promise((resolve, reject) => {
     const textureLoader = new THREE.TextureLoader();
-    scene.background = new THREE.Color(0x1a1e2a);
-    scene.fog = new THREE.Fog(0x1a1e2a, 50, 200);
+
+    // Fondo & Fog in stile Souls: scuro + fog esponenziale
+    const FOG_COLOR = 0x0d0f14;
+    scene.background = new THREE.Color(FOG_COLOR);
+    scene.fog = new THREE.FogExp2(FOG_COLOR, 0.008);
 
     const heightMapImg = new Image();
     heightMapImg.src = '/textures/terrain/heightmap.png';
@@ -188,13 +191,13 @@ export async function createHeightmapTerrain() {
       geometry.computeVertexNormals();
       vertices.needsUpdate = true;
 
-      geometry.computeBoundingBox();
+      // UV coerenti col piano prima della rotazione (x,y del plane)
       const uvAttr = [];
       for (let i = 0; i < vertices.count; i++) {
-        const x = vertices.getX(i);
-        const z = vertices.getY(i);
-        const u = (x + terrainSize / 2) / terrainSize;
-        const v = (z + terrainSize / 2) / terrainSize;
+        const px = vertices.getX(i);
+        const py = vertices.getY(i);
+        const u = (px + terrainSize / 2) / terrainSize;
+        const v = (py + terrainSize / 2) / terrainSize;
         uvAttr.push(u, v);
       }
       geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvAttr, 2));
@@ -202,8 +205,11 @@ export async function createHeightmapTerrain() {
       terrainMaterial = createTerrainMaterial(textureLoader);
       const terrain = new THREE.Mesh(geometry, terrainMaterial);
       terrain.rotation.x = -Math.PI / 2;
+
+      // FIX: il terreno non deve proiettare ombre (riduce acne/artefatti)
       terrain.receiveShadow = true;
-      terrain.castShadow = true;
+      terrain.castShadow = false;
+
       scene.add(terrain);
       setTerrainMesh(terrain);
       console.log(`Terrain deformato correttamente.`);
@@ -218,12 +224,12 @@ export async function createHeightmapTerrain() {
     createSunLight();
     createMoonLight();
 
-    // Ambient più alto di notte (min 0.22) ma non esagerato di giorno
-    ambientLight = new THREE.AmbientLight(0x445566, 0.42);
+    // Ambient più basso (contrasto alto) ma non nero
+    ambientLight = new THREE.AmbientLight(0x404850, 0.18);
     scene.add(ambientLight);
 
-    // Hemisphere più contenuto: era 0.75 di notte -> ora 0.30
-    hemiLight = new THREE.HemisphereLight(0x8aaaff, 0x203040, 0.0);
+    // Hemisphere tenue (quasi nulla di notte)
+    hemiLight = new THREE.HemisphereLight(0x8aaaff, 0x203040, 0.10);
     hemiLight.position.set(0, 1, 0);
     hemiLight.castShadow = false;
     scene.add(hemiLight);
@@ -242,7 +248,7 @@ export function createSky() {
   const moonMat = new THREE.MeshStandardMaterial({
     map: moonTex,
     emissive: new THREE.Color(0xccccff),
-    emissiveIntensity: 1.8, // prima 2.5: meno glow
+    emissiveIntensity: 1.4, // meno glow
     roughness: 1,
     metalness: 0,
     toneMapped: false
@@ -260,8 +266,10 @@ export function createSky() {
   skyUniforms['mieCoefficient'].value = 0.005;
   skyUniforms['mieDirectionalG'].value = 0.8;
 }
-const DAY_LENGTH_SEC = 600;            // es. 5 minuti per un giro completo
+
+const DAY_LENGTH_SEC = 600; // ~5 minuti ciclo completo
 const ANGULAR_SPEED  = (Math.PI * 2) / DAY_LENGTH_SEC; // rad/sec
+
 export function updateSunPosition(delta) {
   sunAngle = (sunAngle + ANGULAR_SPEED * (delta || 0)) % (Math.PI * 2);
   const sunElevation = 45 * Math.sin(sunAngle);
@@ -275,7 +283,7 @@ export function updateSunPosition(delta) {
   }
 
   sun?.position.copy(sunVector.clone().multiplyScalar(400));
-  sun?.lookAt(sun.target?.position);
+  //sun?.lookAt(sun.target?.position);
 
   const moonVector = sunVector.clone().negate();
   moon?.position.copy(moonVector.clone().multiplyScalar(400));
@@ -285,34 +293,28 @@ export function updateSunPosition(delta) {
   const daylight = THREE.MathUtils.smoothstep(daylightRaw, 0.06, 0.94);
 
   // === Luci ===
+  // Sole più forte di giorno, luna appena accennata di notte
   sun.intensity  = THREE.MathUtils.lerp(0.0, 1.0, daylight);
-  // Luna più bassa per evitare foliage troppo chiaro
-  moon.intensity = THREE.MathUtils.lerp(0.22, 0.04, daylight);
+  moon.intensity = THREE.MathUtils.lerp(0.18, 0.04, daylight);
 
-  // Ambient un filo più basso di notte (ma non nero)
-  ambientLight.intensity = THREE.MathUtils.lerp(0.18, 0.56, daylight);
+  // Ambient basso (contrasto alto)
+  ambientLight.intensity = THREE.MathUtils.lerp(0.14, 0.24, daylight);
 
-  // Hemisphere: molto contenuta di notte
+  // Hemisphere: quasi zero di notte
   if (hemiLight) {
-    hemiLight.intensity = THREE.MathUtils.lerp(0.18, 0.0, daylight);
-    const skyCol    = new THREE.Color().setHSL(0.60, 0.28, THREE.MathUtils.lerp(0.56, 0.85, daylight));
-    const groundCol = new THREE.Color().setHSL(0.58, 0.22, THREE.MathUtils.lerp(0.20, 0.35, daylight));
+    hemiLight.intensity = THREE.MathUtils.lerp(0.06, 0.12, daylight);
+    const skyCol    = new THREE.Color().setHSL(0.60, 0.22, THREE.MathUtils.lerp(0.30, 0.60, daylight));
+    const groundCol = new THREE.Color().setHSL(0.58, 0.18, THREE.MathUtils.lerp(0.18, 0.35, daylight));
     hemiLight.color.copy(skyCol);
     hemiLight.groundColor.copy(groundCol);
   }
 
-  // === Fog/Background più scuri di notte ===
-  const fogL = THREE.MathUtils.lerp(0.14, 0.58, daylight); // luminanza notte più bassa
-  const fogS = THREE.MathUtils.lerp(0.20, 0.58, daylight); // saturazione notte più bassa
-  scene.fog.color.setHSL(0.60, fogS, fogL);
-  scene.background.setHSL(0.60, fogS * 0.9, fogL);
-
-  if (scene.fog) {
-    // Più visibilità di notte ma con tono scuro
-    const nearNight = 110, nearDay = 50;
-    const farNight  = 380, farDay  = 200;
-    scene.fog.near = THREE.MathUtils.lerp(nearNight, nearDay, daylight);
-    scene.fog.far  = THREE.MathUtils.lerp(farNight,  farDay,  daylight);
+  // === Fog esponenziale: densità più alta di notte
+  if (scene.fog && scene.fog.isFogExp2) {
+    // notte più “stretta”
+    const densityNight = 0.012;
+    const densityDay   = 0.006;
+    scene.fog.density = THREE.MathUtils.lerp(densityNight, densityDay, daylight);
   }
 
   // Passa dayFactor agli shader del terreno
@@ -322,8 +324,8 @@ export function updateSunPosition(delta) {
 
   // Acqua più scura di notte
   if (water?.material?.uniforms?.waterColor) {
-    const nightWater = new THREE.Color(0x1b2b3a); // più scuro
-    const dayWater   = new THREE.Color(0x001e0f);
+    const nightWater = new THREE.Color(0x0b141a);
+    const dayWater   = new THREE.Color(0x001a12);
     const mix = new THREE.Color().lerpColors(nightWater, dayWater, daylight);
     water.material.uniforms.waterColor.value = mix;
   }
@@ -332,9 +334,9 @@ export function updateSunPosition(delta) {
     water.material.uniforms.sunDirection.value.copy(dir);
   }
 
-  // Exposure FISSA: così guardare il falò non “schiarisce” tutto
+  // Exposure FISSA (leggermente sotto 1) per evitare scene “bruciate”
   if (_setExposure) {
-    _setExposure(1.25);
+    _setExposure(0.95);
   }
 
   // Luna mesh
