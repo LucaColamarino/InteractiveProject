@@ -1,10 +1,24 @@
-<div class="hud-minimap minimap-viewport" role="img">
-<div class="minimap-grid">
-<div aria-hidden="true" class="minimap-heading"></div>
+<!-- /src/ui/chunks/map.html — Soulslike minimap + heading -->
+<div class="hud-minimap minimap-viewport" role="img" aria-label="Minimappa del mondo">
+  <div class="minimap-ring" aria-hidden="true"></div>
+  <div class="minimap-grid">
+    <div class="minimap-heading" aria-hidden="true"></div>
+  </div>
+
+  <!-- Compass Rose -->
+  <div class="minimap-compass" aria-hidden="true">
+    <span class="c-n">N</span>
+    <span class="c-e">E</span>
+    <span class="c-s">S</span>
+    <span class="c-w">W</span>
+  </div>
+
+  <!-- Player Marker -->
+  <div class="minimap-player" aria-hidden="true"></div>
 </div>
-</div>
-<!-- Pills informative -->
-<div class="minimap-hud">
-<div aria-label="Nemici nelle vicinanze" class="pill" id="mm-enemies">🎯 0</div>
-<div aria-label="Livello del giocatore" class="pill" id="mm-level">🧬 LVL 1</div>
+
+<!-- Pills informative (aggiornate stile) -->
+<div class="minimap-hud" role="status" aria-live="polite">
+  <div class="pill" id="mm-enemies" aria-label="Nemici nelle vicinanze">🎯 0</div>
+  <div class="pill" id="mm-level" aria-label="Livello del giocatore">🧬 LVL 1</div>
 </div>

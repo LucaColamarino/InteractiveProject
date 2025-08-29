@@ -1,0 +1,95 @@
+/* --- Loading overlay centering & fade --- */
+#loading-screen.sm-loading{
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: grid;                 /* più semplice per centrare */
+  place-items: center;           /* centro perfetto */
+  padding: 24px;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(139,69,19,0.15) 0%, transparent 50%),
+    linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 50%, #2a1a10 100%);
+  transition: opacity .4s ease;
+  opacity: 1;
+}
+#loading-screen.hidden{ opacity: 0; pointer-events: none; }
+
+/* --- Card del loader (più ampia, non comprime) --- */
+#loading-screen .sm-loading-card{
+  width: clamp(720px, 48vw, 980px);     /* prima 560 -> troppo piccola */
+  padding: 36px 32px;
+  border: 2px solid #d4af37;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(40,25,15,0.96), rgba(20,20,20,0.97));
+  box-shadow: 0 0 40px rgba(212,175,55,0.18), 0 30px 80px rgba(0,0,0,0.6);
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Titolo fluido */
+#loading-screen .loading-logo{
+  font-family: 'Cinzel Decorative', serif;
+  font-size: clamp(32px, 4vw, 56px);
+  line-height: 1.1;
+  letter-spacing: .06em;
+  margin: 0;
+}
+
+/* --- Barra progresso --- */
+.sm-loader-plate{
+  width: 100%;
+  max-width: 860px;
+  padding-inline: 16px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.sm-loader-groove{
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);          /* centrata geometricamente */
+  width: clamp(420px, 72%, 760px);       /* più larga, ma clamp in card */
+  height: 12px;
+  border-radius: 8px;
+  margin: 8px 0 4px;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid rgba(212,175,55,0.35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  background: linear-gradient(135deg, rgba(40,25,15,0.5), rgba(20,20,20,0.45));
+}
+
+#loading-progress{
+  position: relative;
+  inset: 0 auto 0 0;
+  height: 100%;
+  width: 0%;
+  transform: none;                      /* niente translate, solo width */
+  transition: width .25s ease;
+  background: linear-gradient(90deg, rgba(212,175,55,0.35), rgba(212,175,55,0.65));
+  box-shadow: inset 0 0 8px rgba(212,175,55,0.35);
+}
+
+/* Testi messaggio/percentuale */
+.loading-message,
+.loading-percent{
+  color: #f0e6c0;
+  margin: 6px 0 0;
+  font-size: clamp(12px, 1.2vw, 14px);
+}
+
+/* --- Responsive: su schermi piccoli torna compatto --- */
+@media (max-width: 720px){
+  #loading-screen .sm-loading-card{
+    width: min(92vw, 560px);
+    padding: 26px 20px;
+  }
+  .sm-loader-plate{ max-width: 100%; padding-inline: 12px; }
+  .sm-loader-groove{ width: 100%; left: 0; transform: none; }
+  #loading-screen .loading-logo{ font-size: clamp(22px, 6vw, 34px); }
+}

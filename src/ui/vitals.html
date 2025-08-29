@@ -1,45 +1,45 @@
+<!-- /src/ui/chunks/vitals.html — Soulslike vitals bars -->
 
-  <!-- Health -->
-  <div>
-    <div class="hud-label">❤️ Health</div>
-    <div aria-label="Salute" aria-valuemax="100" aria-valuemin="0" aria-valuenow="85" 
-         class="progress-container" role="progressbar">
-      <div class="progress-bar health-bar" id="health-bar" style="width: 85%;">
-        <div class="progress-text" id="health-text">850 / 1000</div>
-      </div>
+<!-- Health -->
+<div class="vital-block">
+  <div class="hud-label">❤️ Health</div>
+  <div class="progress-container" role="progressbar"
+       aria-label="Salute" aria-valuemin="0" aria-valuemax="1000" aria-valuenow="850">
+    <div class="progress-bar health-bar" id="health-bar" style="width: 85%;">
+      <div class="progress-text" id="health-text">850 / 1000</div>
     </div>
   </div>
+</div>
 
-  <!-- Mana -->
-  <div>
-    <div class="hud-label">💙 Mana</div>
-    <div aria-label="Mana" aria-valuemax="100" aria-valuemin="0" aria-valuenow="60" 
-         class="progress-container" role="progressbar">
-      <div class="progress-bar mana-bar" id="mana-bar" style="width: 60%;">
-        <div class="progress-text" id="mana-text">300 / 500</div>
-      </div>
+<!-- Mana -->
+<div class="vital-block">
+  <div class="hud-label">💙 Mana</div>
+  <div class="progress-container" role="progressbar"
+       aria-label="Mana" aria-valuemin="0" aria-valuemax="500" aria-valuenow="300">
+    <div class="progress-bar mana-bar" id="mana-bar" style="width: 60%;">
+      <div class="progress-text" id="mana-text">300 / 500</div>
     </div>
   </div>
+</div>
 
-  <!-- Stamina -->
-  <div>
-    <div class="hud-label">⚡ Stamina</div>
-    <div aria-label="Stamina" aria-valuemax="100" aria-valuemin="0" aria-valuenow="40" 
-         class="progress-container" role="progressbar">
-      <div class="progress-bar stamina-bar" id="stamina-bar" style="width: 40%;">
-        <div class="progress-text" id="stamina-text">40 / 100</div>
-      </div>
+<!-- Stamina -->
+<div class="vital-block">
+  <div class="hud-label">⚡ Stamina</div>
+  <div class="progress-container" role="progressbar"
+       aria-label="Stamina" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40">
+    <div class="progress-bar stamina-bar" id="stamina-bar" style="width: 40%;">
+      <div class="progress-text" id="stamina-text">40 / 100</div>
     </div>
   </div>
+</div>
 
-  <!-- Experience -->
-  <div>
-    <div class="hud-label">🧬 Experience</div>
-    <div aria-label="Esperienza" aria-valuemax="100" aria-valuemin="0" aria-valuenow="0" 
-         class="progress-container" role="progressbar">
-      <div class="progress-bar xp-bar" id="xp-bar" style="width: 0%;">
-        <div class="progress-text" id="xp-text">0 / 100</div>
-      </div>
+<!-- Experience -->
+<div class="vital-block">
+  <div class="hud-label">🧬 Experience</div>
+  <div class="progress-container" role="progressbar"
+       aria-label="Esperienza" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="progress-bar xp-bar" id="xp-bar" style="width: 0%;">
+      <div class="progress-text" id="xp-text">0 / 100</div>
     </div>
   </div>
-
+</div>
