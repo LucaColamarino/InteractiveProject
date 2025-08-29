@@ -4,12 +4,85 @@ import { scene } from '../scene.js';
 export let sun;
 export let moon;
 
+/**
+ * SHADOW SETTINGS (puoi ritoccarli)
+ * - SHADOW_BOX_HALF: metà lato dell'ortho-box; più piccolo = più qualità, ma rischi di tagliare oggetti.
+ * - SHADOW_DIST: quanto è lontano il sole dal centro del box (lungo -lightDirTowardScene).
+ */
+const SHADOW_MAP_SIZE = 4096;
+const SHADOW_BOX_HALF_DEFAULT = 120;
+const SHADOW_DIST_DEFAULT = 280;
+const SHADOW_NEAR = 1;
+const SHADOW_FAR  = 700;
+
+/** Stabilizza la luce allineando pos/target ai texel della shadow map: riduce "shimmering". */
+function stabilizeDirectionalLight(light) {
+  const cam = light.shadow.camera;
+  const mapW = Math.max(1, light.shadow.mapSize.x);
+  const width = (cam.right - cam.left);
+  const worldUnitsPerTexel = Math.max(1e-5, width / mapW);
+
+  // Base ortonormale della camera d'ombra
+  const rot = new THREE.Matrix4().extractRotation(cam.matrixWorld);
+  const right = new THREE.Vector3(1,0,0).applyMatrix4(rot);
+  const up    = new THREE.Vector3(0,1,0).applyMatrix4(rot);
+  const fwd   = new THREE.Vector3(0,0,1).applyMatrix4(rot);
+
+  function snapVec(v) {
+    const vx = right.dot(v), vy = up.dot(v), vz = fwd.dot(v);
+    const sx = Math.round(vx / worldUnitsPerTexel) * worldUnitsPerTexel;
+    const sy = Math.round(vy / worldUnitsPerTexel) * worldUnitsPerTexel;
+    const sz = Math.round(vz / worldUnitsPerTexel) * worldUnitsPerTexel;
+    return right.clone().multiplyScalar(sx)
+      .add(up.clone().multiplyScalar(sy))
+      .add(fwd.clone().multiplyScalar(sz));
+  }
+
+  const center = light.target.position.clone();
+  const pos    = light.position.clone();
+  const snappedCenter = snapVec(center);
+  const dir = pos.clone().sub(center).normalize();
+  const snappedPos = snappedCenter.clone().add(dir.multiplyScalar(pos.distanceTo(center)));
+
+  light.target.position.copy(snappedCenter);
+  light.position.copy(snappedPos);
+  light.target.updateMatrixWorld();
+}
+
+/**
+ * Fitta il frustum d’ombra attorno a "center".
+ * @param {THREE.Vector3} center - punto centrale della zona d'interesse
+ * @param {THREE.Vector3} lightDirTowardScene - direzione **da cui arriva** la luce (dal sole verso la scena)
+ * @param {number} boxHalf - metà lato ortho-box
+ * @param {number} dist - distanza della luce dal center (lungo -lightDirTowardScene)
+ */
+export function fitSunShadowToCenter(center, lightDirTowardScene, boxHalf = SHADOW_BOX_HALF_DEFAULT, dist = SHADOW_DIST_DEFAULT) {
+  if (!sun) return;
+
+  const L = lightDirTowardScene.clone().normalize();
+  // Il sole sta "dietro" rispetto al center, quindi sposto nella direzione opposta alla luce in arrivo
+  const pos = center.clone().sub(L.multiplyScalar(dist));
+  sun.position.copy(pos);
+  sun.target.position.copy(center);
+  sun.target.updateMatrixWorld();
+
+  const cam = sun.shadow.camera;
+  cam.left   = -boxHalf;
+  cam.right  =  boxHalf;
+  cam.top    =  boxHalf;
+  cam.bottom = -boxHalf;
+  cam.near   = SHADOW_NEAR;
+  cam.far    = SHADOW_FAR;
+  cam.updateProjectionMatrix();
+
+  stabilizeDirectionalLight(sun);
+  sun.shadow.needsUpdate = true;
+}
+
 export function createMoonLight() {
-  // Luna fredda e appena percettibile
-  moon = new THREE.DirectionalLight(0x8899cc, 0.15);
+  moon = new THREE.DirectionalLight(0x8899cc, 0.12);
   moon.castShadow = false;
 
-  // Parametri ombra (anche se disattivata, teniamo set coerenti)
   moon.shadow.mapSize.set(1024, 1024);
   moon.shadow.bias = -0.00005;
   moon.shadow.normalBias = 0.01;
@@ -31,26 +104,28 @@ export function createMoonLight() {
 }
 
 export function createSunLight() {
-  // Sole caldo/arancio (stile Souls), più intenso ma non bruciante
-  sun = new THREE.DirectionalLight(0xffe6cc, 0.95);
+  // Sole caldo in stile Souls
+  sun = new THREE.DirectionalLight(0xffe6cc, 1.0);
   sun.castShadow = true;
 
-  // Ombre più dettagliate e stabili
-  sun.shadow.mapSize.set(4096, 4096);
-  sun.shadow.radius = 1;         // transizione molto netta
-  sun.shadow.bias = -0.0003;     // meno acne
-  sun.shadow.normalBias = 0.015; // meno peter-panning
+  // Shadow map HQ
+  sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+  sun.shadow.radius = 1;
 
-  const box = 140;
-  sun.shadow.camera.top = box;
+  // Bias bilanciati (PCF). Se passi a VSM, imposta entrambi a 0.
+  sun.shadow.bias = -0.00025;
+  sun.shadow.normalBias = 0.012;
+
+  // Ortho-box iniziale (verrà sovrascritto dal fit)
+  const box = SHADOW_BOX_HALF_DEFAULT;
+  sun.shadow.camera.left   = -box;
+  sun.shadow.camera.right  =  box;
+  sun.shadow.camera.top    =  box;
   sun.shadow.camera.bottom = -box;
-  sun.shadow.camera.left = -box;
-  sun.shadow.camera.right = box;
-  sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 600;
+  sun.shadow.camera.near   = SHADOW_NEAR;
+  sun.shadow.camera.far    = SHADOW_FAR;
   sun.shadow.camera.updateProjectionMatrix();
 
-  sun.position.set(100, 200, -100);
   scene.add(sun);
 
   const target = new THREE.Object3D();
