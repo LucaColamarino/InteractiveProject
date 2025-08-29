@@ -1,66 +1,235 @@
+/* /src/ui/inventory.css — Soulslike Inventory UI */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&display=swap');
+
 :root {
-  /* palette ember, gold, amber */
-  --inv-ember-gold:#d4af37; --inv-amber:#ffb14a;
-  --inv-bg: rgba(18,14,10,.82);
-  --inv-panel: rgba(28,20,14,.94);
-  --inv-accent: #ffb14a;
-  --inv-line: rgba(212,175,55,.22);
-  --inv-text: #f3ead8; --inv-muted: #c9b79a;
-  --inv-danger:#ff7676;
-  --inv-shadow:0 16px 50px rgba(0,0,0,.55),0 0 40px rgba(212,175,55,.10);
-  --inv-radius:16px;
+  --inv-gold: #d4af37;
+  --inv-gold-soft: rgba(212,175,55,0.35);
+  --inv-amber: #ff6b35;
+  --inv-bg-1: #0a0a0a;
+  --inv-bg-2: #1a1a1a;
+  --inv-bg-3: #2a1a10;
+  --inv-text: #f0e6c0;
+  --inv-muted: #bda269;
 }
 
-/* overlay */
-.inv-overlay{ position:fixed; inset:0; z-index:9998; display:none;
-  background: radial-gradient(60% 60% at 50% 50%, rgba(0,0,0,0.25), rgba(0,0,0,0.70));
-  backdrop-filter: blur(3px);}
-.inv-overlay.is-open{ display:block; }
+.inv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(139,69,19,0.15) 0%, transparent 50%),
+    linear-gradient(180deg, var(--inv-bg-1) 0%, var(--inv-bg-2) 50%, var(--inv-bg-3) 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+  backdrop-filter: blur(1px);
+}
+.inv-overlay.is-open { opacity: .9; pointer-events: auto; }
 
-/* wrap/panel */
-.inv-wrap{ position:fixed; inset:0; z-index:9999; pointer-events:none; display:grid; place-items:center;}
-.inv-panel{ pointer-events:all; width:min(1120px,92vw); max-height:min(86vh,900px);
-  display:grid; grid-template-columns:360px 1fr; gap:16px; background:
-  radial-gradient(120% 140% at 50% 0%, rgba(255,177,74,.08), transparent 60%),
-  linear-gradient(135deg, rgba(38,24,14,.94), rgba(25,16,10,.94));
-  border:1px solid var(--inv-line); border-radius:var(--inv-radius); box-shadow:var(--inv-shadow); padding:18px;}
+.inv-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 20010;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
 
-/* header */
-.inv-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.inv-title{ font-family:'Cinzel',serif; font-weight:800; font-size:14px; text-transform:uppercase;
-  background: linear-gradient(135deg,var(--inv-ember-gold),#fff,var(--inv-amber));
-  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
-  text-shadow:0 0 22px rgba(212,175,55,.18);}
-.inv-gold{ color:var(--inv-amber); font-weight:700; font-family:ui-monospace,monospace;
-  padding:.2rem .5rem; border:1px solid var(--inv-line); border-radius:8px; background:rgba(30,20,12,.7);}
-.inv-close{ margin-left:auto; border:1px solid var(--inv-line); background:linear-gradient(135deg,rgba(40,25,15,.85),rgba(60,35,20,.65));
-  color:var(--inv-text); padding:8px 12px; border-radius:10px; cursor:pointer; transition:.18s ease; font-weight:700;}
-.inv-close:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(0,0,0,.45),0 0 22px rgba(212,175,55,.22);}
+.inv-panel {
+  width: min(1100px, 94vw);
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 18px;
+  padding: 28px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(40,25,15,0.95), rgba(20,20,20,0.96));
+  border: 2px solid var(--inv-gold);
+  box-shadow: 0 0 40px rgba(212,175,55,0.15), 0 30px 80px rgba(0,0,0,0.6);
+  transform: translateY(10px) scale(0.985);
+  opacity: 0;
+  transition: transform .25s ease, opacity .25s ease;
+  font-family: 'Cinzel', serif;
+  color: var(--inv-text);
+}
+.inv-panel.show {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
 
-/* equip */
-.equip-grid{display:grid; grid-template-areas:
-  "head head" "weapon shield" "chest chest" "legs boots" "acc acc";
-  grid-template-columns:1fr 1fr; gap:10px;}
-.equip-slot{ display:flex;align-items:center;gap:12px; min-height:60px;
-  background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.10));
-  border:1px dashed rgba(212,175,55,.30); border-radius:12px; padding:12px; position:relative;}
-.equip-ico{ width:44px;height:44px; border-radius:10px; flex:none; display:grid;place-items:center;
-  background:rgba(0,0,0,.28); border:1px solid rgba(212,175,55,.28); color:#e7c88c;}
-.equip-name{ color:var(--inv-text); font-weight:700; font-size:13px;}
-.equip-type{ color:var(--inv-muted); font-size:11px;}
+.inv-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
 
-/* inventory grid */
-.inv-grid{ display:grid; grid-template-columns:repeat(8, minmax(56px,1fr)); grid-auto-rows:56px;
-  gap:8px; padding:8px; background:rgba(255,255,255,.02); border:1px solid var(--inv-line);
-  border-radius:12px; overflow:auto; max-height:76vh;}
-.inv-slot{ background:linear-gradient(180deg,rgba(0,0,0,.30),rgba(0,0,0,.15));
-  border:1px solid var(--inv-line); border-radius:12px; display:grid; place-items:center;}
-.inv-slot.is-hover{ outline:2px solid var(--inv-amber);}
-.inv-item{ width:44px;height:44px;border-radius:10px; display:grid; place-items:center; border:1px solid rgba(212,175,55,.28);
-  background:linear-gradient(180deg,rgba(255,200,120,.08),rgba(0,0,0,.22)); color:var(--inv-text);}
-.inv-qty{ position:absolute; right:6px; bottom:4px; font-size:11px; font-weight:800; color:#ffe3b0;}
+.inv-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px 6px 4px;
+  border-bottom: 1px solid var(--inv-gold-soft);
+}
+.inv-header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-/* hint */
-.inv-hints{ margin-top:10px; color:var(--inv-muted); font-size:12px; display:flex; gap:14px;}
-.kbd{ display:inline-grid; place-items:center; min-width:24px; height:24px; border:1px solid var(--inv-line);
-  border-radius:8px; background:rgba(40,25,15,.85); color:var(--inv-text);}
+.inv-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.25rem;
+  letter-spacing: 1.5px;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(212,175,55,0.25);
+}
+
+.inv-close {
+  cursor: pointer;
+  border: 1px solid var(--inv-gold-soft);
+  background: #2a1a10;
+  color: var(--inv-text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: 'Cinzel', serif;
+  transition: transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.inv-close:hover {
+  transform: translateY(-1px);
+  border-color: var(--inv-gold);
+  box-shadow: 0 0 14px rgba(212,175,55,0.25);
+}
+
+/* Equipment */
+.equip-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--inv-gold-soft);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));
+}
+.equip-slot {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(212,175,55,0.22);
+  background: linear-gradient(135deg, rgba(40,25,15,0.6), rgba(20,20,20,0.6));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.equip-slot.has-item {
+  border-color: var(--inv-gold);
+  box-shadow: 0 0 14px rgba(212,175,55,0.15), inset 0 1px 0 rgba(255,255,255,0.07);
+}
+.equip-ico {
+  width: 52px; height: 52px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(212,175,55,0.28);
+  background: radial-gradient(circle at 40% 35%, rgba(212,175,55,0.18), transparent 60%);
+  font-size: 22px;
+  color: var(--inv-gold);
+  text-shadow: 0 0 10px rgba(212,175,55,0.2);
+}
+.equip-meta { min-width: 0; }
+.equip-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.equip-type {
+  font-size: 0.8rem;
+  color: var(--inv-muted);
+}
+
+/* Inventory Grid */
+.inv-grid {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--inv-gold-soft);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));
+  user-select: none;
+}
+.inv-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  border: 1px solid rgba(212,175,55,0.18);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(212,175,55,0.08), transparent 60%),
+    linear-gradient(135deg, rgba(40,25,15,0.5), rgba(20,20,20,0.45));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: transform .08s ease, border-color .15s ease, box-shadow .15s ease, outline-color .15s ease;
+  outline: 0 solid transparent;
+}
+.inv-slot:hover {
+  border-color: rgba(212,175,55,0.45);
+  box-shadow: 0 0 10px rgba(212,175,55,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
+  transform: translateY(-1px);
+}
+.inv-slot:focus-visible {
+  outline: 2px solid rgba(212,175,55,0.65);
+}
+.inv-slot.has-item {
+  border-color: var(--inv-gold);
+}
+
+.inv-item {
+  width: 72%;
+  height: 72%;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(212,175,55,0.18), rgba(255,255,255,0.05));
+  color: var(--inv-gold);
+  font-size: 1.15rem;
+  text-shadow: 0 0 10px rgba(212,175,55,0.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.inv-qty {
+  position: absolute;
+  right: 6px; bottom: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #1a1107;
+  background: var(--inv-gold);
+  box-shadow: 0 0 10px rgba(212,175,55,0.25);
+}
+
+/* Hints */
+.inv-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 6px 2px 2px;
+  color: var(--inv-muted);
+  font-size: 0.85rem;
+}
+.inv-hint .kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-left: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--inv-gold-soft);
+  background: #2a1a10;
+  color: var(--inv-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .inv-panel { grid-template-columns: 1fr; gap: 16px; }
+}
+@media (max-width: 560px) {
+  .inv-panel { padding: 20px; }
+  .equip-slot { grid-template-columns: 44px 1fr; }
+  .equip-ico { width: 44px; height: 44px; }
+}
