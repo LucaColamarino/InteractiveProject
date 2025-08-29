@@ -55,8 +55,8 @@ export class SpecialItem extends GameItem {
     super({ id, name, type: 'special', modelPath, meshPrefix, meta });
     
   }
-  specialPickup(){
+  async specialPickup(){
     console.log("TRANSFORMING");
-    gameManager.controller.transform();
+    gameManager.controller = await gameManager.controller.transform('wyvern');
   };
 }

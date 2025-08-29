@@ -32,7 +32,7 @@ export class Player {
   }
 }
 
-function createAbilities(formName, overrides = {}) {
+export function createAbilities(formName, overrides = {}) {
   const config = ENTITY_CONFIG[formName];
   return {
     modelPath: config.modelPath,
