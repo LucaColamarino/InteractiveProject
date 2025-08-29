@@ -121,7 +121,7 @@ export class PickableManager {
           enableRing,
           onPicked: (payload, gameItem) => {
             // invio a inventario + callback utente
-            try { this.inventory?.addItem && this.inventory.addItem(payload); } catch {}
+            try { this.inventory?.addItem && this.inventory.addItem(payload);gameItem.specialPickup?.(); } catch {}
             try { typeof this.onPickup === 'function' && this.onPickup(payload, gameItem); } catch {}
             hudManager.showNotification?.(`+ ${gameItem?.label ?? gameItem?.id ?? 'Item'}`);
           }

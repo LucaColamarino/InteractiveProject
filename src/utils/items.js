@@ -1,4 +1,4 @@
-import {WeaponItem, HelmetItem, ShieldItem} from './gameItem.js';
+import {WeaponItem, HelmetItem, ShieldItem, SpecialItem} from './gameItem.js';
 export const ironSword = new WeaponItem({
   id: 'sword_iron_01',
   name: 'Iron Sword',
@@ -36,7 +36,7 @@ export const ironShield = new ShieldItem({
   meta: { armor: 5 }
 });
 
-export const dragonheart = new ShieldItem({
+export const dragonheart = new SpecialItem({
   id: 'dragon_heart_01',
   name: 'Dragon Heart',
   modelPath: '/models/pickups/heart.fbx',

@@ -1,3 +1,5 @@
+import { gameManager } from "../managers/gameManager";
+
 // GameItem.js
 export class GameItem {
   /**
@@ -28,12 +30,6 @@ export class GameItem {
       meta: this.meta,
     };
   }
-
-  /** Default: aggiungi all'inventario */
-  applyToInventory(inventory) {
-    if (!inventory) return;
-    inventory.addItem(this.getPickupPayload());
-  }
 }
 
 export class WeaponItem extends GameItem {
@@ -52,4 +48,15 @@ export class ShieldItem extends GameItem {
   constructor({ id, name, modelPath, meshPrefix = null, meta = {} }) {
     super({ id, name, type: 'shield', modelPath, meshPrefix, meta });
   }
+}
+
+export class SpecialItem extends GameItem {
+  constructor({ id, name, modelPath, meshPrefix = null, meta = {} }) {
+    super({ id, name, type: 'special', modelPath, meshPrefix, meta });
+    
+  }
+  specialPickup(){
+    console.log("TRANSFORMING");
+    gameManager.controller.transform();
+  };
 }

@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { scene } from '../scene.js';
 import { gameManager } from '../managers/gameManager.js';
+import { dragonheart } from '../utils/items.js';
+import { getTerrainHeightAt } from '../map/map.js';
 
 const _enemies = [];
 const MAX_UPDATE_DISTANCE = 250;     // culling logico
@@ -100,11 +102,19 @@ export function updateEnemies(delta) {
 
 export function killEnemy(enemyInstance) {
   if (!enemyInstance || !enemyInstance.alive) return;
-  console.log("KILLED A ",enemyInstance.type);
+  console.log("KILLED A ",enemyInstance);
   if(enemyInstance.type=="werewolf")
     gameManager.wolvesKilled+=1;
   else if(enemyInstance.type=="archer")
     gameManager.archersKilled+=1;
+  else if (enemyInstance.type=="wyvern"){
+    let pos = enemyInstance.model.position;
+    pos.y = getTerrainHeightAt(pos.x,pos.z);
+    gameManager.pickableManager.spawnItem(
+      dragonheart,
+      pos,
+      { autoPickup: false, pickupRadius: 1.5, enableRing: false, spawnImpulse: { up: 1.0 } }
+    );}
 
   // ferma subito motion/AI
   enemyInstance.navAgent && (enemyInstance.navAgent.isStopped = true);

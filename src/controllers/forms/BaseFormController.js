@@ -289,4 +289,8 @@ export class BaseFormController {
       this.isOnGround = false;
     }
   }
+  transform()
+  {
+    console.log("TRANSFORMED");
+  }
 }
