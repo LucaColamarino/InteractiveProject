@@ -1,8 +1,12 @@
 // src/projectiles/ArrowProjectile.js
 import * as THREE from 'three';
 import { scene } from '../../scene.js';
-
+import { gameManager } from '../../managers/gameManager.js';
 const GRAVITY = new THREE.Vector3(0, -9.81, 0);
+
+// Parametri collider
+const ARROW_RADIUS  = 0.05;  // raggio "hit" della freccia (piccolo)
+const PLAYER_RADIUS = 0.8;   // raggio hitbox del player (tweak se diverso)
 
 export class ArrowProjectile {
   /**
@@ -36,6 +40,9 @@ export class ArrowProjectile {
     this.life = lifeSec;
     this._age = 0;
 
+    // Per swept test (tunneling-safe)
+    this._prevPos = pos0.clone();
+
     scene.add(this.obj);
   }
 
@@ -60,12 +67,92 @@ export class ArrowProjectile {
     return ang; // roll attorno a fw
   }
 
+  /**
+   * Ritorna centro e raggio della hitbox del player (fallback robusto).
+   */
+  _getPlayerHitSphere() {
+    // Prova a ottenere il centro dal gameManager se disponibile
+    const pObj = gameManager?.controller?.player.model;
+
+    const center = new THREE.Vector3();
+    if (pObj && pObj.isObject3D) {
+      pObj.getWorldPosition(center);
+    } else {
+      // fallback totale: niente player -> nessuna collisione
+      return null;
+    }
+
+    // Se esiste una proprietà di raggio specifica, usala; altrimenti default
+    const r =
+      gameManager?.player?.hitRadius ??
+      gameManager?.player?.colliderRadius ??
+      PLAYER_RADIUS;
+
+    return { center, radius: r };
+  }
+
+  /**
+   * Test continuo segmento-sfera per evitare tunneling.
+   * Ritorna true se il segmento [p0,p1] interseca la sfera (c,r).
+   */
+  static _segmentSphereHit(p0, p1, c, r) {
+    const seg = new THREE.Vector3().subVectors(p1, p0);
+    const segLenSq = seg.lengthSq();
+    if (segLenSq < 1e-12) {
+      // Trattalo come punto
+      return c.distanceToSquared(p0) <= r * r;
+    }
+    // Param t del punto sul segmento più vicino al centro sfera
+    const t = THREE.MathUtils.clamp(
+      new THREE.Vector3().subVectors(c, p0).dot(seg) / segLenSq,
+      0, 1
+    );
+    const closest = new THREE.Vector3().copy(p0).addScaledVector(seg, t);
+    return c.distanceToSquared(closest) <= r * r;
+  }
+
+  _checkHitPlayer(nextPos) {
+    const sph = this._getPlayerHitSphere();
+    if (!sph) return false;
+
+    const { center, radius } = sph;
+    const effectiveR = radius + ARROW_RADIUS;
+
+    // Swept test tra posizione precedente e nuova
+    const hit = ArrowProjectile._segmentSphereHit(this._prevPos, nextPos, center, effectiveR);
+    if (hit) {
+      // Applica danno richiesto
+      try {
+        if (gameManager?.controller?.stats?.damage) {
+          gameManager.controller.stats.damage(10);
+        }
+      } catch (e) {
+        // evita crash se qualcosa non è definito
+        // console.warn('[ArrowProjectile] damage call failed:', e);
+      }
+      return true;
+    }
+    return false;
+  }
+
   update(dt) {
     if (!this.alive) return;
 
-    // fisica base
+    // --- integrazione fisica ---
     this.vel.addScaledVector(GRAVITY, dt);
-    this.obj.position.addScaledVector(this.vel, dt);
+
+    // Calcola la nuova posizione candidata (per swept test)
+    const nextPos = new THREE.Vector3().copy(this.obj.position).addScaledVector(this.vel, dt);
+
+    // --- collisione col player (tunneling-safe) ---
+    if (this._checkHitPlayer(nextPos)) {
+      this.dispose();
+      return;
+    }
+
+    // Nessun impatto: aggiorna posizione
+    this._prevPos.copy(this.obj.position);
+    this.obj.position.copy(nextPos);
 
     // orienta la freccia: forward locale → direzione di volo, mantenendo il roll iniziale
     const v = this.vel.clone();

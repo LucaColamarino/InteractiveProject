@@ -35,6 +35,11 @@ export class SwordMeleeStrategy extends AttackStrategy {
 
   // --- Attacco speciale: SHOCKWAVE (overlay) ---
   specialAttack(controller, clipName = 'shockwave') {
+    if (controller.stats.useMana(15)) {  
+    } else {
+      console.log("Not enough mana!");
+      return;
+    }
     if (controller.isAttacking || this._shockCd > 0) return false;
 
     const animator = controller.player.animator;

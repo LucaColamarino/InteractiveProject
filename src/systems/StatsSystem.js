@@ -1,21 +1,25 @@
 // systems/StatsSystem.js
 export class StatsSystem {
-  constructor(maxHP = 100, maxStamina = 100, maxMana = 50) {
+  constructor(maxHP = 100, maxStamina = 100, maxMana = 50,armor = 0) {
     this.maxHP = maxHP;   this.hp = maxHP;
     this.maxStamina = maxStamina; this.stamina = maxStamina;
     this.maxMana = maxMana; this.mana = maxMana;
-
+    this.armor = armor;
+    this.levelPoints = 3; // punti iniziali disponibili per upgrade
     this._listeners = [];
-    // --- cooldown rigenerazione stamina dopo uso intenso ---
-    this._staminaCd = 0;             // secondi rimanenti
-    this._staminaCdDefault = 0.6;    // tweakabile
+    this._staminaCd = 0;
+    this._staminaCdDefault = 0.6;
   }
 
   onChange(cb){ this._listeners.push(cb); }
   _notify(){ this._listeners.forEach(cb => cb(this)); }
 
   // ========== HP ==========
-  damage(n){ this.hp = Math.max(0, this.hp - n); this._notify(); }
+  damage(n){
+     console.log("OUCH");
+     const damage = n*(1-this.armor/100);
+     this.hp = Math.max(0, this.hp - damage);
+      this._notify(); }
   heal(n){ this.hp = Math.min(this.maxHP, this.hp + n); this._notify(); }
 
   // ========== STAMINA ==========
@@ -67,4 +71,25 @@ export class StatsSystem {
     this.mana = Math.min(this.maxMana, this.mana + rate * dt);
     if (this.mana !== before) this._notify();
   }
+  upgrade(stat) {
+  if (this.levelPoints <= 0) return false;
+  switch(stat){
+    case 'hp':
+      this.maxHP += 10;
+      this.hp = this.maxHP;
+      break;
+    case 'stamina':
+      this.maxStamina += 5;
+      this.stamina = this.maxStamina;
+      break;
+    case 'mana':
+      this.maxMana += 5;
+      this.mana = this.maxMana;
+      break;
+    default: return false;
+  }
+  this.levelPoints--;
+  this._notify();
+  return true;
+}
 }

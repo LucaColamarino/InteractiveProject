@@ -140,7 +140,7 @@ function _onPointerLockChange() {
     if (c) c.style.cursor = 'crosshair';
 
     // apri il menu solo se non già in pausa e inventario chiuso
-    if (wasLocked && !gameManager.paused && !isInventoryOpen?.()) {
+    if (wasLocked && !gameManager.campfiremenu &&!gameManager.paused && !isInventoryOpen?.()) {
       gameManager.menu.toggleMenu();
     }
 

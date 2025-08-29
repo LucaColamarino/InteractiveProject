@@ -21,6 +21,7 @@ export const wolfObjective=0;
    wolvesKilled = 0;
    archersKilled =0;
    activatedStones=0;
+   campfiremenu=false;
   }
 export function createGameManager() {
   

@@ -24,7 +24,8 @@ export class HandMeleeStrategy extends AttackStrategy {
 
 
   // Nessun speciale di default (si può aggiungere)
-  specialAttack(_controller) { return false; }
+  specialAttack(_controller) {
+     console.log("NO SPECIAL ATTACK");return false; }
 
   // Override: danno dello slash base
   _applyHits(controller) {

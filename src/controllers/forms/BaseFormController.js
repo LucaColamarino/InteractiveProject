@@ -14,6 +14,7 @@ import { Animator } from '../../components/Animator.js';
 
 // Camera (se il path non combacia, aggiorna)
 import { offset as camOffset } from '../../player/cameraFollow.js';
+import { gameManager } from '../../managers/gameManager.js';
 
 const PLAYER_RADIUS = 0.4;
 const TREE_RADIUS   = 0.6;
@@ -66,6 +67,7 @@ export class BaseFormController {
     this._isBurning = false;
     this._burningLeft = 0;
     this._burnFx = null;
+    this.isBlocking=false;
   }
 
   // --- Burning / HUD ---
@@ -98,6 +100,11 @@ export class BaseFormController {
   }
 
   update(dt) {
+    console.log("STO BLOCCANDO?",this.isBlocking);
+    if(this.isBlocking)
+      {
+        gameManager.controller.stats.useStamina(10*dt);
+      }
     // FX burning
     if (this._burnFx) this._burnFx.update(dt);
     if (this._isBurning) {

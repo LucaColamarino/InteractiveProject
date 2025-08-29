@@ -191,11 +191,8 @@ export class HumanFormController extends BaseFormController {
   }
   specialAttack() {
     if (!this._attackStrategy) return;
-    if (this.stats.useMana(15)) {
-      this._attackStrategy.specialAttack?.(this);
-    } else {
-      console.log("Not enough mana!");
-    }
+    this._attackStrategy.specialAttack?.(this);
+
   }
 
   update(dt) {

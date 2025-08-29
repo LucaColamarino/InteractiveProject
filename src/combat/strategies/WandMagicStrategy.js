@@ -61,6 +61,11 @@ export class WandMagicStrategy extends AttackStrategy {
 
   // Cast (proiettili) → tasto speciale (overlay)
   specialAttack(controller, clipName = 'wandCast') {
+    if (controller.stats.useMana(15)) {  
+    } else {
+      console.log("Not enough mana!");
+      return;
+    }
     if (controller.isAttacking || this._cd > 0) return false;
     if (!this._pool.length) this._ensurePool();
 

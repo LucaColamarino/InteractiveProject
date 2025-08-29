@@ -41,7 +41,7 @@ export const dragonheart = new SpecialItem({
   name: 'Dragon Heart',
   modelPath: '/models/pickups/heart.fbx',
   meshPrefix: 'shield',
-  meta: { armor: 5 }
+  meta: { armor: 10 }
 });
 
 export const allItems = [ironSword, magicWand, ironHelmet,ironShield];

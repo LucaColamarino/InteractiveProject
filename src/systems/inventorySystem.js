@@ -23,12 +23,25 @@ export class InventorySystem {
   equip(itemId, slot = "weapon") {
     const item = this.items.find(i => i.id === itemId);
     if (!item) { console.warn(`Item ${itemId} non trovato`); return; }
+    if(this.equipment[slot]) this.unequip(slot);
     this.equipment[slot] = item;
+    this.updateStats(item);
     this.updateEquipmentVisibility(gameManager.player?.model);
     this._emit();
   }
+  updateStats(item,remove=false)
+  {
+    const armor = item.meta.armor;
+    const stats=gameManager.controller.stats;
+    if(remove) stats.armor-=armor;
+    else stats.armor+=armor;
+    console.log("NEW ARMOR STAT",stats.armor);
+  }
   unequip(slot = "weapon") {
+    const item = this.equipment[slot];
+    console.log("UNEQUIP"+slot+" "+item);
     this.equipment[slot] = null;
+    this.updateStats(item,true);
     this.updateEquipmentVisibility(gameManager.player?.model);
     this._emit();
   }

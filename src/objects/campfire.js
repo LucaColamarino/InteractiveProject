@@ -7,7 +7,8 @@ import { spawnFire } from '../particles/FireParticleSystem.js';
 import { interactionManager } from '../systems/interactionManager.js';
 import { hudManager } from '../ui/hudManager.js';
 import { gameManager } from '../managers/gameManager.js';
-import { setCameraFocus, clearCameraFocus} from '../player/cameraFollow.js';
+import { setCameraFocus, clearCameraFocus } from '../player/cameraFollow.js';
+import { showCampfireMenu, hideCampfireMenu } from '../ui/hudCampfireMenu.js';
 
 const loader = new FBXLoader();
 const texLoader = new THREE.TextureLoader();
@@ -44,6 +45,7 @@ function makePBR({
   if (mat.normalMap) mat.normalMapType = THREE.TangentSpaceNormalMap;
   return mat;
 }
+
 function makeRunestoneMaterial() {
   const base = texLoader.load('/textures/runestone/runestone_basecolor.jpg');
   base.colorSpace = THREE.SRGBColorSpace;
@@ -65,6 +67,7 @@ function makeRunestoneMaterial() {
   });
   return mat;
 }
+
 // ---------------
 // Campfire class
 // ---------------
@@ -75,18 +78,15 @@ export class Campfire {
    */
   constructor(position = new THREE.Vector3(), opts = {}) {
     this.yoffset = opts.yOffset ?? 0.05;
-    this.position = position.clone().add(new THREE.Vector3(0, this.yoffset ?? 0, 0)); // yOffset per allineare al terreno
+    this.position = position.clone().add(new THREE.Vector3(0, this.yoffset ?? 0, 0));
     this.modelPath = opts.modelPath ?? '/models/props/campfire1.fbx';
     this.scale = opts.scale ?? 0.01;
     this.runestone = null;
     this.runestoneMat = makeRunestoneMaterial();
     this._floatTime = 0;
-     // per allineare al terreno
 
-    // se il tuo FBX ha più materiali su singoli mesh, puoi usare indici
     this.materialIndices = opts.materialIndices ?? { campfire: 0, rock: 1 };
 
-    // Texture (rinomina se i file hanno nomi diversi)
     const camp = {
       basecolor:  '/textures/campfire/campfire_basecolor.png',
       normal:     '/textures/campfire/campfire_normal.png',
@@ -124,7 +124,7 @@ export class Campfire {
     // Handle del sistema fuoco (creato con spawnFire)
     this.fireSystem = null;
 
-    // Opzioni fuoco pensate per un falò (più esteso della torcia)
+    // Opzioni fuoco
     this.fireOptions = {
       count: opts.count ?? 360,
       radius: opts.radius ?? 0.34,
@@ -136,8 +136,7 @@ export class Campfire {
       side: opts.side ?? 0.16,
       windStrength: opts.windStrength ?? 0.07,
       turbulence: opts.turbulence ?? 0.06,
-      // luci integrate del FireParticleSystem
-      lightingStrength: opts.lightingStrength ?? 1.2, // più “glow” in area
+      lightingStrength: opts.lightingStrength ?? 1.2,
       lightingRange: opts.lightingRange ?? 10.0,
       enableShadows: opts.enableShadows ?? true,
       shadowJitter: 0.2,
@@ -184,7 +183,8 @@ export class Campfire {
     // Spawna il sistema di fuoco (luci incluse)
     const firePos = this.model.position.clone().add(this.fireOffset);
     this.fireSystem = spawnFire(firePos, this.fireOptions);
-        // === RUNESTONE ===
+
+    // === RUNESTONE ===
     const runeObj = await loader.loadAsync('/models/props/runestone.fbx');
     this.runestone = runeObj;
     this.runestone.scale.setScalar(0.01);
@@ -196,7 +196,6 @@ export class Campfire {
         c.receiveShadow = true;
       }
     });
-    console.log("runestone position", this.runestone.position);
     scene.add(this.runestone);
 
     return this.model;
@@ -204,7 +203,6 @@ export class Campfire {
 
   update(delta) {
     // Il particellare viene aggiornato globalmente da updateFires(dt).
-    // Qui puoi modulare lentamente vento/intensità per varietà locale.
     if (this.fireSystem) {
       const t = performance.now() * 0.001;
       const windAngle = t * 0.18;
@@ -224,14 +222,9 @@ export class Campfire {
       this.runestone.rotation.y += delta * 0.2; // rotazione lenta
     }
 
-    //PlayerCollision
+    // Player "brucia" se troppo vicino
     const dist = this.model.position.distanceTo(gameManager?.controller?.player?.model.position);
-    if(dist<0.95)
-      {
-        gameManager?.controller.startBurning?.();
-      }
-
-
+    if (dist < 0.95) gameManager?.controller.startBurning?.();
   }
 
   // Controlli runtime
@@ -245,6 +238,7 @@ export class Campfire {
       this.fireSystem.setWindStrength(strength);
     }
   }
+
   setFlameBlue(on, smooth = true) {
     if (!this.fireSystem) return;
     if (smooth && typeof this.fireSystem.transitionPalette === 'function') {
@@ -263,7 +257,6 @@ export class Campfire {
 
   setRimEmissiveBlue(on) {
     if (this.campfireMat && 'emissive' in this.campfireMat) {
-      // leggero glow blu sulla brace
       this.campfireMat.emissive.setHex(on ? 0x2C74FF : 0x000000);
       this.campfireMat.emissiveIntensity = on ? 0.15 : 0.0;
       this.campfireMat.needsUpdate = true;
@@ -294,18 +287,12 @@ export class Campfire {
 // -----------------------------------------
 
 function computeSitPosition(campfirePos, playerPos, radius = 1.2) {
-  // Direzione dal falò verso il player (se è troppo vicino/centrato, usa una direzione di default)
   const dir = new THREE.Vector3().subVectors(playerPos, campfirePos);
   if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
   dir.normalize();
 
-  // Punto sul “cerchio” attorno al falò
   const target = new THREE.Vector3().copy(campfirePos).add(dir.multiplyScalar(radius));
-
-  // Allinea alla quota del terreno
   target.y = getTerrainHeightAt(target.x, target.z);
-
-  // Leggero rialzo per evitare compenetrazioni
   target.y += 0.02;
   return target;
 }
@@ -345,6 +332,12 @@ export async function spawnCampfireAt(x, z, opts = {}) {
         cf.setFlameBlue(false, true);
         cf.setRimEmissiveBlue(false);
 
+        // chiudi menu
+        hideCampfireMenu();
+
+        // (opzionale) riattiva input gioco, se gestisci uno stato UI
+        gameManager?.setUIMode?.(false);
+
       } else {
         // --- TI SIEDI ---
         gameManager.controller?.sitToggle();
@@ -366,12 +359,19 @@ export async function spawnCampfireAt(x, z, opts = {}) {
         // palette blu
         cf.setFlameBlue(true, true);
         cf.setRimEmissiveBlue(true);
+
+        // apri menu: passa lo StatsSystem del player
+        showCampfireMenu(controller.stats, {
+          onClose: () => {
+            // se chiudi con ESC mentre sei seduto, resta seduto ma UI libera
+            gameManager?.setUIMode?.(false);
+          }
+        });
+
+        // (opzionale) metti il gioco in "UI mode" (niente input movimento)
+        gameManager?.setUIMode?.(true);
       }
     }
-
-
-
-
   });
 
   campfires.push(cf);
