@@ -11,7 +11,7 @@ export class BaseEnemy {
     this.actions = opt.actions || {};
     this.animator = opt.animator || null; // istanza di Animator
     this.forwardYawOffsetDeg = opt.forwardYawOffsetDeg ?? 0;
-
+    this.health=10;
     this.alive = true;
     this.state = {
       speed: 0,

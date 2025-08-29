@@ -1,3 +1,5 @@
+import { gameManager } from "../managers/gameManager";
+
 // systems/StatsSystem.js
 export class StatsSystem {
   constructor(maxHP = 100, maxStamina = 100, maxMana = 50,armor = 0) {
@@ -16,10 +18,20 @@ export class StatsSystem {
 
   // ========== HP ==========
   damage(n){
+      try {
+        console.log(gameManager.controller.effects);
+        gameManager.controller.effects.onHit({ dmg: n, type: 'normal' });
+      } catch {console.log("[StatsSystem] damage error");}
      console.log("OUCH");
      const damage = n*(1-this.armor/100);
      this.hp = Math.max(0, this.hp - damage);
-      this._notify(); }
+     this._notify(); 
+      if (this.hp === 0) this.die();
+    }
+  die()
+  {
+    console.log("GAME OVER");
+  }
   heal(n){ this.hp = Math.min(this.maxHP, this.hp + n); this._notify(); }
 
   // ========== STAMINA ==========

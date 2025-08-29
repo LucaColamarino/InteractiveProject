@@ -32,10 +32,12 @@ export class InventorySystem {
   updateStats(item,remove=false)
   {
     const armor = item.meta.armor;
-    const stats=gameManager.controller.stats;
-    if(remove) stats.armor-=armor;
-    else stats.armor+=armor;
-    console.log("NEW ARMOR STAT",stats.armor);
+    if(armor){
+      const stats=gameManager.controller.stats;
+      if(remove) stats.armor-=armor;
+      else stats.armor+=armor;
+      console.log("NEW ARMOR STAT",stats.armor)
+    }
   }
   unequip(slot = "weapon") {
     const item = this.equipment[slot];

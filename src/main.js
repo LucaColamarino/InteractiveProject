@@ -13,7 +13,7 @@ import { StartMenu } from './ui/startMenu.js';
 import { createGameManager, gameManager } from './managers/gameManager.js';
 import { updateLoadingProgress, hideLoadingScreen, showLoadingScreen, suspendLoadingScreen } from './loading.js';
 import { PickableManager } from './managers/pickableManager.js';
-import { scene } from './scene.js';
+import { camera, scene } from './scene.js';
 import { allItems, dragonheart } from './utils/items.js';
 import { preloadAllEntities } from './utils/entityFactory.js';
 import { abilitiesByForm, spawnPlayer } from './player/Player.js';
@@ -25,6 +25,7 @@ import * as THREE from 'three';
 import { setNoGoLevel } from './systems/GroundSystem.js';
 import { spawnarchersStone } from './objects/archerStone.js';
 import { spawnWolfStone } from './objects/wolfStone.js';
+import {HitFeedbackSystem} from "./systems/HitFeedbackSystem.js";
 // =====================
 // SETTINGS
 // =====================
@@ -114,6 +115,10 @@ async function init() {
 
     updateLoadingProgress(95, 'Player initialization...');
     gameManager.controller = await spawnPlayer();
+    gameManager.controller.effects = new HitFeedbackSystem({
+    camera: camera, 
+    playerObj: gameManager.controller.player?.model,
+    });
     updateVitalsHUD(gameManager.controller.stats);
     gameManager.inventory.updateEquipmentVisibility();
     gameManager.controller.syncWeaponFromInventory(gameManager.inventory);

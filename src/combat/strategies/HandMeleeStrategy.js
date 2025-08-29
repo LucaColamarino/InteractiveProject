@@ -1,7 +1,7 @@
 // combat/strategies/HandMeleeStrategy.js
 import * as THREE from 'three';
 import { AttackStrategy } from './AttackStrategy.js';
-import { getEnemies, killEnemy } from '../../enemies/EnemyManager.js';
+import { getEnemies, damageEnemy } from '../../enemies/EnemyManager.js';
 import { hudManager } from '../../ui/hudManager.js';
 
 export class HandMeleeStrategy extends AttackStrategy {
@@ -13,6 +13,7 @@ export class HandMeleeStrategy extends AttackStrategy {
       pitchOffsetDeg: -10,
       yOffset: 1.05
     });
+    this.damage = 30;
   }
 
   onEquip(controller, weaponItem) {
@@ -43,7 +44,7 @@ export class HandMeleeStrategy extends AttackStrategy {
 
       if (this._inSwordArc(playerObj, enemy.model)) {
         this._attackState.enemiesHit.add(key);
-        killEnemy(enemy);
+        damageEnemy(enemy,this.damage);
         if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
           window.giveXP(20);
         }

@@ -4,105 +4,128 @@ import { scene } from '../../scene.js';
 import { gameManager } from '../../managers/gameManager.js';
 const GRAVITY = new THREE.Vector3(0, -9.81, 0);
 
-// Parametri collider
-const ARROW_RADIUS  = 0.05;  // raggio "hit" della freccia (piccolo)
-const PLAYER_RADIUS = 0.8;   // raggio hitbox del player (tweak se diverso)
+const ARROW_RADIUS  = 0.05;
+const PLAYER_RADIUS = 0.8;
+
+// === Parry params ===
+const PARRY_FRONT_DEG = 60;
+const PARRY_FRONT_COS = Math.cos(THREE.MathUtils.degToRad(PARRY_FRONT_DEG));
+const PARRY_DIR_DOT_MAX = -0.2;
+
+// === IMPORTANTISSIMO: direzione "avanti" del tuo player nel suo spazio locale ===
+// Se il tuo rig guarda lungo +Z, lascia così:
+const PLAYER_LOCAL_FWD = new THREE.Vector3(0, 0, 1);
+// Se invece guarda lungo -Z, cambia in: new THREE.Vector3(0, 0, -1);
 
 export class ArrowProjectile {
-  /**
-   * @param {THREE.Object3D} visual
-   * @param {THREE.Vector3} pos0 (world)
-   * @param {THREE.Quaternion} quat0 (world)
-   * @param {number} speed
-   * @param {number} lifeSec
-   * @param {{localForward?:THREE.Vector3, localUp?:THREE.Vector3}} opts
-   */
   constructor(visual, pos0, quat0, speed = 36, lifeSec = 6, opts = {}) {
     this.obj = visual;
     this.obj.position.copy(pos0);
 
-    // Assi locali del modello freccia
     this.localForward = (opts.localForward || new THREE.Vector3(0, 0, -1)).clone().normalize();
     this.localUp      = (opts.localUp      || new THREE.Vector3(0, 1,  0)).clone().normalize();
 
-    // Inizializza orientamento
     this.obj.quaternion.copy(quat0);
     this.obj.updateMatrixWorld(true);
 
-    // Velocità iniziale lungo il forward **locale** del modello, in world
     const fwdWorld0 = this.localForward.clone().applyQuaternion(quat0).normalize();
     this.vel = fwdWorld0.multiplyScalar(speed);
 
-    // Calcola roll iniziale da mantenere durante il volo
     this.roll = this._computeInitialRoll(quat0);
 
     this.alive = true;
     this.life = lifeSec;
     this._age = 0;
 
-    // Per swept test (tunneling-safe)
     this._prevPos = pos0.clone();
 
     scene.add(this.obj);
   }
 
   _computeInitialRoll(q) {
-    // forward e up del modello in world allo spawn
     const fw = this.localForward.clone().applyQuaternion(q).normalize();
     let upW  = this.localUp.clone().applyQuaternion(q).normalize();
-
-    // proietta up sul piano ortogonale a fw
     upW = upW.projectOnPlane(fw).normalize();
-
-    // "allineamento canonico" (solo forward)
     const qAlign = new THREE.Quaternion().setFromUnitVectors(this.localForward, fw);
     let upCanon = this.localUp.clone().applyQuaternion(qAlign).projectOnPlane(fw).normalize();
 
     if (upW.lengthSq() < 1e-6 || upCanon.lengthSq() < 1e-6) return 0;
-
     const dot = THREE.MathUtils.clamp(upCanon.dot(upW), -1, 1);
     let ang = Math.acos(dot);
     const sgn = Math.sign(new THREE.Vector3().crossVectors(upCanon, upW).dot(fw));
     ang *= sgn;
-    return ang; // roll attorno a fw
+    return ang;
   }
 
-  /**
-   * Ritorna centro e raggio della hitbox del player (fallback robusto).
-   */
   _getPlayerHitSphere() {
-    // Prova a ottenere il centro dal gameManager se disponibile
-    const pObj = gameManager?.controller?.player.model;
-
+    const pObj = gameManager?.controller?.player?.model;
     const center = new THREE.Vector3();
     if (pObj && pObj.isObject3D) {
       pObj.getWorldPosition(center);
     } else {
-      // fallback totale: niente player -> nessuna collisione
       return null;
     }
 
-    // Se esiste una proprietà di raggio specifica, usala; altrimenti default
     const r =
       gameManager?.player?.hitRadius ??
       gameManager?.player?.colliderRadius ??
       PLAYER_RADIUS;
 
-    return { center, radius: r };
+    return { center, radius: r, obj: pObj };
+  }
+
+  _isPlayerParrying() {
+    // adattato alla tua proprietà
+    return !!gameManager?.controller?.isBlocking;
   }
 
   /**
-   * Test continuo segmento-sfera per evitare tunneling.
-   * Ritorna true se il segmento [p0,p1] interseca la sfera (c,r).
+   * Forward del player calcolato da **+Z locale** (configurabile sopra).
+   * Evita getWorldDirection che restituisce la -Z locale e genera ambiguità.
    */
+  _getPlayerForward(pObj) {
+    const q = new THREE.Quaternion();
+    pObj.getWorldQuaternion(q);
+    const fwd = PLAYER_LOCAL_FWD.clone().applyQuaternion(q).normalize();
+    return fwd;
+  }
+
+  _isArrowInFrontWhileParrying(playerPos, pObj, testPos) {
+    if (!this._isPlayerParrying() || !pObj) return false;
+
+    const fwd = this._getPlayerForward(pObj);                      // "avanti" del player in world
+    const toArrow = new THREE.Vector3().subVectors(testPos, playerPos).normalize();
+
+    const frontDot = fwd.dot(toArrow);                             // >0 → davanti
+    const velDir = this.vel.clone().normalize();
+    const dirDot = velDir.dot(fwd);                                // ~ -1 se la freccia arriva frontalmente
+
+    console.log("[ArrowProjectile] check parry:",
+      { frontDot: +frontDot.toFixed(3), dirDot: +dirDot.toFixed(3),
+        cosThreshold: +PARRY_FRONT_COS.toFixed(3), dirThreshold: PARRY_DIR_DOT_MAX,
+        playerFwd: { x:+fwd.x.toFixed(3), y:+fwd.y.toFixed(3), z:+fwd.z.toFixed(3) },
+        toArrow: { x:+toArrow.x.toFixed(3), y:+toArrow.y.toFixed(3), z:+toArrow.z.toFixed(3) }
+      });
+
+    if (frontDot < PARRY_FRONT_COS) {
+      console.log("[ArrowProjectile] → Non è davanti al player");
+      return false;
+    }
+    if (dirDot > PARRY_DIR_DOT_MAX) {
+      console.log("[ArrowProjectile] → La freccia non viene incontro al player");
+      return false;
+    }
+
+    console.log("[ArrowProjectile] → Freccia deflessa da parry!");
+    return true;
+  }
+
   static _segmentSphereHit(p0, p1, c, r) {
     const seg = new THREE.Vector3().subVectors(p1, p0);
     const segLenSq = seg.lengthSq();
     if (segLenSq < 1e-12) {
-      // Trattalo come punto
       return c.distanceToSquared(p0) <= r * r;
     }
-    // Param t del punto sul segmento più vicino al centro sfera
     const t = THREE.MathUtils.clamp(
       new THREE.Vector3().subVectors(c, p0).dot(seg) / segLenSq,
       0, 1
@@ -115,20 +138,32 @@ export class ArrowProjectile {
     const sph = this._getPlayerHitSphere();
     if (!sph) return false;
 
-    const { center, radius } = sph;
+    const { center, radius, obj: pObj } = sph;
     const effectiveR = radius + ARROW_RADIUS;
 
-    // Swept test tra posizione precedente e nuova
     const hit = ArrowProjectile._segmentSphereHit(this._prevPos, nextPos, center, effectiveR);
     if (hit) {
-      // Applica danno richiesto
+      console.log("[ArrowProjectile] Freccia ha colpito hit-sphere del player!");
+      const deflect = this._isArrowInFrontWhileParrying(center, pObj, nextPos);
+      if (deflect) {
+        try {
+          gameManager?.controller?.combat?.onParryDeflect?.({
+            position: nextPos.clone(),
+            normal: new THREE.Vector3().subVectors(nextPos, center).normalize(),
+            projectile: this
+          });
+        } catch {}
+        console.log("[ArrowProjectile] → DEFLECTED, nessun danno.");
+        return 'deflected';
+      }
+
       try {
         if (gameManager?.controller?.stats?.damage) {
           gameManager.controller.stats.damage(10);
+          console.log("[ArrowProjectile] → HIT, danno applicato");
         }
       } catch (e) {
-        // evita crash se qualcosa non è definito
-        // console.warn('[ArrowProjectile] damage call failed:', e);
+        console.warn("[ArrowProjectile] damage call failed:", e);
       }
       return true;
     }
@@ -138,34 +173,23 @@ export class ArrowProjectile {
   update(dt) {
     if (!this.alive) return;
 
-    // --- integrazione fisica ---
     this.vel.addScaledVector(GRAVITY, dt);
-
-    // Calcola la nuova posizione candidata (per swept test)
     const nextPos = new THREE.Vector3().copy(this.obj.position).addScaledVector(this.vel, dt);
 
-    // --- collisione col player (tunneling-safe) ---
-    if (this._checkHitPlayer(nextPos)) {
+    const hitResult = this._checkHitPlayer(nextPos);
+    if (hitResult) {
       this.dispose();
       return;
     }
 
-    // Nessun impatto: aggiorna posizione
     this._prevPos.copy(this.obj.position);
     this.obj.position.copy(nextPos);
 
-    // orienta la freccia: forward locale → direzione di volo, mantenendo il roll iniziale
     const v = this.vel.clone();
     if (v.lengthSq() > 1e-8) {
       const dir = v.normalize();
-
-      // allinea forward locale a dir
       const qAlign = new THREE.Quaternion().setFromUnitVectors(this.localForward, dir);
-
-      // applica roll iniziale attorno a dir
       const qRoll = new THREE.Quaternion().setFromAxisAngle(dir, this.roll);
-
-      // qFinal = qRoll * qAlign
       this.obj.quaternion.copy(qRoll.multiply(qAlign));
     }
 
@@ -180,7 +204,6 @@ export class ArrowProjectile {
   }
 }
 
-// Registro semplice
 const _active = new Set();
 
 export function spawnArrowProjectile(visual, pos, quat, speed, lifeSec, opts = {}) {

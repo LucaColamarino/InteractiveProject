@@ -1,7 +1,7 @@
 // combat/strategies/SwordMeleeStrategy.js
 import * as THREE from 'three';
 import { AttackStrategy } from './AttackStrategy.js';
-import { getEnemies, killEnemy } from '../../enemies/EnemyManager.js';
+import { getEnemies, damageEnemy } from '../../enemies/EnemyManager.js';
 import { hudManager } from '../../ui/hudManager.js';
 import { scene } from '../../scene.js';
 
@@ -24,6 +24,8 @@ export class SwordMeleeStrategy extends AttackStrategy {
     this._shockCd = 0;
     this._shockState = null; // { t, dur, clipName, fired }
     this._shockwaves = [];
+    this.damage =60;
+    this.spDamage = 30;
   }
 
   onEquip(controller, weaponItem) {
@@ -105,7 +107,7 @@ export class SwordMeleeStrategy extends AttackStrategy {
         const dist = e.model.position.distanceTo(sw.origin);
         if (dist >= rMin && dist <= rMax) {
           sw.hit.add(key);
-          killEnemy(e);
+          damageEnemy(e,this.spDamage)
           if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
             window.giveXP(this.shockDamageXP);
           }
@@ -147,7 +149,7 @@ export class SwordMeleeStrategy extends AttackStrategy {
 
       if (this._inSwordArc(playerObj, enemy.model)) {
         this._attackState.enemiesHit.add(key);
-        killEnemy(enemy);
+        damageEnemy(enemy,this.damage);
         if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
           window.giveXP(30);
         }

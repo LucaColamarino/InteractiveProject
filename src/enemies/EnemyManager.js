@@ -4,6 +4,7 @@ import { scene } from '../scene.js';
 import { gameManager } from '../managers/gameManager.js';
 import { dragonheart } from '../utils/items.js';
 import { getTerrainHeightAt } from '../map/map.js';
+import { hudManager } from '../ui/hudManager.js';
 
 const _enemies = [];
 const MAX_UPDATE_DISTANCE = 250;     // culling logico
@@ -99,10 +100,9 @@ export function updateEnemies(delta) {
     e.postUpdate?.(step);
   }
 }
-
-export function killEnemy(enemyInstance) {
+function killEnemy(enemyInstance){
+  hudManager.showNotification('Enemy Killed!');
   if (!enemyInstance || !enemyInstance.alive) return;
-  console.log("KILLED A ",enemyInstance);
   if(enemyInstance.type=="werewolf")
     gameManager.wolvesKilled+=1;
   else if(enemyInstance.type=="archer")
@@ -155,6 +155,20 @@ export function killEnemy(enemyInstance) {
     enemyInstance.alive = false;
     _startFadeOut(enemyInstance);
   }
+}
+
+
+export function damageEnemy(enemyInstance,damage=0) {
+  if (!enemyInstance || !enemyInstance.alive) return;
+  const current_health =enemyInstance.health;
+  const future_health = Math.max(0,current_health-damage);
+  enemyInstance.health=future_health;
+  console.log("HEALTH:",future_health);
+  if(future_health<=0)
+    {
+      killEnemy(enemyInstance);
+    }
+ 
 }
 
 /* ---------------- helpers ---------------- */

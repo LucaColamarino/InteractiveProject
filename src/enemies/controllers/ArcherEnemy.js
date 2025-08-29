@@ -8,7 +8,7 @@ const IDLE_ARROW_SPEED_THRESH = 0.25; // speed <= soglia => considerato idle-ish
 export class ArcherEnemy extends BaseEnemy {
   constructor(opt = {}) {
     super({ ...opt, type: 'archer' });
-
+    this.health=50;
     // Ranges
     this.visionRange   = opt.visionRange   ?? 28;
     this.attackRange   = opt.attackRange   ?? 16;

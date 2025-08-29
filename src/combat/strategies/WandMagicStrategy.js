@@ -1,7 +1,7 @@
 // combat/strategies/WandMagicStrategy.js
 import * as THREE from 'three';
 import { AttackStrategy } from './AttackStrategy.js';
-import { getEnemies, killEnemy } from '../../enemies/EnemyManager.js';
+import { getEnemies, damageEnemy } from '../../enemies/EnemyManager.js';
 import { hudManager } from '../../ui/hudManager.js';
 import { MagicProjectile } from '../projectiles/magicProjectile.js';
 import { scene } from '../../scene.js';
@@ -44,6 +44,8 @@ export class WandMagicStrategy extends AttackStrategy {
       rightWorld: new THREE.Vector3(), posWorld: new THREE.Vector3(),
     };
     this._debugPips = [];
+    this.damage=40;
+    this.spDamage=70;
   }
 
   onEquip(controller, weaponItem) {
@@ -243,7 +245,7 @@ export class WandMagicStrategy extends AttackStrategy {
 
 
   _onHitEnemy(enemy) {
-    killEnemy(enemy);
+    damageEnemy(enemy,this.spDamage)
     if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
       window.giveXP(this.damage);
     }
@@ -276,11 +278,11 @@ export class WandMagicStrategy extends AttackStrategy {
 
       if (this._inSwordArc(playerObj, enemy.model)) {
         this._attackState.enemiesHit.add(key);
-        killEnemy(enemy);
+        damageEnemy(enemy,this.damage);
         if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
           window.giveXP(this.damage ?? 20);
         }
-        hudManager.showNotification('Enemy Killed!');
+        
       }
     }
   }

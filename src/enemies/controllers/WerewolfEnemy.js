@@ -11,7 +11,7 @@ import { getTerrainHeightAt } from '../../map/map.js';
 export class WerewolfEnemy extends BaseEnemy {
   constructor(opt = {}) {
     super({ ...opt, type: 'werewolf' });
-
+    this.health=120;
     // ===== Perception / ranges =====
     this.visionRange = opt.visionRange ?? 32;
     this.attackRange = opt.attackRange ?? 1.2;

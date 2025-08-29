@@ -206,6 +206,7 @@ export function startLoop(c) {
       updateEnvironment();
       updateWolfStone(delta);
       updatearchersStone(delta);
+      gameManager.controller.effects?.update(delta);
       gameManager.controller.stats.regenStamina(delta, 8);
       //gameManager.controller.stats.regenMana(delta, 3);
       gameManager.pickableManager?.update(delta, player?.model?.position);

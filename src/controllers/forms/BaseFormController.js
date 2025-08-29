@@ -100,10 +100,10 @@ export class BaseFormController {
   }
 
   update(dt) {
-    console.log("STO BLOCCANDO?",this.isBlocking);
     if(this.isBlocking)
       {
-        gameManager.controller.stats.useStamina(10*dt);
+        const enough=gameManager.controller.stats.useStamina(10*dt);
+        if(!enough) this.isBlocking=false;
       }
     // FX burning
     if (this._burnFx) this._burnFx.update(dt);
