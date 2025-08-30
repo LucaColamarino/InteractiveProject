@@ -13,6 +13,12 @@ import {
   clearCameraFocus,
   getLockHeadingYaw
 } from '../player/cameraFollow.js';
+import { isCampfireMenuOpen } from '../ui/hudCampfireMenu.js';
+
+// ======= Helper Main Menu =======
+function isMenuOpen() {
+  try { return !!gameManager.menu?.isVisible?.() || isCampfireMenuOpen() } catch { return false; }
+}
 
 // ======= State =======
 let _controller = null;
@@ -74,8 +80,7 @@ function _recomputeMoveVec() {
     if (_pressed.has('KeyW')) _moveVec.add(_fwd);
     if (_pressed.has('KeyS')) _moveVec.sub(_fwd);
 
-    // ⬇️ Inverti anche l'asse laterale per mantenere la stessa mano:
-    //     D deve restare “strafe right” → usa -right
+    // D deve restare “strafe right” → usa -right
     if (_pressed.has('KeyD')) _moveVec.sub(_right);
     if (_pressed.has('KeyA')) _moveVec.add(_right);
   } else {
@@ -109,7 +114,7 @@ function _isCanvasFocused() {
 function _requestPointerLock() {
   const c = _canvasEl();
   if (!c) return;
-  if (isInventoryOpen?.()) return;
+  if (isInventoryOpen?.() || isMenuOpen()) return; // evita lock se un menu è aperto
   if (document.pointerLockElement === c) return;
   if (_plReqInFlight) return;
 
@@ -140,7 +145,7 @@ function _onPointerLockChange() {
     if (c) c.style.cursor = 'crosshair';
 
     // apri il menu solo se non già in pausa e inventario chiuso
-    if (wasLocked && !gameManager.campfiremenu &&!gameManager.paused && !isInventoryOpen?.()) {
+    if (wasLocked && !gameManager.campfiremenu && !gameManager.paused && !isInventoryOpen?.()) {
       gameManager.menu.toggleMenu();
     }
 
@@ -157,6 +162,8 @@ function _onPointerLockError() {
 function _onKeyDown(e) {
   // Se l'inventario è aperto, ignora tutto tranne G/Escape
   if (isInventoryOpen?.() && e.code !== 'KeyG' && e.code !== 'Escape') return;
+  // Se il Main Menu è aperto, ignora tutto (il menu gestisce già ESC)
+  if (isMenuOpen()) return;
 
   switch (e.code) {
     case 'KeyW': case 'KeyA': case 'KeyS': case 'KeyD':
@@ -215,7 +222,7 @@ function _onKeyUp(e) {
 }
 
 function _onMouseDown(e) {
-  if (isInventoryOpen?.()) return;
+  if (isInventoryOpen?.() || isMenuOpen()) return;
 
   // se non in lock e click sul canvas → chiedi lock (il click non deve attaccare)
   if (!_pointerLocked && _isCanvasEvent(e)) {
@@ -245,7 +252,7 @@ function _onMouseDown(e) {
 }
 
 function _onMouseMove(e) {
-  if (!_pointerLocked) return;
+  if (!_pointerLocked || isMenuOpen()) return;
   const dx = e.movementX || 0;
   const dy = -(e.movementY || 0);
 
@@ -261,6 +268,7 @@ function _onMouseMove(e) {
 function _onMouseUp(_e) {
   if (_e.button === 2) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
+    if (isMenuOpen()) return;
     _controller?.blockEnd?.();
   }
 }
@@ -303,8 +311,8 @@ export function setupInput() {
 export function pumpActions(controller) {
   _controller = controller ?? gameManager.controller ?? null;
 
-  // se inventario aperto → stop movimento
-  if (isInventoryOpen?.()) {
+  // se inventario o main menu aperti → stop movimento
+  if (isInventoryOpen?.() || isMenuOpen()) {
     if (_moveVec.lengthSq() !== 0) _moveVec.set(0, 0, 0);
   } else if (_moveDirty) {
     _recomputeMoveVec();
