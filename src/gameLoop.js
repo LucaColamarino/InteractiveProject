@@ -13,7 +13,6 @@ import { updateChests } from './objects/chest.js';
 import { updateEnvironment, trees } from './spawners/vegetationSpawner.js';
 import { updatetorchs } from './objects/torch.js';
 import { updateFires } from './particles/FireParticleSystem.js';
-import { LevelSystem } from './systems/LevelSystem.js';
 import { gameManager } from './managers/gameManager.js';
 import { initInventoryUI } from './ui/inventoryUi.js';
 import { refreshInventoryUI } from './ui/inventoryBridge.js';
@@ -23,6 +22,7 @@ import { registerTreeEssenceInteraction } from './objects/treeEssenceInteractabl
 import { updateArrowProjectiles } from './combat/projectiles/ArrowProjectile.js';
 import { updateWolfStone } from './objects/wolfStone.js';
 import { updatearchersStone } from './objects/archerStone.js';
+import { renderXPHud } from './ui/xpHud.js';
 
 const LEAF_MIN_OPACITY_DURING_COOLDOWN = 0.25;
 
@@ -30,61 +30,6 @@ const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
 const clock = new THREE.Clock();
-
-// === XP SYSTEM (single source of truth) ===
-const STORAGE_KEY = 'player_xp';
-export let xp = null;
-
-function loadXP() {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-  xp = new LevelSystem({ startingLevel: 1, startingXP: 0 });
-  xp.load(saved);
-}
-
-function saveXP() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(xp.toJSON()));
-}
-
-function renderXPHud() {
-  const pill = document.getElementById('mm-level');
-  const bar = document.getElementById('xp-bar');
-  const text = document.getElementById('xp-text');
-
-  if (pill) pill.textContent = `🧬 LVL ${xp.level}`;
-  if (bar)  bar.style.width = `${Math.round(xp.progress * 100)}%`;
-  if (text) text.textContent = `${xp.xp} / ${xp.xpToNextLevel}`;
-}
-
-function toastLevelUp(newLevel) {
-  const area = document.getElementById('notifications');
-  if (!area) return;
-  const div = document.createElement('div');
-  div.className = 'notification';
-  div.textContent = `🎉 Level Up! Sei al livello ${newLevel}`;
-  area.appendChild(div);
-  setTimeout(() => div.remove(), 4000);
-
-  const xpEl = document.getElementById('xp-bar');
-  if (xpEl) {
-    xpEl.classList.add('levelup');
-    setTimeout(() => xpEl.classList.remove('levelup'), 650);
-  }
-}
-
-function initXP() {
-  loadXP();
-  renderXPHud();
-
-  // API globale per assegnare XP da qualsiasi punto
-  window.giveXP = function(amount = 10) {
-    const before = xp.level;
-    const leveled = xp.addXP(Math.max(0, amount|0));
-    saveXP();
-    renderXPHud();
-    if (leveled && xp.level > before) toastLevelUp(xp.level);
-  };
-}
-
 export function startLoop(c) {
   gameManager.controller = c;
 
@@ -97,8 +42,7 @@ export function startLoop(c) {
 
   // HUD & XP
   hudManager.init();
-  initXP();
-
+  renderXPHud(gameManager?.controller?.stats);
   registerTreeEssenceInteraction();
 
   // 👉 traccia l’ultimo sito drenato per gestire la rigenerazione visiva

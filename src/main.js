@@ -25,9 +25,10 @@ import { spawnarchersStone } from './objects/archerStone.js';
 import { spawnWolfStone } from './objects/wolfStone.js';
 import {HitFeedbackSystem} from "./systems/HitFeedbackSystem.js";
 import { waterHeight } from './utils/entities.js';
-// =====================
-// SETTINGS
-// =====================
+
+// ⬇️ importa anche applyPendingSave per applicare Stats+Inventory dopo l’init dei sistemi
+import { loadGame, saveGame, applyPendingSave } from './managers/saveManager.js';
+
 const settings = (window.__gameSettings = {
   quality: 'medium',
   shadows: true,
@@ -37,9 +38,6 @@ const settings = (window.__gameSettings = {
 
 let _initializing = false;
 
-// =====================
-// APPLY SETTINGS
-// =====================
 function applyMenuSettings(s) {
   Object.assign(settings, s);
   setFireShadowBudget(settings.shadows ? 3 : 0);
@@ -50,17 +48,21 @@ window.addEventListener("DOMContentLoaded", () => {
   loadHudMap();
   loadHudPills();
 });
-// =====================
-// INIT GAME
-// =====================
+
 async function init() {
   if (_initializing) return;
   _initializing = true;
   try {
-    const inventory = new InventorySystem();
-    window.inventory = inventory;
-    gameManager.inventory = inventory;
+    // === INVENTORY: crea se manca, mantieni se esiste ===
+    if(!gameManager.inventory){
+      console.log("CREATING NEW INVENTORY SYSTEM");
+      const inventory = new InventorySystem();
+      window.inventory = inventory;
+      gameManager.inventory = inventory;
+    }
+    const inventory = gameManager.inventory;
 
+    // === PICKABLES manager ===
     gameManager.pickableManager = new PickableManager({
       scene,
       inventory,
@@ -89,7 +91,7 @@ async function init() {
     createSky();
     const waterY = waterHeight;
     addWaterPlane(waterY);
-    setNoGoLevel(waterY, 0.06); // 6 cm di margine sopra
+    setNoGoLevel(waterY, 0.06);
     await wait(120);
 
     updateLoadingProgress(70, 'Populate vegetation...');
@@ -101,29 +103,36 @@ async function init() {
 
     updateLoadingProgress(90, 'Placing objects...');
     spawnCampfireAt(-60, 65);
-    //spawntorchAt(30, 15);
-    //spawntorchAt(17, 20);
-    //spawntorchAt(-20, -15);
-    spawnChestAt(-65, 60,ironSword);
+    spawnChestAt(-65, 60, ironSword);
     spawnChestAt(-65, 70, magicWand);
-    spawnChestAt(-55, 60,ironShield);
+    spawnChestAt(-55, 60, ironShield);
     spawnChestAt(-55, 70, ironHelmet);
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
-    
 
     updateLoadingProgress(95, 'Player initialization...');
-    gameManager.controller = await spawnPlayer();
-    gameManager.controller.effects = new HitFeedbackSystem({
-    camera: camera, 
-    playerObj: gameManager.controller.player?.model,
-    });
+    if(!gameManager.controller) {
+      console.log("CRETING NEW CONTROLLER");
+      gameManager.controller = await spawnPlayer();
+      gameManager.controller.effects = new HitFeedbackSystem({
+        camera: camera,
+        playerObj: gameManager.controller.player?.model,
+      });
+    }
+
+    // ⬇️ APPlica qui lo snapshot (StatsSystem + Inventory) ora che controller & inventory esistono
+    applyPendingSave();
+
+    // === Sincronizzazioni post-load ===
     updateVitalsHUD(gameManager.controller.stats);
     gameManager.inventory.updateEquipmentVisibility();
     gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
+
+    // Se cambi l’inventario a runtime, riallinea arma/equip controller
     gameManager.inventory.onChange(() => {
       gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
     });
+
     await wait(80);
 
     updateLoadingProgress(100, 'Finalizing...');
@@ -145,6 +154,8 @@ async function init() {
           window.dispatchEvent(new Event('game:resume'));
         },
         onQuit: () => {
+          // ⬇️ salvataggio allo “quit”
+          saveGame();
           gameManager.paused = false;
           gameManager.running = false;
           window.dispatchEvent(new Event('game:quit'));
@@ -167,7 +178,6 @@ async function init() {
   }
 }
 
-// Helpers
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 function showFatal(msg) {
   const errorDiv = document.createElement('div');
@@ -197,7 +207,15 @@ const ui = {
           console.log('[UI] StartGame dal menu iniziale');
           showLoadingScreen?.();
           updateLoadingProgress?.(0, 'Preparazione...');
-          if (!gameManager.running) init();
+          init();
+        },
+        onContinue: () => {
+          console.log('[UI] ContinueGame dal menu iniziale');
+          // ⬇️ carica lo snapshot in memoria; verrà applicato in init() con applyPendingSave()
+          loadGame();
+          showLoadingScreen?.();
+          updateLoadingProgress?.(0, 'Preparazione...');
+          init();
         },
         onQuit: () => {
           console.log('[UI] Quit dal menu iniziale');

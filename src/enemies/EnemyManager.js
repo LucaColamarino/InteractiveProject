@@ -102,6 +102,7 @@ export function updateEnemies(delta) {
 }
 function killEnemy(enemyInstance){
   hudManager.showNotification('Enemy Killed!');
+  gameManager.controller.stats.addXp(enemyInstance.xp);
   if (!enemyInstance || !enemyInstance.alive) return;
   if(enemyInstance.type=="werewolf")
     gameManager.wolvesKilled+=1;

@@ -1,9 +1,10 @@
 import {WeaponItem, HelmetItem, ShieldItem, SpecialItem} from './gameItem.js';
+
 export const ironSword = new WeaponItem({
   id: 'sword_iron_01',
   name: 'Iron Sword',
   modelPath: '/models/pickups/iron_sword.fbx',
-  meshPrefix: 'sword',             // per l’equipment (sword*)
+  meshPrefix: 'sword',
   meta: { damage: 12, rarity: 'common', weaponKind: 'sword', reach: 2.7, arcDeg: 90 }
 });
 
@@ -12,14 +13,14 @@ export const magicWand = new WeaponItem({
   name: 'Magic Wand',
   modelPath: '/models/pickups/magic_wand.fbx',
   meshPrefix: 'wand',
- meta: {
-   damage: 20, rarity: 'rare', weaponKind: 'wand',
-   speed: 35, cooldown: 0.45, boltRadius: 0.5, lifetime: 2.0,
-   multishot: 1, spreadDeg: 0, homing: 0.0,
-   // opzionale: offset [x,y,z] dal centro del player da cui parte il bolt
-   muzzleOffset: [0, 1.3, 0.5]
- }
+  meta: {
+    damage: 20, rarity: 'rare', weaponKind: 'wand',
+    speed: 35, cooldown: 0.45, boltRadius: 0.5, lifetime: 2.0,
+    multishot: 1, spreadDeg: 0, homing: 0.0,
+    muzzleOffset: [0, 1.3, 0.5]
+  }
 });
+
 export const ironHelmet = new HelmetItem({
   id: 'helmet_iron_01',
   name: 'Iron Helmet',
@@ -44,11 +45,18 @@ export const dragonheart = new SpecialItem({
   meta: { armor: 10 }
 });
 
-export const allItems = [ironSword, magicWand, ironHelmet,ironShield];
+// elenco globale
+export const allItems = [ironSword, magicWand, ironHelmet, ironShield, dragonheart];
 
+/** Restituisce un item casuale dall'elenco */
 export function getRandomItem() {
-  
   const index = Math.floor(Math.random() * allItems.length);
   console.log("getRandomItem:", allItems[index].name);
   return allItems[index];
+}
+
+/** Restituisce l'item con id corrispondente (oppure null se non trovato) */
+export function getItemById(id) {
+  if (!id) return null;
+  return allItems.find(it => it.id === id) || null;
 }

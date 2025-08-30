@@ -1,5 +1,7 @@
 import { gameManager } from "../managers/gameManager";
-
+import { hudManager } from "../ui/hudManager";
+import { renderXPHud } from "../ui/xpHud";
+export let xp = null;
 // systems/StatsSystem.js
 export class StatsSystem {
   constructor(maxHP = 100, maxStamina = 100, maxMana = 50,armor = 0) {
@@ -7,16 +9,31 @@ export class StatsSystem {
     this.maxStamina = maxStamina; this.stamina = maxStamina;
     this.maxMana = maxMana; this.mana = maxMana;
     this.armor = armor;
-    this.levelPoints = 300; // punti iniziali disponibili per upgrade
+    this.levelPoints = 5; // punti iniziali disponibili per upgrade
     this._listeners = [];
     this._staminaCd = 0;
     this._staminaCdDefault = 0.6;
+    this.level =1;
+    this.xp =0;
   }
-
+  xpCurve = (level) => Math.floor(10 * Math.pow(level, 1.5));
+  get xpToNextLevel() { return this.xpCurve(this.level); }
+  get progress() { return Math.min(1, this.xp / this.xpToNextLevel); }
+  addXp(amount) {
+    this.xp += amount;
+    let leveledUp = false;
+    while (this.xp >= this.xpToNextLevel) {
+      this.xp -= this.xpToNextLevel;
+      this.level++;
+      leveledUp = true;
+      this.levelPoints+=1;
+    }
+    renderXPHud(this);
+    hudManager?.showNotification("LEVEL UP!");
+    return leveledUp;
+  }
   onChange(cb){ this._listeners.push(cb); }
   _notify(){ this._listeners.forEach(cb => cb(this)); }
-
-  // ========== HP ==========
   damage(n){
       try {
         console.log(gameManager.controller.effects);
@@ -33,8 +50,6 @@ export class StatsSystem {
     console.log("GAME OVER");
   }
   heal(n){ this.hp = Math.min(this.maxHP, this.hp + n); this._notify(); }
-
-  // ========== STAMINA ==========
   useStamina(n){
     if (this.stamina >= n) {
       this.stamina -= n;
@@ -44,11 +59,6 @@ export class StatsSystem {
     }
     return false;
   }
-
-  /**
-   * Consumo continuo per sprint: costo al secondo.
-   * Ritorna true se lo sprint può continuare in questo frame.
-   */
   drainStaminaForSprint(dt, costPerSec = 12, minToStart = 5){
     // se non c'è abbastanza stamina per mantenere il frame corrente → stop
     const cost = costPerSec * dt;
@@ -62,7 +72,6 @@ export class StatsSystem {
     this._notify();
     return true;
   }
-
   regenStamina(dt, rate = 8){
     if (this._staminaCd > 0){
       this._staminaCd = Math.max(0, this._staminaCd - dt);
@@ -72,8 +81,6 @@ export class StatsSystem {
     this.stamina = Math.min(this.maxStamina, this.stamina + rate * dt);
     if (this.stamina !== before) this._notify();
   }
-
-  // ========== MANA ==========
   useMana(n){
     if (this.mana >= n){ this.mana -= n; this._notify(); return true; }
     return false;

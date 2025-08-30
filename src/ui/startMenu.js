@@ -3,6 +3,7 @@ export class StartMenu {
   /**
    * @param {{
    *   onStart?: Function,
+   *   onContinue?: Function,
    *   onQuit?: Function,
    *   onSettingsChange?: (settings)=>void,
    *   initialSettings?: Partial<{
@@ -15,10 +16,12 @@ export class StartMenu {
   constructor({
     onStart = () => {},
     onQuit = () => {},
+    onContinue = () => {},
     onSettingsChange = () => {},
     initialSettings = {}
   } = {}) {
     this.onStart = onStart;
+    this.onContinue = onContinue;
     this.onQuit = onQuit;
     this.onSettingsChange = onSettingsChange;
 
@@ -212,6 +215,8 @@ export class StartMenu {
     this.btnContinue.addEventListener('click', () => {
       this._playClickSound();
       // Hook your "continue" logic here (e.g., load last save)
+      this.onContinue(); 
+      this.show(false); 
       console.log('[StartMenu] Continue clicked');
     });
     

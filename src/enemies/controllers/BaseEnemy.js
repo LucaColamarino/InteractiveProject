@@ -31,6 +31,7 @@ export class BaseEnemy {
     this.maxUpdateDistance = opt.maxUpdateDistance ?? 250;
 
     this.target = null;
+    this.xp = 10;
   }
 
   get player() { return gameManager.controller?.player || null; }

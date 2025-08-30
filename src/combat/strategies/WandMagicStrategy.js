@@ -48,15 +48,46 @@ export class WandMagicStrategy extends AttackStrategy {
     this.spDamage=70;
   }
 
-  onEquip(controller, weaponItem) {
-    super.onEquip(controller, weaponItem);
-    const m = weaponItem?.meta || {};
-    for (const k of Object.keys(DEFAULTS)) if (m[k] !== undefined) this[k] = m[k];
-    if (m.muzzleOffset instanceof THREE.Vector3) this.muzzleOffset.copy(m.muzzleOffset);
-    else if (Array.isArray(m.muzzleOffset) && m.muzzleOffset.length === 3) this.muzzleOffset.set(...m.muzzleOffset);
-    if (!isFiniteVec3(this.muzzleOffset)) this.muzzleOffset.set(0, 1.3, 0.5);
-    this._ensurePool();
+// --- onEquip() aggiornato ---
+onEquip(controller, weaponItem) {
+  super.onEquip(controller, weaponItem);
+  const m = weaponItem?.meta || {};
+
+  // 1) copia i meta tranne 'muzzleOffset' (che gestiamo a parte)
+  for (const k of Object.keys(DEFAULTS)) {
+    if (k === 'muzzleOffset') continue;
+    if (m[k] !== undefined) this[k] = m[k];
   }
+
+  // 2) normalizza m.muzzleOffset → Vector3
+  //    accettiamo: THREE.Vector3 | [x,y,z] | {x,y,z}
+  const mo = m.muzzleOffset;
+  if (mo instanceof THREE.Vector3) {
+    this.muzzleOffset.copy(mo);
+  } else if (Array.isArray(mo) && mo.length === 3) {
+    const [x, y, z] = mo.map(Number);
+    this.muzzleOffset.set(
+      Number.isFinite(x) ? x : 0,
+      Number.isFinite(y) ? y : 1.3,
+      Number.isFinite(z) ? z : 0.5
+    );
+  } else if (mo && typeof mo === 'object'
+          && Number.isFinite(mo.x) && Number.isFinite(mo.y) && Number.isFinite(mo.z)) {
+    this.muzzleOffset.set(mo.x, mo.y, mo.z);
+  } else {
+    // fallback sicuro
+    this.muzzleOffset.set(0, 1.3, 0.5);
+  }
+
+  if (!Number.isFinite(this.muzzleOffset.x)
+   || !Number.isFinite(this.muzzleOffset.y)
+   || !Number.isFinite(this.muzzleOffset.z)) {
+    this.muzzleOffset.set(0, 1.3, 0.5);
+  }
+
+  this._ensurePool();
+}
+
 
   // Attacco base condiviso (slash) → click sinistro (fa un colpo ravvicinato “di bacchetta”)
   attack(controller) { return this.baseAttack(controller, 'wandSlash', 'attack'); }
