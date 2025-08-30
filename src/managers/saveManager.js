@@ -22,12 +22,6 @@ function snapshotStats(stats) {
     xp: Number(stats.xp ?? 0),
   };
 }
-
-/**
- * INVENTORY SNAPSHOT
- * A runtime l'inventario contiene oggetti completi.
- * Nel save memorizziamo SOLO GLI ID per robustezza/leggerezza.
- */
 function snapshotInventory(inv) {
   if (!inv) return null;
 
@@ -44,22 +38,23 @@ function snapshotInventory(inv) {
 
   return { itemIds, equipment };
 }
-
 function snapshotGame() {
-  const gm = createGameManager();
+  const gm = gameManager;
   const stats = gm.controller?.stats ? snapshotStats(gm.controller.stats) : null;
   const inventory = gm.inventory ? snapshotInventory(gm.inventory) : null;
+  const position = gm.controller?.player?.model?.position;
+  const bridgeCreated = gm.bridgeCreated;
 
   return {
+    bridgeCreated,
+    position,
     stats,
     inventory,
     wolvesKilled: Number(gm.wolvesKilled || 0),
     archersKilled: Number(gm.archersKilled || 0),
-    activatedStones: Number(gm.activatedStones || 0),
+    activatedStones: gm.activatedStones,
   };
 }
-
-/** ---- DESERIALIZATION ---- **/
 function applyStats(gm, s) {
   if (!s) return false;
   const stats = gm.controller?.stats;
@@ -83,7 +78,6 @@ function applyStats(gm, s) {
   if (typeof stats._notify === 'function') stats._notify();
   return true;
 }
-
 function applyInventory(gm, invSnap) {
   if (!invSnap) return false;
   const inv = gm.inventory;
@@ -110,8 +104,6 @@ function applyInventory(gm, invSnap) {
   if (typeof inv._emit === 'function') inv._emit();
   return true;
 }
-
-/** Prova ad applicare uno snapshot completo. */
 function applySnapshot(snapshot) {
   const gm = createGameManager();
   let needDefer = false;
@@ -119,8 +111,10 @@ function applySnapshot(snapshot) {
   // Progress semplici
   gm.wolvesKilled = Number(snapshot.wolvesKilled ?? (gm.wolvesKilled || 0));
   gm.archersKilled = Number(snapshot.archersKilled ?? (gm.archersKilled || 0));
-  gm.activatedStones = Number(snapshot.activatedStones ?? (gm.activatedStones || 0));
-
+  gm.activatedStones = snapshot.activatedStones;
+  gm.savedPos = snapshot.position;
+  gm.bridgeCreated = snapshot.bridgeCreated;
+  console.log("SAVED POS", snapshot.position);
   // Stats
   const statsApplied = applyStats(gm, snapshot.stats);
   if (snapshot.stats && !statsApplied) needDefer = true;
@@ -131,8 +125,6 @@ function applySnapshot(snapshot) {
 
   return !needDefer;
 }
-
-/** ---- API PUBBLICHE ---- **/
 export function saveGame() {
   try {
     const data = snapshotGame();

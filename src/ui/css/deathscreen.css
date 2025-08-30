@@ -1,0 +1,102 @@
+/* ui/deathscreen.css — Death Screen stile Souls */
+#death-screen.ds {
+  position: fixed;
+  inset: 0;
+  z-index: 30000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity .6s ease;
+}
+
+#death-screen.ds.hidden { opacity: 0; pointer-events: none; }
+
+#death-screen .ds-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 45%, rgba(150,0,0,.25) 0%, rgba(0,0,0,.8) 60%),
+    linear-gradient(180deg, rgba(0,0,0,.6), rgba(0,0,0,.9));
+  filter: saturate(.9);
+  animation: dsPulse 3.2s ease-in-out infinite;
+}
+
+#death-screen .ds-card {
+  position: relative;
+  width: min(720px, 92vw);
+  padding: 28px 20px 22px;
+  text-align: center;
+  border: 2px solid #d4af37;     /* oro come HUD */
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(10,10,10,.85), rgba(20,10,8,.9));
+  box-shadow: 0 8px 40px rgba(0,0,0,.6), inset 0 0 40px rgba(212,175,55,.08);
+  backdrop-filter: blur(2px);
+}
+
+.ds-title {
+  margin: 0 0 8px;
+  font-family: 'Cinzel', 'Trajan Pro', serif;
+  font-weight: 900;
+  font-size: clamp(44px, 7vw, 92px);
+  letter-spacing: .18em;
+  color: #b31414;
+  text-shadow:
+    0 0 12px rgba(200,0,0,.6),
+    0 0 40px rgba(212,175,55,.12);
+  transform: translateZ(0);
+  animation: dsTitle .9s ease-out both;
+  user-select: none;
+}
+
+.ds-sub {
+  margin: 0 0 18px;
+  font-family: 'Exo 2', system-ui, sans-serif;
+  font-size: clamp(14px, 1.8vw, 18px);
+  color: #e7d6a8;
+  opacity: .9;
+  min-height: 1.3em;
+}
+
+.ds-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.ds-btn {
+  cursor: pointer;
+  padding: 10px 16px;
+  font: 600 14px 'Exo 2', system-ui, sans-serif;
+  color: #e8e8e8;
+  background: linear-gradient(180deg, #151515, #0f0f0f);
+  border: 1.5px solid #d4af37;
+  border-radius: 12px;
+  letter-spacing: .02em;
+  transition: transform .08s ease, box-shadow .2s ease, background .25s ease;
+}
+.ds-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+.ds-btn:active { transform: translateY(0); }
+
+.ds-btn.ghost {
+  background: transparent;
+  border-style: dashed;
+  opacity: .85;
+}
+
+/* Effetto desaturazione del gioco quando la death screen è aperta */
+body.deathscreen-open canvas,
+body.deathscreen-open #game-canvas {
+  filter: grayscale(1) contrast(.85) brightness(.85);
+}
+
+/* Animazioni */
+@keyframes dsPulse {
+  0%,100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: .98; }
+}
+@keyframes dsTitle {
+  0% { letter-spacing: .5em; filter: blur(2px); opacity: 0; transform: translateY(-6px); }
+  100% { letter-spacing: .18em; filter: blur(0); opacity: 1; transform: translateY(0); }
+}

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { scene } from '../scene';
 import { registerWalkable } from '../systems/GroundSystem';
+import { gameManager } from '../managers/gameManager';
 
 // --- Cache semplice per le texture ---
 const _texCache = new Map();
@@ -88,6 +89,7 @@ export async function createBridge({
   castShadow = true,
   receiveShadow = true,
 } = {}) {
+  gameManager.bridgeCreated=true;
   const modelUrl = '/models/props/Bridge.fbx';
   const texturesPath = '/textures/bridge';
   const loader = new FBXLoader();

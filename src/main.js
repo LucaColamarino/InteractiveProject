@@ -25,9 +25,11 @@ import { spawnarchersStone } from './objects/archerStone.js';
 import { spawnWolfStone } from './objects/wolfStone.js';
 import {HitFeedbackSystem} from "./systems/HitFeedbackSystem.js";
 import { waterHeight } from './utils/entities.js';
-
+import * as THREE from 'three';
 // ⬇️ importa anche applyPendingSave per applicare Stats+Inventory dopo l’init dei sistemi
 import { loadGame, saveGame, applyPendingSave } from './managers/saveManager.js';
+import { createBridge } from './objects/bridge.js';
+import { deathScreen } from './ui/deathScreen.js';
 
 const settings = (window.__gameSettings = {
   quality: 'medium',
@@ -109,16 +111,45 @@ async function init() {
     spawnChestAt(-55, 70, ironHelmet);
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
+    if(gameManager.bridgeCreated)
+      createBridge({
+                modelUrl: '/models/props/Bridge.fbx',
+                texturesPath: '/textures/bridge',
+                scale: 0.004,
+                position: new THREE.Vector3(-135,getTerrainHeightAt(-135,115),115),
+                rotationY: 10,
+                uvTile: 2,  // aumenta/riduci tiling
+              });
 
     updateLoadingProgress(95, 'Player initialization...');
-    if(!gameManager.controller) {
-      console.log("CRETING NEW CONTROLLER");
-      gameManager.controller = await spawnPlayer();
+    if (!gameManager.controller) {
+      console.log("CREATING NEW CONTROLLER");
+      const spawnArg = gameManager.savedPos != null ? gameManager.savedPos : undefined;
+      gameManager.controller = await spawnPlayer(spawnArg);
       gameManager.controller.effects = new HitFeedbackSystem({
-        camera: camera,
-        playerObj: gameManager.controller.player?.model,
+      camera: camera,
+      playerObj: gameManager.controller.player?.model,
       });
     }
+    deathScreen.init({
+      onRespawn: async () => {
+        deathScreen.hide();
+        // Esempio: respawn al falò/checkpoint
+        const cp = gameManager.lastCheckpoint;
+        if (cp?.position) await gameManager.respawnAt(cp.position);
+        else if (gameManager?.respawnAt) await gameManager.respawnAt(new THREE.Vector3(0,0,0));
+        if (gameManager) gameManager.isPaused = false;
+      },
+      onLoad: async () => {
+        deathScreen.hide();
+        if (gameManager?.loadLastSave) await gameManager.loadLastSave();
+        if (gameManager) gameManager.isPaused = false;
+      },
+      onQuit: () => {
+        // Vai al menu principale / ricarica scena
+        window.location.href = '/';
+      }
+    });
 
     // ⬇️ APPlica qui lo snapshot (StatsSystem + Inventory) ora che controller & inventory esistono
     applyPendingSave();

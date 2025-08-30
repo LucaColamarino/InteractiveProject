@@ -1,4 +1,5 @@
 import { gameManager } from "../managers/gameManager";
+import { deathScreen } from "../ui/deathScreen";
 import { hudManager } from "../ui/hudManager";
 import { renderXPHud } from "../ui/xpHud";
 export let xp = null;
@@ -45,9 +46,11 @@ export class StatsSystem {
      this._notify(); 
       if (this.hp === 0) this.die();
     }
-  die()
+  die(causa="")
   {
     console.log("GAME OVER");
+    deathScreen.show({ cause: causa || 'Il tuo viaggio finisce qui...' });
+
   }
   heal(n){ this.hp = Math.min(this.maxHP, this.hp + n); this._notify(); }
   useStamina(n){

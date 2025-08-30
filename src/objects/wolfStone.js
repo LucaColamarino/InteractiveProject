@@ -169,8 +169,8 @@ export async function spawnWolfStone({
       let left = objective -gameManager.wolvesKilled;
       if(left>0){hudManager.showNotification("You need to kill "+left+" more wolves.");return;}
         _state.activated = true; _state.glowTarget = 1.0;
-        gameManager.activatedStones+=1;
-        if(gameManager.activatedStones>=2){
+        gameManager.activatedStones.wolf=true;
+        if(gameManager.activatedStones.archer==true){
           hudManager.showNotification("Bridge activated.");
           createBridge({
               modelUrl: '/models/props/Bridge.fbx',
@@ -191,6 +191,7 @@ export async function spawnWolfStone({
 // ===== Update (solo glow pulse) =====
 export function updateWolfStone(dt) {
   if (!wolvesStone) return;
+  if(_state.activated==false && gameManager.activatedStones.wolf==true) {_state.activated = true; _state.glowTarget = 1.0;}
   _time += dt;
   const k = 1 - Math.pow(0.0001, dt);
   _state.glow = THREE.MathUtils.lerp(_state.glow, _state.glowTarget, k);

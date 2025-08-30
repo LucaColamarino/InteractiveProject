@@ -179,8 +179,8 @@ export async function spawnarchersStone({
       if(left>0){hudManager.showNotification("You need to kill "+left+" more archers.");return;}
      _state.activated = true;
     _state.glowTarget = 1.0;
-    gameManager.activatedStones+=1;
-    if(gameManager.activatedStones>=2){
+    gameManager.activatedStones.archer=true;
+    if(gameManager.activatedStones.wolf==true){
       hudManager.showNotification("Bridge activated.");
       createBridge({
           modelUrl: '/models/props/Bridge.fbx',
@@ -201,6 +201,7 @@ export async function spawnarchersStone({
 // ===== Update (solo glow pulse) =====
 export function updatearchersStone(dt) {
   if (!archersStone) return;
+  if(_state.activated==false && gameManager.activatedStones.wolf==true) {_state.activated = true; _state.glowTarget = 1.0;}
   _time += dt;
   const k = 1 - Math.pow(0.0001, dt);
   _state.glow = THREE.MathUtils.lerp(_state.glow, _state.glowTarget, k);

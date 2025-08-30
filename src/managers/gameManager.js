@@ -7,6 +7,7 @@ export const archerObjective=0;
 export const wolfObjective=0;
 //(-60, 65);
  class GameManager {
+   savedPos =null;
    controller = null;
    running = false; 
    paused = false;
@@ -20,10 +21,11 @@ export const wolfObjective=0;
    pickableManager = null;
    wolvesKilled = 0;
    archersKilled =0;
-   activatedStones=0;
+   activatedStones={archer: false,wolf: false};
    campfiremenu=false;
    effects = null;
    isPaused = false;
+   bridgeCreated = false;
   }
 export function createGameManager() {
   
