@@ -60,7 +60,6 @@ export function getGroundHeightAtXZ(x, z, {
 
     if (hit.point.y > bestY) bestY = hit.point.y;
   }
-
   return bestY;
 }
 

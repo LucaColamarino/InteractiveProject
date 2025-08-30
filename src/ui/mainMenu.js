@@ -1,3 +1,5 @@
+import { gameManager } from "../managers/gameManager";
+
 // /src/ui/mainMenu.js — Pause/Main Menu (Soulslike style, with live Settings)
 export class MainMenu {
   /**
@@ -192,6 +194,7 @@ export class MainMenu {
     if (this.isVisible()) {
       this._resume();
     } else {
+      gameManager.isPaused=true;
       this.show(true);
     }
   }
@@ -245,6 +248,7 @@ export class MainMenu {
     this._playClickSound();
     this.onResume?.();
     this.show(false);
+    gameManager.isPaused=false;
     this._requestPointerLockIfAny(this.pointerLockTarget);
   }
 

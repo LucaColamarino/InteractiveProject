@@ -23,6 +23,7 @@ export const wolfObjective=0;
    activatedStones=0;
    campfiremenu=false;
    effects = null;
+   isPaused = false;
   }
 export function createGameManager() {
   

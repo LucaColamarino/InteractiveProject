@@ -10,6 +10,7 @@ import { instantiateEntity, buildMixerAndActions } from '../../utils/entityFacto
 import { ENTITY_CONFIG } from '../../utils/entities.js';
 import { Animator } from '../../components/Animator.js';
 import { offset as camOffset } from '../../player/cameraFollow.js';
+import { WyvernFormController } from './WyvernFormController.js';
 
 const STRATEGY_REGISTRY = {
   sword: () => new SwordMeleeStrategy(),
@@ -84,14 +85,12 @@ export class HumanFormController extends BaseFormController {
       // 6) Crea controller specifico senza import a livello top (no cicli)
       let newController = this;
       if (formKey === 'wyvern') {
-        // import dinamico per evitare l’import circolare
-        const { WyvernFormController } = await import('./WyvernFormController.js');
 
         const wyvAbilities = {
           formName: 'wyvern',
           canFly: true,
           canJump: false,
-          speed: 10,
+          speed: 50,
           gravity: -6,
           jumpForce: 10,
           cameraOffset: defaultCamOffset,
@@ -124,9 +123,6 @@ export class HumanFormController extends BaseFormController {
       // 8) Marca avatar/child per future trasformazioni
       newFBX.userData.keepOnTransform = false;
       if (this.player.swordHitbox) this.player.swordHitbox.userData.keepOnTransform = true;
-
-      // 9) Installa il nuovo controller sul player e ritorna
-      this.player.controller = newController;
       console.log(`[TRANSFORM] Trasformato in ${formKey} con ${newController.constructor.name}.`);
       return newController;
     } catch (e) {

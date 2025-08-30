@@ -7,7 +7,7 @@ export class StatsSystem {
     this.maxStamina = maxStamina; this.stamina = maxStamina;
     this.maxMana = maxMana; this.mana = maxMana;
     this.armor = armor;
-    this.levelPoints = 3; // punti iniziali disponibili per upgrade
+    this.levelPoints = 300; // punti iniziali disponibili per upgrade
     this._listeners = [];
     this._staminaCd = 0;
     this._staminaCdDefault = 0.6;

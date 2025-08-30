@@ -20,12 +20,11 @@ import { abilitiesByForm, spawnPlayer } from './player/Player.js';
 import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";
 import { ironShield, ironSword,magicWand,ironHelmet } from './utils/items.js';
 import { updateVitalsHUD } from './ui/hudVitals.js';
-import { createBridge } from './objects/bridge.js';
-import * as THREE from 'three';
 import { setNoGoLevel } from './systems/GroundSystem.js';
 import { spawnarchersStone } from './objects/archerStone.js';
 import { spawnWolfStone } from './objects/wolfStone.js';
 import {HitFeedbackSystem} from "./systems/HitFeedbackSystem.js";
+import { waterHeight } from './utils/entities.js';
 // =====================
 // SETTINGS
 // =====================
@@ -88,7 +87,7 @@ async function init() {
 
     updateLoadingProgress(55, 'Creating sky and water...');
     createSky();
-    const waterY = 8;
+    const waterY = waterHeight;
     addWaterPlane(waterY);
     setNoGoLevel(waterY, 0.06); // 6 cm di margine sopra
     await wait(120);

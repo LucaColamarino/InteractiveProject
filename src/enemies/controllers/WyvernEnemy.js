@@ -6,7 +6,7 @@ import { getTerrainHeightAt } from '../../map/map.js';
 export class WyvernEnemy extends BaseEnemy {
   constructor(opt = {}) {
     super({ ...opt, type: 'wyvern' });
-    this.health=350;
+    this.health=50;
     this.behaviorState = 'walking';         // 'walking' | 'flying' | 'landing'
     this.stateTimer = 0;
     this.altitude = opt.altitude ?? 12;

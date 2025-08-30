@@ -95,9 +95,6 @@ export function startLoop(c) {
   if (inv?.onChange) inv.onChange(() => refreshInventoryUI());
   refreshInventoryUI();
 
-  const controller = gameManager.controller;
-  const player = controller?.player;
-
   // HUD & XP
   hudManager.init();
   initXP();
@@ -113,30 +110,39 @@ export function startLoop(c) {
 
     let delta = clock.getDelta();
     delta = Math.min(delta, 0.05);
-    tickTrees(delta); // <-- gestisce rigenerazione essence dei siti
 
+    // 🔄 LEGGI SEMPRE IL CONTROLLER CORRENTE AD OGNI FRAME
+    const ctrl   = gameManager.controller;
+    const player = ctrl?.player;
+
+    // === PAUSA ===
+    if (gameManager?.isPaused) {
+      hudManager.updatePaused?.(player, ctrl, camera);
+      renderer.render(scene, camera);
+      stats.end();
+      return;
+    }
+
+    // --- world time & shaders (solo se NON in pausa) ---
+    tickTrees(delta);
     updateSunPosition(delta);
     if (terrainMaterial?.userData?.shaderRef?.uniforms?.time) {
       terrainMaterial.userData.shaderRef.uniforms.time.value += delta;
     }
 
     try {
-      if (controller) {
-        pumpActions(controller);           // input → controller.setInputState(...)
-        controller.update(delta);          // movimento/stati (Base/HumanFormController)
-        if (player) player.update(delta);  // <-- ORA qui vive l’Animator
+      if (ctrl) {
+        pumpActions(ctrl);           // input → controller.setInputState(...)
+        ctrl.update(delta);          // movimento/stati (Base/Human/Wyvern ecc.)
+        if (player) player.update(delta);  // Animator e logiche player
       }
 
       // ➜ FACING verso il target quando lock-on attivo
       if (player) {
-        // Se vedi 180° di errore, passa { yawOffset: Math.PI }
         updatePlayerFacingToLock(player, delta /*, { turnSpeed: 12, yawOffset: 0 } */);
       }
 
-      const ctrl = controller; // alias
-
       if (ctrl?.isDraining) {
-        // Se per qualche motivo non ho più un “sito” valido, ricalcolo vicino al player
         const playerPos = player?.model?.position;
         if (playerPos && !ctrl._drainSite) {
           ctrl._drainSite = findDrainableTree(playerPos);
@@ -146,15 +152,11 @@ export function startLoop(c) {
         if (ctrl._drainSite) {
           const ess = drainOnce(ctrl._drainSite, TREE_ESSENCE_CFG.drainPerSec, delta);
 
-          // 🔄 Opacità foglie SOLO sull'albero drenato, proporzionale alla density (0..1)
-          const density = getLeafDensity(ctrl._drainSite); // 1=folto, 0=spoglio
+          const density = getLeafDensity(ctrl._drainSite); // 1..0
           trees?.setLeafOpacityForSite?.(ctrl._drainSite, density);
-
-          // ricorda il sito corrente per la fase di rigenerazione
           lastRegenSite = ctrl._drainSite;
 
           if (ess > 0) {
-            // mana gain
             const stats = ctrl.stats;
             if (stats && typeof stats.mana === 'number' && typeof stats.maxMana === 'number') {
               const add = Math.min(ess, ctrl._manaPerSecFromTree * delta);
@@ -165,7 +167,6 @@ export function startLoop(c) {
               }
             }
           } else {
-            // sito esaurito: smetto di drenare, lascio le foglie “minime” sul SOLO albero
             const site = ctrl._drainSite;
             lastRegenSite = site;
             ctrl.stopDrain();
@@ -173,18 +174,15 @@ export function startLoop(c) {
           }
         }
       } else if (lastRegenSite) {
-        // cooldown: mantieni opacità minima finché non risale la density
         const cd = lastRegenSite.cooldown ?? 0;
         if (cd > 0) {
           trees?.setLeafOpacityForSite?.(lastRegenSite, LEAF_MIN_OPACITY_DURING_COOLDOWN);
         } else {
-          // cooldown finito → density risale con tickTrees
-          const density = getLeafDensity(lastRegenSite); // current / maxEssence
+          const density = getLeafDensity(lastRegenSite);
           trees?.setLeafOpacityForSite?.(lastRegenSite, density);
-
           if (density >= 0.999) {
             trees?.setLeafOpacityForSite?.(lastRegenSite, 1);
-            lastRegenSite = null; // tracking finito
+            lastRegenSite = null;
           }
         }
       }
@@ -206,12 +204,15 @@ export function startLoop(c) {
       updateEnvironment();
       updateWolfStone(delta);
       updatearchersStone(delta);
-      gameManager.controller.effects?.update(delta);
-      gameManager.controller.stats.regenStamina(delta, 8);
-      //gameManager.controller.stats.regenMana(delta, 3);
+
+      // ✅ queste usano già gameManager.controller (quindi ok)
+      gameManager.controller?.effects?.update(delta);
+      gameManager.controller?.stats?.regenStamina(delta, 8);
+      //gameManager.controller?.stats?.regenMana(delta, 3);
+
       gameManager.pickableManager?.update(delta, player?.model?.position);
       interactionManager.update();
-      hudManager.update(player, controller, camera, getEnemies());
+      hudManager.update(player, ctrl, camera, getEnemies());
 
       renderer.render(scene, camera);
     } catch (e) {
@@ -221,6 +222,7 @@ export function startLoop(c) {
           console.warn('⚠️ Problema in mesh:', obj);
         }
       });
+      renderer.render(scene, camera);
     }
 
     stats.end();
@@ -228,3 +230,4 @@ export function startLoop(c) {
 
   animate();
 }
+

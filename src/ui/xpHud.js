@@ -29,37 +29,6 @@ const xpAnimations = {
     });
   },
 
-  createSparkleEffect(container) {
-    if (!container) return;
-    const frag = document.createDocumentFragment();
-    const sparkles = [];
-    const N = 12;
-    const rect = container.getBoundingClientRect();
-
-    for (let i = 0; i < N; i++) {
-      const s = document.createElement('div');
-      s.className = 'xp-sparkle';
-      s.style.cssText = `
-        position:absolute;width:4px;height:4px;border-radius:50%;
-        background:var(--warning-orange-light);pointer-events:none;z-index:10;
-        box-shadow:0 0 6px var(--warning-orange);
-      `;
-      const ang = (i / N) * Math.PI * 2;
-      const R = 30 + Math.random() * 20;
-      s.style.left = `${rect.width / 2 + Math.cos(ang) * R}px`;
-      s.style.top  = `${rect.height / 2 + Math.sin(ang) * R}px`;
-      frag.appendChild(s); sparkles.push(s);
-
-      s.animate([
-        { transform: 'scale(0) rotate(0deg)', opacity: 1 },
-        { transform: 'scale(1.5) rotate(180deg)', opacity: 0.8, offset: 0.3 },
-        { transform: 'scale(0) rotate(360deg)', opacity: 0 }
-      ], { duration: 1200, easing: 'cubic-bezier(0.68,-0.55,0.265,1.55)', delay: i * 50 });
-    }
-    container.appendChild(frag);
-    setTimeout(() => sparkles.forEach(s => s.remove()), 1500);
-  },
-
   levelPulseEffect(el, level) {
     if (!el) return;
     const color = this.getLevelColor(level);
@@ -84,8 +53,6 @@ export function initXPHud() {
     pillLevel: document.getElementById('mm-level'),
     xpBar: document.getElementById('xp-bar'),
     xpText: document.getElementById('xp-text'),
-    xpContainer: document.querySelector('.progress-container:has(#xp-bar)'),
-    notificationArea: document.getElementById('notifications'),
   };
   const missing = ['pillLevel','xpBar','xpText'].filter(k => !elements[k]);
   if (missing.length) {
@@ -146,30 +113,7 @@ export function toastLevelUp(newLevel, options = {}) {
       75: "Sei diventato una forma superiore!",
       100: "Evoluzione completa raggiunta!"
     }[newLevel] || "Continua ad evolverti!")}`;
-
-  if (typeof hudManager?.showNotification === 'function') {
     hudManager.showNotification(message, 'levelup', { duration: XP_CONFIG.levelUpEffectDuration });
-  } else if (elements?.notificationArea) {
-    const n = document.createElement('div');
-    n.className = 'notification notification-levelup';
-    n.innerHTML = `<span class="notification-icon">🎉</span><span class="notification-text">${message}</span>`;
-    n.style.background = 'linear-gradient(135deg, rgba(241,196,15,.15), rgba(243,156,18,.1))';
-    n.style.borderLeftColor = 'var(--warning-orange)';
-    n.style.transform = 'translateX(-100%)';
-    n.style.boxShadow = '0 4px 20px rgba(241,196,15,.3)';
-    elements.notificationArea.appendChild(n);
-    requestAnimationFrame(() => {
-      n.style.transition = 'all .45s cubic-bezier(0.68,-0.55,0.265,1.55)';
-      n.style.transform = 'translateX(0)';
-    });
-    setTimeout(() => {
-      n.style.transition = 'all .25s ease';
-      n.style.transform = 'translateX(-100%)'; n.style.opacity = '0';
-      setTimeout(() => n.remove(), 250);
-    }, XP_CONFIG.levelUpEffectDuration);
-  }
-
-  if (elements?.xpContainer) xpAnimations.createSparkleEffect(elements.xpContainer);
   if (elements?.xpBar) {
     elements.xpBar.classList.add('levelup');
     setTimeout(() => elements.xpBar.classList.remove('levelup'), XP_CONFIG.levelUpEffectDuration);

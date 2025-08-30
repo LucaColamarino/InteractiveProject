@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-
+export const waterHeight = 9;
 export const ENTITY_CONFIG = {
   human: {
     modelPath: '/models/knightwand.fbx',

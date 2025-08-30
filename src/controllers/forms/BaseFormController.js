@@ -9,7 +9,7 @@ import { getGroundHeightAtXZ, isBlockedByWater } from '../../systems/GroundSyste
 
 // Utils/entities/animator
 import { instantiateEntity, buildMixerAndActions } from '../../utils/entityFactory.js';
-import { ENTITY_CONFIG } from '../../utils/entities.js';
+import { ENTITY_CONFIG, waterHeight } from '../../utils/entities.js';
 import { Animator } from '../../components/Animator.js';
 
 // Camera (se il path non combacia, aggiorna)
@@ -25,6 +25,10 @@ const STAMINA_REGEN_RATE  = 8;
 const MANA_REGEN_RATE     = 0;
 const BURNING_TIME = 5;
 const BURN_DPS = 1;
+
+// Margini verticali minimi rispetto a terreno/acqua quando si vola
+const WATER_CLEARANCE  = 1.0; // distanza minima dalla superficie dell'acqua
+const GROUND_CLEARANCE = 0.6; // distanza minima dal terreno (creste/colline)
 
 export class BaseFormController {
   constructor(player, abilities) {
@@ -92,7 +96,7 @@ export class BaseFormController {
     if (this.abilities?.canFly) {
       const tY = getGroundHeightAtXZ(p.x, p.z, { fromY: p.y + 2.0 });
       const onGround = p.y <= tY + 0.01;
-      if (onGround) { this.isFlying = true; this.velY = 10; }
+      if (onGround) { this.isFlying = false; this.velY = 10; }
     } else if (this.isOnGround) {
       this.velY = this.abilities?.jumpForce ?? 8;
       this.isOnGround = false;
@@ -100,11 +104,11 @@ export class BaseFormController {
   }
 
   update(dt) {
-    if(this.isBlocking)
-      {
-        const enough=gameManager.controller.stats.useStamina(10*dt);
-        if(!enough) this.isBlocking=false;
-      }
+    if(this.isBlocking) {
+      const enough = gameManager.controller.stats.useStamina(10*dt);
+      if(!enough) this.isBlocking=false;
+    }
+
     // FX burning
     if (this._burnFx) this._burnFx.update(dt);
     if (this._isBurning) {
@@ -185,8 +189,10 @@ export class BaseFormController {
     // Ostacoli generici
     resolveObstaclesXZ(this._candPos, PLAYER_RADIUS);
 
-    // Muro invisibile sull’acqua + slide
-    {
+    // ===== Muro invisibile sull’acqua + slide =====
+    // Se il form può volare ed è in volo, NON blocchiamo sull'acqua (può sorvolarla).
+    const isAirborne = (this.abilities?.canFly && this.isFlying) === true;
+    if (!isAirborne) {
       const fromY = Math.max(this._prePos.y, this._candPos.y) + 2.0;
       if (isBlockedByWater(this._candPos.x, this._candPos.z, { fromY })) {
         const tryX = !isBlockedByWater(this._prePos.x + this._step.x, this._prePos.z, { fromY });
@@ -204,7 +210,7 @@ export class BaseFormController {
       }
     }
 
-    // Applica posizione finale
+    // Applica posizione finale XZ
     pos.copy(this._candPos);
 
     // Yaw verso direzione di marcia
@@ -215,18 +221,33 @@ export class BaseFormController {
       this.player.model.rotation.y += d * 0.15;
     }
 
-    // Movimento verticale
+    // ===== Movimento verticale =====
     const g = this.abilities?.gravity ?? -30;
     if (this.abilities?.canFly && this.isFlying) {
+      // input verticali
       if (this._input.isJumpPressed)  this.velY += 30 * dt; // su
       if (this._input.isShiftPressed) this.velY -= 30 * dt; // giù
       this.velY += g * 0.2 * dt;
-    } else {
-      this.velY += g * dt;
-    }
-    pos.y += this.velY * dt;
 
-    // Colla al suolo / ponte
+      // Limite minimo = max(terreno, acqua) + margini
+      const groundY = getGroundHeightAtXZ(pos.x, pos.z, { fromY: pos.y + 2.0 });
+      const waterY  = waterHeight;
+      const minFlyY = Math.max(groundY + GROUND_CLEARANCE, waterY + WATER_CLEARANCE);
+
+      const nextY = pos.y + this.velY * dt;
+      if (nextY < minFlyY) {
+        pos.y = minFlyY;
+        if (this.velY < 0) this.velY = 0;
+      } else {
+        pos.y = nextY;
+      }
+    } else {
+      // terrestre / salto normale
+      this.velY += g * dt;
+      pos.y += this.velY * dt;
+    }
+
+    // Snap al suolo / gestione atterraggio
     this._ensureAboveGround();
 
     // Regen
@@ -245,6 +266,22 @@ export class BaseFormController {
 
   _ensureAboveGround() {
     const p = this.player.model.position;
+
+    // Se vola (ed è abilitato a volare), NON “incollare” al terreno,
+    // ma rispetta comunque la quota minima rispetto a terreno/acqua.
+    if (this.abilities?.canFly && this.isFlying) {
+      const groundY = getGroundHeightAtXZ(p.x, p.z, { fromY: p.y + 2.0 });
+      const waterY  = waterHeight;
+      const minFlyY = Math.max(groundY + GROUND_CLEARANCE, waterY + WATER_CLEARANCE);
+      if (p.y < minFlyY) {
+        p.y = minFlyY;
+        this.velY = Math.max(0, this.velY);
+      }
+      this.isOnGround = false;
+      return;
+    }
+
+    // Comportamento standard terrestre
     const groundY = getGroundHeightAtXZ(p.x, p.z, { fromY: p.y + 2.0 });
     if (p.y < groundY) {
       p.y = groundY; this.velY = 0; this.isOnGround = true;
