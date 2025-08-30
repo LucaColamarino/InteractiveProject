@@ -49,7 +49,7 @@ export class StatsSystem {
   die(causa="")
   {
     console.log("GAME OVER");
-    deathScreen.show({ cause: causa || 'Il tuo viaggio finisce qui...' });
+    deathScreen.show({ cause: causa || 'Your journey ends here...' });
 
   }
   heal(n){ this.hp = Math.min(this.maxHP, this.hp + n); this._notify(); }
