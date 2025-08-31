@@ -36,6 +36,8 @@ export class FireBreathCone {
 
     this.setVisible(false);
     this._makeNonPickable();
+this._invertForward = false; // sostituisce il vecchio invertForward()
+this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ'); // offset locale (pitch,yaw,roll)
 
     if (this.parent) this.attachTo(this.parent, this.localOffset);
   }
@@ -192,6 +194,41 @@ export class FireBreathCone {
     this.fireGeometry = fireGeo;
     this.fireMaterial = fireMaterial;
   }
+setRotationOffsetEuler(euler) {
+  this.aimOffsetEuler.copy(euler);
+  this._applyLocalRotation();
+}
+
+setRotationOffsetDegrees(pitchDeg = 0, yawDeg = 0, rollDeg = 0) {
+  console.log("ROTATION SET");
+  this.aimOffsetEuler.set(
+    THREE.MathUtils.degToRad(pitchDeg),
+    THREE.MathUtils.degToRad(yawDeg),
+    THREE.MathUtils.degToRad(rollDeg),
+    'XYZ'
+  );
+  this._applyLocalRotation();
+}
+
+// rimpiazza la vecchia invertForward(flag) che ruotava solo sullo Y
+invertForward(flag = true) {
+  this._invertForward = !!flag;
+  this._applyLocalRotation();
+}
+
+_applyLocalRotation() {
+  // Base: +Z è la direzione del getto
+  const qOffset = new THREE.Quaternion().setFromEuler(this.aimOffsetEuler);
+
+  // Se invertito, aggiungi una rotazione di 180° attorno a Y (inverte la +Z)
+  if (this._invertForward) {
+    const qInv = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI);
+    qInv.multiply(qOffset);
+    this.group.quaternion.copy(qInv);
+  } else {
+    this.group.quaternion.copy(qOffset);
+  }
+}
 
   /* ========================= CORE: Jet ========================= */
   _createJetCore() {
@@ -684,7 +721,7 @@ export class FireBreathCone {
     if (!parent) return;
     parent.add(this.group);
     this.group.position.copy(this.localOffset);
-    this.group.rotation.set(0, 0, 0);
+    this._applyLocalRotation();  
   }
 
   autoscaleFromModelBounds(diagonal, kLen = 0.35, kRad = 0.10) {

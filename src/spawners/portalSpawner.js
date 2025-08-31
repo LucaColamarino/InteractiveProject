@@ -1,7 +1,7 @@
 // PortalSpawner.js — Minimal 3D single-portal spawner for Three.js
 // Usage:
 //   import { PortalSpawner } from './PortalSpawner.js';
-//   const spawner = new PortalSpawner(scene);
+//   const spawner = new PortalSpawner(scene, camera); // aggiungi camera
 //   spawner.spawn({ position: new THREE.Vector3(10, 2, -5) });
 //   // in your game loop: spawner.update(deltaSeconds);
 //   // to remove: spawner.remove();
@@ -11,9 +11,11 @@ import * as THREE from 'three';
 export class PortalSpawner {
   /**
    * @param {THREE.Scene} scene
+   * @param {THREE.Camera} camera - Necessaria per far guardare il portale verso il player
    */
-  constructor(scene) {
+  constructor(scene, camera) {
     this.scene = scene;
+    this.camera = camera;
     this.group = null;    // THREE.Group containing the portal
     this._shaderMesh = null;
     this._ringMesh = null;
@@ -25,7 +27,7 @@ export class PortalSpawner {
    * Spawn (or replace) the single portal.
    * @param {Object} opt
    * @param {THREE.Vector3} [opt.position=new THREE.Vector3()]  World position
-   * @param {THREE.Vector3} [opt.normal=new THREE.Vector3(0,1,0)]  Facing direction
+   * @param {boolean} [opt.lookAtPlayer=true] Se true, il portale guarda sempre il player
    * @param {number} [opt.radius=1.6]  Outer radius in meters
    * @param {number} [opt.thickness=0.15] Ring thickness (outer - inner)
    * @param {THREE.Color|number|string} [opt.color=0x8a2be2] Main color
@@ -34,7 +36,7 @@ export class PortalSpawner {
   spawn(opt = {}) {
     const {
       position = new THREE.Vector3(),
-      normal = new THREE.Vector3(0, 1, 0),
+      lookAtPlayer = true,
       radius = 1.6,
       thickness = 0.15,
       color = 0x8a2be2,
@@ -48,12 +50,6 @@ export class PortalSpawner {
     this.group = new THREE.Group();
     this.group.position.copy(position);
 
-    // Orient group so that its local +Z faces along the provided normal
-    const zAxis = new THREE.Vector3(0, 0, 1);
-    const n = normal.clone().normalize();
-    const quat = new THREE.Quaternion().setFromUnitVectors(zAxis, n);
-    this.group.quaternion.copy(quat);
-
     // Simple ring frame (geometry-only, no post)
     const innerR = Math.max(0.01, radius - thickness);
     const ringGeo = new THREE.RingGeometry(innerR, radius, 96, 1);
@@ -65,11 +61,10 @@ export class PortalSpawner {
       side: THREE.DoubleSide,
     });
     this._ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    this._ringMesh.rotateX(Math.PI / 2); // orient ring in the group XY plane
     this.group.add(this._ringMesh);
 
-    // Inner disk with animated shader (smooth radial alpha + swirl)
-    const planeGeo = new THREE.PlaneGeometry(innerR * 2, innerR * 2, 1, 1);
+    // Inner disk con geometria circolare invece di quadrata
+    const circleGeo = new THREE.CircleGeometry(innerR, 64);
     const portalMat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -118,7 +113,7 @@ export class PortalSpawner {
           float n = noise(vec2(a * 2.0, r * 4.0) + u_time * 0.7);
           float swirl = (n - 0.5) * u_noiseAmp;
 
-          // Feathered circular mask
+          // Feathered circular mask (più morbido)
           float edge = smoothstep(1.0, 1.0 - u_softness, r);
 
           // Animated radiance
@@ -133,14 +128,18 @@ export class PortalSpawner {
         }
       `,
     });
-    this._shaderMesh = new THREE.Mesh(planeGeo, portalMat);
-    this._shaderMesh.rotateX(Math.PI / 2);
+    this._shaderMesh = new THREE.Mesh(circleGeo, portalMat);
     this.group.add(this._shaderMesh);
 
     // Subtle point light to sell the glow (optional, cheap)
     this._light = new THREE.PointLight(new THREE.Color(color), 0.8, radius * 6.0, 2.0);
     this._light.position.set(0, 0, 0.05); // just in front of the disk
     this.group.add(this._light);
+
+    // Orienta il portale verso il player se richiesto
+    if (lookAtPlayer && this.camera) {
+      this.group.lookAt(this.camera.position);
+    }
 
     // Add to scene
     this.scene.add(this.group);
@@ -154,6 +153,7 @@ export class PortalSpawner {
   update(dt) {
     if (!this.group || !this._shaderMesh) return;
     this._time += dt;
+    
     // spin the ring very slightly
     if (this._ringMesh) this._ringMesh.rotation.z += dt * 0.8;
 
@@ -162,6 +162,11 @@ export class PortalSpawner {
 
     // feed shader time
     this._shaderMesh.material.uniforms.u_time.value = this._time;
+
+    // Far guardare sempre il portale verso il player
+    if (this.camera && this.group) {
+      this.group.lookAt(this.camera.position);
+    }
   }
 
   /**

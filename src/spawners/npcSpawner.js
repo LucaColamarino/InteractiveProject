@@ -74,7 +74,11 @@ async function spawnEnemy(configKey, position, typeOverride = null) {
   // aggancia Animator centrale
   const animator = new Animator({ mixer, actions }, () => ctrl.state);
   ctrl.animator = animator;
-
+  try {
+  ctrl.onModelReady && ctrl.onModelReady();
+} catch (e) {
+  console.warn('[NPC] onModelReady error:', e);
+}
   // ---- Hook specifico per arciere ----
   if (type === 'archer') {
     ctrl.arrowMesh = fbx.userData?.attachments?.arrow || null;

@@ -112,7 +112,7 @@ async function init() {
     spawnChestAt(-55, 70, ironHelmet);
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
-    const spawner = new PortalSpawner(scene);
+    const spawner = new PortalSpawner(scene,camera);
     gameManager.spawner = spawner;
     // spawn un portale di colore "fire" a (0,30,0)
     spawner.spawn({
