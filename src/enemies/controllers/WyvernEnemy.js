@@ -5,16 +5,23 @@ import { getTerrainHeightAt } from '../../map/map.js';
 import { gameManager } from '../../managers/gameManager.js';
 import { FireBreathCone } from '../../particles/FireBreathCone.js';
 
+const BOSS_NAME = 'AZHARYX, VORTICE CINERINO';
+
 export class WyvernEnemy extends BaseEnemy {
   constructor(opt = {}) {
     super({ ...opt, type: 'wyvern' });
 
     // ── Stats
     this.health = opt.health ?? 30;
+    this.maxHealth = this.health;          // <<< per boss bar
+    this._prevHealth = this.health;        // <<< tracking HP per update evento
+    this._deathNotified = false;           // <<< evita doppio disengage
     this.xp     = opt.xp ?? 250;
 
     // ── Ingaggio
     this.engageRange = opt.engageRange ?? 45;
+    this._engagedBoss = false;             // <<< stato bossbar
+    this._bossUiId = `wyvern-${(Math.random()*1e9|0).toString(16)}`; // <<< id logico
 
     // ── Movimento / volo
     this.altitudeMin = opt.altitudeMin ?? 15;
@@ -104,6 +111,23 @@ export class WyvernEnemy extends BaseEnemy {
     this._fire.update?.(dt);
     this.stateTimer += dt;
 
+    // --- BOSS BAR: aggiornamenti HP e morte ---
+    if (this.health !== this._prevHealth) {
+      // se prende danno prima dell'aggro, forza l'aggro UI (classico souls)
+      if (!this._engagedBoss) this._dispatchBossEngage();
+      window.dispatchEvent(new CustomEvent('boss:update', {
+        detail: { id: this._bossUiId, cur: this.health }
+      }));
+      this._prevHealth = this.health;
+    }
+    if (!this._deathNotified && this.health <= 0) {
+      window.dispatchEvent(new CustomEvent('boss:disengage', {
+        detail: { id: this._bossUiId }
+      }));
+      this._deathNotified = true;
+      this._engagedBoss = false;
+    }
+
     switch (this.behaviorState) {
       case 'idle':            this._updateIdle(dt);          break;
       case 'ground_fire':     this._updateGroundFire(dt);    break;
@@ -129,7 +153,11 @@ export class WyvernEnemy extends BaseEnemy {
     p.y = THREE.MathUtils.lerp(p.y, groundY + this.yOffset, Math.min(1, dt * 8));
 
     const dist = this._distanceToPlayer();
-    if (dist <= this.engageRange) this._enterGroundFire();
+    if (dist <= this.engageRange) {
+      // primo contatto: mostra boss bar
+      this._dispatchBossEngage();
+      this._enterGroundFire();
+    }
   }
 
   // ── GROUND FIRE ─────────────────────────────────────────────────────────────
@@ -419,6 +447,20 @@ export class WyvernEnemy extends BaseEnemy {
     if (!this.model) return 1.0;
     const s = new THREE.Vector3(); this.model.getWorldScale(s);
     return (Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.z)) / 3;
+  }
+
+  // --- Boss UI helpers ---
+  _dispatchBossEngage() {
+    if (this._engagedBoss) return;
+    this._engagedBoss = true;
+    window.dispatchEvent(new CustomEvent('boss:engage', {
+      detail: {
+        id: this._bossUiId,
+        name: BOSS_NAME,
+        max: this.maxHealth,
+        cur: this.health
+      }
+    }));
   }
 }
 

@@ -116,6 +116,13 @@ function killEnemy(enemyInstance){
       pos,
       { autoPickup: false, pickupRadius: 1.5, enableRing: false, spawnImpulse: { up: 1.0 } }
     );}
+  // === Boss bar (Wyvern) — chiudi barra alla morte ===
+  if (enemyInstance.type === 'wyvern' && enemyInstance._engagedBoss) {
+    window.dispatchEvent(new CustomEvent('boss:disengage', {
+      detail: { id: enemyInstance._bossUiId }
+    }));
+    enemyInstance._engagedBoss = false;
+  }
 
   // ferma subito motion/AI
   enemyInstance.navAgent && (enemyInstance.navAgent.isStopped = true);
@@ -159,17 +166,38 @@ function killEnemy(enemyInstance){
 }
 
 
-export function damageEnemy(enemyInstance,damage=0) {
+export function damageEnemy(enemyInstance, damage = 0) {
   if (!enemyInstance || !enemyInstance.alive) return;
-  const current_health =enemyInstance.health;
-  const future_health = Math.max(0,current_health-damage);
-  enemyInstance.health=future_health;
-  console.log("HEALTH:",future_health);
-  if(future_health<=0)
-    {
-      killEnemy(enemyInstance);
+
+  const current_health = enemyInstance.health;
+  const future_health  = Math.max(0, current_health - damage);
+  enemyInstance.health = future_health;
+  console.log("HEALTH:", future_health);
+
+  // === Boss bar (Wyvern) ===
+  if (enemyInstance.type === 'wyvern') {
+    // id e nome stabili (assegna se mancano)
+    enemyInstance._bossUiId = enemyInstance._bossUiId || `wyvern-${(Math.random()*1e9|0).toString(16)}`;
+    enemyInstance.maxHealth = enemyInstance.maxHealth || current_health;
+    const BOSS_NAME = enemyInstance.bossName || 'AZHARYX, VORTICE CINERINO';
+
+    // primo danno => ingaggio UI
+    if (!enemyInstance._engagedBoss) {
+      enemyInstance._engagedBoss = true;
+      window.dispatchEvent(new CustomEvent('boss:engage', {
+        detail: { id: enemyInstance._bossUiId, name: BOSS_NAME, max: enemyInstance.maxHealth, cur: future_health }
+      }));
     }
- 
+
+    // update HP
+    window.dispatchEvent(new CustomEvent('boss:update', {
+      detail: { id: enemyInstance._bossUiId, cur: future_health }
+    }));
+  }
+
+  if (future_health <= 0) {
+    killEnemy(enemyInstance);
+  }
 }
 
 /* ---------------- helpers ---------------- */

@@ -33,6 +33,7 @@ import { deathScreen } from './ui/deathScreen.js';
 import { initFireBreathTest, updateFireBreathTest } from './testFireBreath.js';
 import { PortalSpawner } from './spawners/portalSpawner.js';
 import { victoryScreen } from './ui/victoryScreen.js';
+import { bossHealth } from './ui/bossHealth.js';
 const settings = (window.__gameSettings = {
   quality: 'medium',
   shadows: true,
@@ -118,7 +119,7 @@ async function init() {
       // Pausa + mostra schermata di vittoria in stile soulslike
       victoryScreen.show({
         title: 'YOU ESCAPED',
-        sub: 'L’eco del portale svanisce… ma il destino ti chiama ancora.'
+        sub: 'The echo of the portal fades… but destiny still calls to you.'
       });
     });
      victoryScreen.init({
@@ -199,7 +200,7 @@ async function init() {
     await wait(60);
 
     hideLoadingScreen();
-
+    bossHealth.init();
     // Stato gioco
     gameManager.running = true;
     gameManager.paused  = false;
