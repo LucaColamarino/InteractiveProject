@@ -141,32 +141,37 @@ class VictoryScreen {
     document.body.appendChild(this.el);
   }
 
-  show({ title = 'YOU ESCAPED', sub = 'Hai attraversato il portale. Il tuo viaggio continua altrove…', playSound = true } = {}) {
-    this._ensureDom();
-    if (this.titleEl) this.titleEl.textContent = title;
-    if (this.subEl) this.subEl.textContent = sub;
+show({ title = 'YOU ESCAPED', sub = 'Hai attraversato il portale. Il tuo viaggio continua altrove…', playSound = true } = {}) {
+  this._ensureDom();
+  if (this.titleEl) this.titleEl.textContent = title;
+  if (this.subEl) this.subEl.textContent = sub;
 
-    // Pausa il gioco
-    if (gameManager) gameManager.isPaused = true;
+  if (gameManager) gameManager.isPaused = true;
 
-    this.el.classList.remove('hidden');
-    this.el.classList.add('active');
-    this.el.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('victory-open');
+  // 🔒 forza la visibilità a prescindere dal CSS globale
+  this.el.style.display = 'flex';
+  this.el.classList.remove('hidden');
+  this.el.classList.add('active');
+  this.el.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('victory-open');
 
-    document.addEventListener('keydown', this._onKey);
+  document.addEventListener('keydown', this._onKey);
+  if (playSound) this._playSound();
+}
 
-    if (playSound) this._playSound();
-  }
+hide() {
+  if (!this.el) return;
 
-  hide() {
-    if (!this.el) return;
-    this.el.classList.remove('active');
-    this.el.classList.add('hidden');
-    this.el.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('victory-open');
-    document.removeEventListener('keydown', this._onKey);
-  }
+  // 🔓 forza l’occultamento a prescindere dal CSS globale
+  this.el.classList.remove('active');
+  this.el.classList.add('hidden');
+  this.el.setAttribute('aria-hidden', 'true');
+  this.el.style.display = 'none';
+
+  document.body.classList.remove('victory-open');
+  document.removeEventListener('keydown', this._onKey);
+}
+
 
   _playSound() {
     // opzionale: breve shimmer/choir – qui lasciamo il placeholder

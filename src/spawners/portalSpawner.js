@@ -25,6 +25,7 @@ export class PortalSpawner {
     this._time = 0;
     this._radius = 10;   // memorizza il raggio per collision detection
     this._gameEnded = false;
+    this._active = true; 
   }
 
   /**
@@ -171,7 +172,7 @@ update(dt, playerPos = null) {
   }
 
   // ✅ rileva collisione player–portale
-  if (playerPos && !this._gameEnded) {
+  if (this._active && playerPos && !this._gameEnded ) {
     const portalPos = new THREE.Vector3();
     this.group.getWorldPosition(portalPos);
     console.log("PORTAL POS",portalPos);
@@ -179,6 +180,7 @@ update(dt, playerPos = null) {
     const dist = portalPos.distanceTo(playerPos);
     if (dist <= this._radius) {
       this._gameEnded = true;
+      this._active = false; 
       console.log("[PortalSpawner] Player touched the portal!");
 
       if (typeof this.onPlayerEscape === "function") {

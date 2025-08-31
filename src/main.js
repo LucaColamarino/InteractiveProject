@@ -126,8 +126,7 @@ async function init() {
       onContinue: () => {
         // di default: riprende il gioco dalla situazione corrente
         if (gameManager) gameManager.isPaused = false;
-        spawner._gameEnded=false;
-        victoryScreen.hide();
+        gameManager.spawner._gameEnded=false;
       },
       // “Torna al menu”
       onQuit: () => {
