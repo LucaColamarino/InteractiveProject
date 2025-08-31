@@ -12,15 +12,19 @@ export class PortalSpawner {
   /**
    * @param {THREE.Scene} scene
    * @param {THREE.Camera} camera - Necessaria per far guardare il portale verso il player
+   * @param {Function} [onPlayerEscape] - Callback chiamata quando il player tocca il portale
    */
-  constructor(scene, camera) {
+  constructor(scene, camera, onPlayerEscape = null) {
     this.scene = scene;
     this.camera = camera;
+    this.onPlayerEscape = onPlayerEscape;
     this.group = null;    // THREE.Group containing the portal
     this._shaderMesh = null;
     this._ringMesh = null;
     this._light = null;
     this._time = 0;
+    this._radius = 1.6;   // memorizza il raggio per collision detection
+    this._gameEnded = false;
   }
 
   /**

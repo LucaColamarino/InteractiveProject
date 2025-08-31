@@ -112,7 +112,12 @@ async function init() {
     spawnChestAt(-55, 70, ironHelmet);
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
-    const spawner = new PortalSpawner(scene,camera);
+    const spawner = new PortalSpawner(scene, camera, () => {
+      // Il tuo codice personalizzato quando il player scappa
+      console.log("Player escaped through portal!");
+      // Ferma il game loop, mostra menu, riavvia livello, etc.
+      showCustomEscapeScreen?.();
+    });
     gameManager.spawner = spawner;
     // spawn un portale di colore "fire" a (0,30,0)
     spawner.spawn({
@@ -234,7 +239,10 @@ function showFatal(msg) {
     </button>`;
   document.body.appendChild(errorDiv);
 }
-
+function showCustomEscapeScreen() {
+  // Il tuo codice per mostrare schermata di vittoria
+  // Fermare musica, mostrare statistiche, etc.
+}
 // =====================
 // UI CONTROLLER
 // =====================

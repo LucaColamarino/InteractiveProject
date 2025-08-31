@@ -61,7 +61,7 @@ export function startLoop(c) {
     const player = ctrl?.player;
 
     // === PAUSA ===
-    if (gameManager?.isPaused) {
+    if (gameManager?.isPaused && spawner.isGameEnded()) {
       hudManager.updatePaused?.(player, ctrl, camera);
       renderer.render(scene, camera);
       stats.end();
@@ -149,7 +149,7 @@ export function startLoop(c) {
       updateEnvironment();
       updateWolfStone(delta);
       updatearchersStone(delta);
-      gameManager.spawner.update(delta);
+      gameManager.spawner.update(delta,gameManager.controller.player.model.position);
      // updateFireBreathTest(delta);
 
       // ✅ queste usano già gameManager.controller (quindi ok)

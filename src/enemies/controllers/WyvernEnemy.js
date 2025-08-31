@@ -56,7 +56,7 @@ export class WyvernEnemy extends BaseEnemy {
     this._altitude = this._randAltitude();
     this._mouthRef = null;
 
-    // ── Timeline attacco fuoco (compatta ma leggibile)
+    // ── Timeline attacco fuoco
     this._atkT = 0;
     this._ATK_WARMUP   = 0.20;
     this._ATK_BURST    = 0.50;
@@ -75,6 +75,14 @@ export class WyvernEnemy extends BaseEnemy {
     // ── Bocca / orientamento
     this.mouthBoneName = opt.mouthBoneName ?? null;
     this.invertForward = !!opt.invertForward;
+
+    // ── Hit capsule player (fix danni in volo) + velocità
+    this._lastPlayerPos = new THREE.Vector3();
+    this._playerCapsule = {
+      height: opt.playerHeight ?? 1.7,
+      radius: opt.playerRadius ?? 0.35,
+      centerYOffset: opt.playerCenterYOffset ?? 0.9
+    };
 
     // temp
     this._tmpDir = new THREE.Vector3();
@@ -105,7 +113,7 @@ export class WyvernEnemy extends BaseEnemy {
     }
   }
 
-  // ── IDLE (solo all’inizio, poi si entra qui se si disingaggia) ─────────────
+  // ── IDLE ───────────────────────────────────────────────────────────────────
   _enterIdle(first=false) {
     this.behaviorState = 'idle';
     this.stateTimer = 0;
@@ -170,7 +178,7 @@ export class WyvernEnemy extends BaseEnemy {
     }
   }
 
-  // ── AIR ASSAULT: orbita + cicli di fuoco → landing ────────────────────────
+  // ── AIR ASSAULT ────────────────────────────────────────────────────────────
   _enterAirAssault() {
     this.behaviorState = 'air_assault';
     this.stateTimer = 0;
@@ -235,7 +243,7 @@ export class WyvernEnemy extends BaseEnemy {
     if (far || this._airTime >= this.airMaxTime) this._enterLandingGround();
   }
 
-  // ── LANDING → torna a ground_fire e ricicla ────────────────────────────────
+  // ── LANDING ────────────────────────────────────────────────────────────────
   _enterLandingGround() {
     this.behaviorState = 'landing_ground';
     this.stateTimer = 0;
@@ -295,32 +303,59 @@ export class WyvernEnemy extends BaseEnemy {
   }
 
   _applyConeDps(dt) {
-    if (!this._playerInFireVolume()) return;
+    if (!this._playerInFireVolume(dt)) return;
     const dmg = this.fireDps * dt;
     if (dmg > 0) gameManager?.controller?.stats?.damage?.(dmg);
   }
 
-  _playerInFireVolume() {
+  // === FIX DANNI IN VOLO: capsule + matrici aggiornate + margine velocità ===
+  _playerInFireVolume(dt = 0) {
     if (!this._fire?.group || !this.player?.model) return false;
 
+    // Assicura world-space corretto del cono (collo/mandibola animati)
+    this._fire.group.updateMatrixWorld(true);
+
+    // Origine + asse del cono (+Z per FireBreathCone; se fosse -Z vedi nota sotto)
     const origin = new THREE.Vector3().setFromMatrixPosition(this._fire.group.matrixWorld);
     const q = new THREE.Quaternion(); this._fire.group.getWorldQuaternion(q);
-    const axis = new THREE.Vector3(0,0,1).applyQuaternion(q).normalize(); // +Z del cono
+    let axis = new THREE.Vector3(0,0,1).applyQuaternion(q).normalize(); // forward del cono
 
-    const p = this.player.model.position.clone();
-    const v = p.sub(origin);
+    const L = this._fire.length;
+    const baseR = this._fire.radius;
 
-    const z = v.dot(axis);
-    if (z < 0 || z > this._fire.length) return false;
+    // Capsule del player: piedi, busto, testa
+    const pp = this.player.model.position;
+    const h  = this._playerCapsule.height;
+    const r  = this._playerCapsule.radius;
 
-    const radialVec = v.sub(axis.clone().multiplyScalar(z));
-    const r = radialVec.length();
+    const pFeet  = new THREE.Vector3(pp.x, pp.y, pp.z);
+    const pChest = new THREE.Vector3(pp.x, pp.y + this._playerCapsule.centerYOffset, pp.z);
+    const pHead  = new THREE.Vector3(pp.x, pp.y + h, pp.z);
 
-    const z01 = z / this._fire.length;
-    const maxR = THREE.MathUtils.lerp(this._fire.radius * 0.10, this._fire.radius, z01);
+    // Margine dinamico per velocità (anti "salto")
+    const prev = this._lastPlayerPos;
+    const speed = prev.distanceTo(pp) / Math.max(dt || 1/60, 1e-5);
+    const speedMargin = Math.min(0.6, speed * 0.03); // ~3cm per m/s, max 60cm
 
-    return r <= maxR;
+    const insideCone = (P) => {
+      const v = new THREE.Vector3().subVectors(P, origin);
+      const z = v.dot(axis);
+      if (z < 0 || z > L) return false;
+
+      const radial = v.sub(axis.clone().multiplyScalar(z)).length();
+      const z01 = z / L;
+      const maxR = THREE.MathUtils.lerp(baseR * 0.10, baseR, z01);
+      return radial <= (maxR + r + speedMargin);
+    };
+
+    const hit = insideCone(pFeet) || insideCone(pChest) || insideCone(pHead);
+
+    // salva posizione per il calcolo della velocità al frame successivo
+    this._lastPlayerPos.copy(pp);
+    return hit;
   }
+  // Nota: se il tuo FireBreathCone “spara” lungo -Z, cambia la riga sopra con:
+  // let axis = new THREE.Vector3(0,0,-1).applyQuaternion(q).normalize();
 
   // ── Utils ──────────────────────────────────────────────────────────────────
   _breathEngageRange() { return this._fire.length * 1.15; }
