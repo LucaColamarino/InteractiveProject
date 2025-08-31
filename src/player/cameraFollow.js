@@ -1,4 +1,4 @@
-// player/cameraFollow.js (ottimizzato anti-lag)
+// player/cameraFollow.js (lock-on stabile + fix Sprite.raycast)
 import * as THREE from 'three';
 import { camera, scene } from '../scene.js';
 import { getCameraAngles } from '../systems/InputSystem.js';
@@ -23,7 +23,7 @@ const _occluders = [];
 /**
  * Passa i root statici del livello (es. terreno, pareti, rocce...).
  * Esempio: setOccluders([worldGroup, rocksGroup]);
- * Se non setti nulla, userà fallback = scene (comunque funziona).
+ * Se non setti nulla, userà fallback = scene.
  */
 export function setOccluders(roots = []) {
   _occluders.length = 0;
@@ -63,13 +63,17 @@ const _lock = {
   zoomNear: 2.0,
   zoomFar: 20.0,
 
-  // === NUOVO: throttle LOS ===
-  _losInterval: 0.10,     // secondi tra un controllo LOS e il successivo
+  // throttle LOS
+  _losInterval: 0.10,     // secondi tra i controlli LOS
   _losAccumulator: 0,
   _lastVisOk: true,
 };
 
+// Raycaster condiviso
 const _ray = new THREE.Raycaster();
+// Impostazioni conservative per gli Sprite
+_ray.params.Sprite = _ray.params.Sprite || {};
+_ray.params.Sprite.threshold = 0; // default; non serve ma esplicito
 
 export function isLockOn() { return _lock.active; }
 
@@ -77,7 +81,7 @@ export function lockOnEnemy(enemyEntity, {
   height = 1.5, stiffness = 8, maxRange = 25, fovDeg = 45,
   shoulder = 0.9, midBias = 0.55,
   zoomMin = 0.9, zoomMax = 1.35, zoomNear = 2.0, zoomFar = 20.0,
-  losInterval = 0.10, // opzionale: cambia frequenza LOS
+  losInterval = 0.10,
 } = {}) {
   _lock.active = true;
   _lock.target = enemyEntity || null;
@@ -148,7 +152,7 @@ function _visibleFrom(playerEntity, enemyEntity, maxRange, fovDeg) {
   if (dist > maxRange) return { ok: false, dist };
 
   // 2) FOV (camera→nemico)
-  camera.getWorldDirection(V2).normalize(); // V2 = camFwd (0,0,-1 nella world)
+  camera.getWorldDirection(V2).normalize(); // V2 = camFwd
   const rayOrigin = V3.copy(camera.position)
     .addScaledVector(V2, 0.35)     // avanti ~35 cm
     .add(VUP.set(0, 0.20, 0));     // su ~20 cm
@@ -163,14 +167,31 @@ function _visibleFrom(playerEntity, enemyEntity, maxRange, fovDeg) {
   _ray.set(rayOrigin, dir);
   _ray.far = rayOrigin.distanceTo(enemyPos) + 0.001;
 
+  // >>> FIX CRASH SPRITE: imposta SEMPRE la camera sul raycaster
+  _ray.camera = camera;
+
+  // pool di intersezione: scena o occluders espliciti
   const pool = _occluders.length ? _occluders : [scene];
-  const hits = _ray.intersectObjects(pool, true);
+
+  let hits = [];
+  try {
+    hits = _ray.intersectObjects(pool, true);
+  } catch (e) {
+    console.warn('[Lock] Raycast error (ignorato):', e);
+    return { ok: true, dist }; // meglio “ottimista” che bloccare il lock
+  }
 
   let firstBlock = null;
   for (let i = 0; i < hits.length; i++) {
     const o = hits[i].object;
+
+    // Salta oggetti marcati noPick (es. FireBreathCone, flare sprite, helpers)
+    if (o?.userData?.noPick) continue;
+
+    // Salta player e nemico (evita auto-hit su parti interne)
     if (playerObj && _isDescendantOf(o, playerObj)) continue;
     if (enemyObj  && _isDescendantOf(o, enemyObj))  continue;
+
     firstBlock = hits[i];
     break;
   }
@@ -239,7 +260,7 @@ export function updateCamera(player, delta = 0) {
     const sLook = 1 - Math.exp(-_lock.stiffness * delta);
     targetLookAt.lerp(mid, sLook);
 
-    // === NUOVO: throttle controlli FOV/range/LOS ===
+    // Throttle controlli FOV/range/LOS
     _lock._losAccumulator += delta;
     if (_lock._losAccumulator >= _lock._losInterval) {
       _lock._losAccumulator = 0;

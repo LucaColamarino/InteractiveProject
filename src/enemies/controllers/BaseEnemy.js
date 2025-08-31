@@ -9,7 +9,7 @@ export class BaseEnemy {
     this.model = opt.model || null;
     this.mixer = opt.mixer || null;
     this.actions = opt.actions || {};
-    this.animator = opt.animator || null; // istanza di Animator
+    this.animator = opt.animator || null;
     this.forwardYawOffsetDeg = opt.forwardYawOffsetDeg ?? 0;
     this.health=10;
     this.alive = true;
@@ -37,22 +37,29 @@ export class BaseEnemy {
   get player() { return gameManager.controller?.player || null; }
   setTarget(obj3D) { this.target = obj3D; }
 
-  // Hooks per sottoclassi
+  // <<< NEW: utility >>>
+  faceTarget(turnSpeed = 6.0, dt = 1/60) {
+    const t = this.target?.model || this.target;
+    if (!t) return;
+    const dir = this._tmpDir.copy(t.position).sub(this.model.position).setY(0).normalize();
+    this.faceDirection(dir, turnSpeed, dt);
+  }
+  distanceToTarget() {
+    const t = this.target?.model || this.target;
+    if (!t) return Infinity;
+    return this.model.position.distanceTo(t.position);
+  }
+
   preUpdate(_dt) {}
   postUpdate(_dt) {}
 
   update(dt) {
     this.preUpdate(dt);
-
-    // default behaviour: wandering
     this.wanderOnGround(dt);
     this.applyGroundHeightSnap(dt);
     this.applyLookForward();
-
-    // aggiorna anims
     this.updateAnimFromMove();
     this.animator?.update?.(dt);
-
     this.postUpdate(dt);
   }
 
@@ -68,7 +75,6 @@ export class BaseEnemy {
       const fix = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yawRad);
       targetQuat.multiply(fix);
     }
-
     const t = Math.min(1, turnSpeed * dt);
     this.model.quaternion.copy(curQuat).slerp(targetQuat, t);
   }
@@ -97,7 +103,6 @@ export class BaseEnemy {
 
   updateAnimFromMove() {
     const blocking = this.state.isAttacking && !this.state.allowLocomDuringAttack;
-    // Lo “blocking” sugli overlay lo gestisce internamente l'Animator: qui passiamo solo lo stato
     this.animator?.setLocomotion?.({
       speed: this.state.speed || 0,
       isFlying: !!this.state.isFlying,

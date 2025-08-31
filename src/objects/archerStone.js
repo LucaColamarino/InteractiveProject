@@ -201,7 +201,7 @@ export async function spawnarchersStone({
 // ===== Update (solo glow pulse) =====
 export function updatearchersStone(dt) {
   if (!archersStone) return;
-  if(_state.activated==false && gameManager.activatedStones.wolf==true) {_state.activated = true; _state.glowTarget = 1.0;}
+  if(_state.activated==false && gameManager.activatedStones.archer==true) {_state.activated = true; _state.glowTarget = 1.0;}
   _time += dt;
   const k = 1 - Math.pow(0.0001, dt);
   _state.glow = THREE.MathUtils.lerp(_state.glow, _state.glowTarget, k);
