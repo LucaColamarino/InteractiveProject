@@ -102,7 +102,7 @@ async function init() {
     updateLoadingProgress(80, 'Spawn enemies...');
     spawnEnemies();
     await wait(80);
-    initFireBreathTest();
+   // initFireBreathTest();
     updateLoadingProgress(90, 'Placing objects...');
     spawnCampfireAt(-60, 65);
     spawnChestAt(-65, 60, ironSword);

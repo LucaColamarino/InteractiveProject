@@ -1,6 +1,6 @@
-// particles/FireBreathCone.js - Fire breath (boss rosso adulto) con Jet di fuoco reale su +Z
+// particles/FireBreathCone.js - Fire breath con Jet core su +Z (no flare, cone clamp, fix uniform name)
 import * as THREE from 'three';
-import {FireJetSystem} from "./FireJetSystem.js";
+import { FireJetSystem } from './FireJetSystem.js';
 
 export class FireBreathCone {
   constructor(opts = {}) {
@@ -11,30 +11,27 @@ export class FireBreathCone {
     this.intensity   = opts.intensity ?? 6.0;
     this.renderOrder = opts.renderOrder ?? 999;
 
-    this._active      = false;
-    this._forcedTime  = 0;
-    this._fade        = 0;
-    this._fadeInK     = 6.0;
-    this._fadeOutK    = 5.0;
-    this._helpersOn   = false;
-    this._time        = 0;
+    this._active     = false;
+    this._forcedTime = 0;
+    this._fade = 0;
+    this._fadeInK  = 6.0;
+    this._fadeOutK = 5.0;
+    this._helpersOn = false;
+    this._time = 0;
 
-    // Particles budget
-    this.particleCount = 1400; // fiamme esterne
-    this.sparkCount    = 350;  // scintille
-    this.smokeCount    = 180;  // fumo (allineato all'asse del respiro)
+    this.particleCount = 300;
+    this.sparkCount    = 50;
+    this.smokeCount    = 0;
 
     this.group = new THREE.Group();
     this.group.name = 'FireBreathCone';
     this.group.renderOrder = this.renderOrder;
     this.group.frustumCulled = false;
 
-    // Sistemi
-    this._createFireSystem();     // particelle fiamma volumetriche
-    this._createSparkSystem();    // scintille
-    this._createSmokeSystem();    // fumo lungo +Z
-    this._createJetCore();        // <<< core "fuoco vero" (FireJetSystem)
-    this._createFlareSprite();    // bagliore alla bocca
+    this._createFireSystem();
+    this._createSparkSystem();
+    this._createSmokeSystem();
+    this._createJetCore();
     this._createDistortionEffect();
 
     this.setVisible(false);
@@ -44,7 +41,6 @@ export class FireBreathCone {
   }
 
   /* ========================= FIRE PARTICLES (corona esterna) ========================= */
-
   _createFireSystem() {
     const fireGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.particleCount * 3);
@@ -71,7 +67,8 @@ export class FireBreathCone {
         time:      { value: 0 },
         fade:      { value: 0 },
         intensity: { value: this.intensity },
-        length:    { value: this.length }
+        uLen:      { value: this.length },   // <— era "length"
+        coneRadius:{ value: this.radius }
       },
       vertexShader: `
         attribute vec3 velocity;
@@ -80,7 +77,8 @@ export class FireBreathCone {
 
         uniform float time;
         uniform float fade;
-        uniform float length;
+        uniform float uLen;
+        uniform float coneRadius;
 
         varying float vLife;
         varying float vZ;
@@ -92,31 +90,35 @@ export class FireBreathCone {
           vLife = lifetime;
           vSeed = uv.x;
 
-          // Loop lungo Z per evitare l’effetto “nuvola che si sposta”
+          // Conveyor: volume fermo, scorrimento lungo Z
           vec3 pos = position;
-          pos.z = mod(position.z + velocity.z * time, length);
+          pos.z = mod(position.z + velocity.z * time, uLen);
           pos.x += velocity.x * time;
           pos.y += velocity.y * time;
 
+          float z01 = clamp(pos.z / uLen, 0.0, 1.0);
 
-          // swirl attorno all'asse +Z locale (più forte vicino alla bocca)
-          float z01 = clamp(pos.z / length, 0.0, 1.0);
           float swirl = (1.5 + sin(time*1.2 + vSeed*12.0)*0.5) * (1.0 - z01);
           pos.xy = rot(swirl * 0.6) * pos.xy;
 
-          // turbolenza addizionale
           float n1 = sin(time*2.7 + vSeed*20.0 + pos.x*6.0) * 0.12;
           float n2 = cos(time*2.1 + vSeed*18.0 + pos.y*5.0) * 0.10;
           pos.x += n1;
           pos.y += n2;
 
-          // espansione conica
-          float expansion = clamp(pos.z / length, 0.0, 1.0);
-          pos.xy *= (1.0 + expansion * 2.6);
-          vZ = expansion;
+          // Espansione guidata dal radius
+          float baseR = 0.8;
+          float widen = mix(1.0, coneRadius / baseR, z01);
+          pos.xy *= widen;
 
+          // Clamp XY alla sezione del cono
+          float maxR = mix(coneRadius * 0.10, coneRadius, z01);
+          float m = length(pos.xy);
+          if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
+
+          vZ = z01;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-          float sizeBase = mix(42.0, 70.0, smoothstep(0.0, 0.6, expansion));
+          float sizeBase = mix(42.0, 70.0, smoothstep(0.0, 0.6, z01));
           gl_PointSize = sizeBase * scale * fade;
         }
       `,
@@ -191,9 +193,8 @@ export class FireBreathCone {
     this.fireMaterial = fireMaterial;
   }
 
-  /* ========================= CORE: "Fuoco vero" (FireJetSystem) ========================= */
-
-  _createJetCore(){
+  /* ========================= CORE: Jet ========================= */
+  _createJetCore() {
     this.jet = new FireJetSystem({
       length: this.length * 0.95,
       radius: this.radius * 0.55,
@@ -201,19 +202,18 @@ export class FireBreathCone {
       renderOrder: this.renderOrder + 1
     });
     this.group.add(this.jet.group);
-    this.jet.group.position.set(0,0,0);
+    this.jet.group.position.set(0, 0, 0);
   }
 
-  _updateJetSync(){
+  _updateJetSync() {
     if (!this.jet) return;
     this.jet.setIntensity(this.intensity);
     this.jet.setFade(this._fade);
-    this.jet.setGeometry(this.length*0.95, this.radius*0.55);
+    this.jet.setGeometry(this.length * 0.95, this.radius * 0.55);
     this.jet.setActive(this._active);
   }
 
   /* ========================= SPARKS ========================= */
-
   _createSparkSystem() {
     const sparkGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.sparkCount * 3);
@@ -232,27 +232,50 @@ export class FireBreathCone {
     sparkGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, this.length / 2), this.length * 2);
 
     const sparkMaterial = new THREE.ShaderMaterial({
-      uniforms: { time: { value: 0 }, fade: { value: 0 } },
+      uniforms: {
+        time: { value: 0 }, fade: { value: 0 },
+        uLen: { value: this.length },         // <— era "length"
+        coneRadius: { value: this.radius },
+        sparkRange: {value: this.length},
+      },
       vertexShader: `
-        attribute vec3 velocity;
-        attribute float lifetime;
-        attribute float size;
+       attribute vec3 velocity;
+      attribute float lifetime;
+      attribute float size;
 
-        uniform float time;
-        uniform float fade;
+      uniform float time;
+      uniform float fade;
+      uniform float uLen;
+      uniform float coneRadius;
+      uniform float sparkRange;
 
-        varying float vLife;
+      varying float vLife;
 
-        void main(){
-          vLife = lifetime;
-          vec3 pos = position + velocity * time;
-          // leggera "gravità" locale per scintille
-          pos.y -= time * time * 0.9;
-          pos.x += sin(time * 3.0 + position.z) * 0.06;
-          pos.z += cos(time * 2.4 + position.x) * 0.06;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
-          gl_PointSize = size * (1.0 - lifetime) * fade * 22.0;
-        }
+      void main(){
+        vLife = lifetime;
+
+        float age = clamp(lifetime, 0.0, 1.0);     // 0..1 per particella
+        vec3 pos = position;
+
+        // Movimento basato sull'età (non sul tempo globale)
+        pos += velocity * (age * sparkRange);
+
+        // Gravità lieve, scalata sull'età
+        pos.y -= age * age * 0.9 * (sparkRange * 0.03);
+
+        // Limita lungo Z dentro il getto
+        pos.z = clamp(pos.z, 0.0, uLen);
+
+        // Clamp XY alla sezione del cono all'altezza z
+        float z01 = clamp(pos.z / uLen, 0.0, 1.0);
+        float maxR = mix(coneRadius * 0.20, coneRadius, z01);
+        float m = length(pos.xy);
+        if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
+        gl_PointSize = size * (1.0 - age) * fade * 12.0; // un po' più piccolo (22→12→16→12)
+      }
+
       `,
       fragmentShader: `
         varying float vLife;
@@ -281,8 +304,7 @@ export class FireBreathCone {
     this.sparkMaterial = sparkMaterial;
   }
 
-  /* ========================= SMOKE (allineato a +Z locale) ========================= */
-
+  /* ========================= SMOKE ========================= */
   _createSmokeSystem() {
     const smokeGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.smokeCount * 3);
@@ -303,7 +325,12 @@ export class FireBreathCone {
     smokeGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, this.length / 2), this.length * 2.2);
 
     const smokeMaterial = new THREE.ShaderMaterial({
-      uniforms: { time: { value: 0 }, fade: { value: 0 }, length: { value: this.length } },
+      uniforms: {
+        time:   { value: 0 },
+        fade:   { value: 0 },
+        uLen:   { value: this.length },     // <— era "length"
+        coneRadius: { value: this.radius }
+      },
       vertexShader: `
         attribute vec3 velocity;
         attribute float lifetime;
@@ -312,7 +339,8 @@ export class FireBreathCone {
 
         uniform float time;
         uniform float fade;
-        uniform float length;
+        uniform float uLen;
+        uniform float coneRadius;
 
         varying float vLife;
         varying float vRot;
@@ -324,26 +352,23 @@ export class FireBreathCone {
           vLife = lifetime;
           vRot  = rotation;
 
-          // Smoke ancorato: scorre lungo l’asse e rimane nello stesso volume
+          // Conveyor: scorrimento lungo Z con loop, volume fermo
           vec3 pos = position;
-          pos.z = mod(position.z + velocity.z * time, length);
+          pos.z = mod(position.z + velocity.z * time, uLen);
           pos.x += velocity.x * time;
           pos.y += velocity.y * time;
 
-
-          // swirl attorno a +Z, aumenta con z
-          float z01 = clamp(pos.z / length, 0.0, 1.0);
+          float z01 = clamp(pos.z / uLen, 0.0, 1.0);
           vZ01 = z01;
+
           float swirl = mix(0.2, 1.2, z01);
           float ang = time * mix(0.8, 1.6, z01) + rotation;
           pos.xy = rot(ang * swirl) * pos.xy;
 
-          // allargamento conico
-          pos.xy *= (1.0 + z01 * 1.8);
-
-          // nessuna deriva verso l’alto (opzionale: leggera caduta)
-          // pos.y -= z01 * 0.02;
-
+          // Clamp al raggio del cono
+          float maxR = mix(coneRadius * 0.15, coneRadius, z01);
+          float m = length(pos.xy);
+          if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
 
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
           gl_PointSize = scale * mix(24.0, 110.0, lifetime) * fade;
@@ -368,10 +393,9 @@ export class FireBreathCone {
           vec2 nc = (uv-0.5) * 3.5 + time * 0.22;
           float sn = noise(nc) * 0.6 + noise(nc*2.0) * 0.25;
 
-          // più scuro vicino alla bocca, più grigio verso la coda
           vec3 dark  = vec3(0.06, 0.05, 0.05);
           vec3 grey  = vec3(0.36);
-          float tint = smoothstep(0.2, 1.0, vZ01);  // lungo l'asse
+          float tint = smoothstep(0.2, 1.0, vZ01);
           vec3 smokeColor = mix(dark, grey, tint);
 
           float density = (1.0 - d*2.0) * sn;
@@ -397,32 +421,7 @@ export class FireBreathCone {
     this.smokeMaterial = smokeMaterial;
   }
 
-  /* ========================= FLARE (sprite alla bocca) ========================= */
-
-  _createFlareSprite() {
-    const spriteMat = new THREE.SpriteMaterial({
-      color: 0xffe0a0,
-      transparent: true,
-      opacity: 0.0,
-      depthWrite: false,
-      depthTest: false,
-      blending: THREE.AdditiveBlending,
-      fog: false
-    });
-
-    this.flareSprite = new THREE.Sprite(spriteMat);
-    this.flareSprite.name = 'FireFlare';
-    this.flareSprite.scale.setScalar(this.radius * 1.4);
-    this.flareSprite.position.set(0, 0, 0.02);
-    this.flareSprite.renderOrder = this.renderOrder + 3;
-    this.flareSprite.frustumCulled = false;
-
-    this.group.add(this.flareSprite);
-    this.flareMaterial = spriteMat;
-  }
-
-  /* ========================= HEAT DISTORTION ========================= */
-
+  /* ========================= DISTORTION ========================= */
   _createDistortionEffect() {
     const distortGeo = new THREE.CylinderGeometry(this.radius * 0.9, 0, this.length, 18, 1, true);
     distortGeo.rotateX(Math.PI / 2);
@@ -469,16 +468,15 @@ export class FireBreathCone {
   }
 
   /* ========================= RESPAWN HELPERS ========================= */
-
   _resetFireParticle(index, positions, velocities, lifetimes, scales) {
     const i3 = index * 3;
     const angle = Math.random() * Math.PI * 2;
-    const r = Math.random() * 0.22; // base più compatta alla bocca
-    positions[i3]     = Math.cos(angle) * (Math.random() * 0.22);
-    positions[i3 + 1] = Math.sin(angle) * (Math.random() * 0.22);
-    positions[i3 + 2] = Math.random() * this.length;    // <— prima era ~0..0.35
+    const r = Math.random() * 0.22;
+    positions[i3]     = Math.cos(angle) * r;
+    positions[i3 + 1] = Math.sin(angle) * r;
+    positions[i3 + 2] = Math.random() * this.length;
 
-    const speed  = 1.6 + Math.random() * 2.2;           // <— meno rapida
+    const speed  = 1.6 + Math.random() * 2.2;
     velocities[i3]     = (Math.random() - 0.5) * 0.6 * 0.6;
     velocities[i3 + 1] = (Math.random() - 0.5) * 0.25;
     velocities[i3 + 2] = speed;
@@ -489,22 +487,21 @@ export class FireBreathCone {
 
   _resetSparkParticle(index, positions, velocities, lifetimes, sizes) {
     const i3 = index * 3;
-    const z = Math.random() * this.length * 0.9;   // prima 0..0.6*length
-
+    const z = Math.random() * this.length * 0.9;
     const expansion = z / this.length;
     const maxR = this.radius * (1 + expansion * 2.2);
 
     const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * maxR;
+    const r = Math.random() * (maxR * 0.6);
     positions[i3]     = Math.cos(a) * r;
     positions[i3 + 1] = Math.sin(a) * r;
     positions[i3 + 2] = z;
 
-    const speed = 1.5 + Math.random() * 2.0;
+    const speed = 1.2 + Math.random() * 1.8;
     const dir = new THREE.Vector3(
-      (Math.random() - 0.5) * 2,
-      Math.random() * 1.5,
-      (Math.random() - 0.5) * 0.5
+      (Math.random() - 0.5) * 0.4,
+      (Math.random() - 0.5) * 0.3,
+      0.7 + Math.random() * 0.6
     ).normalize();
 
     velocities[i3]     = dir.x * speed;
@@ -517,8 +514,7 @@ export class FireBreathCone {
 
   _resetSmokeParticle(index, positions, velocities, lifetimes, scales, rotations) {
     const i3 = index * 3;
-    const z = this.length * (Math.random() * 0.95); // prima: 0.6..1.0
-
+    const z = this.length * (Math.random() * 0.95);
     const expansion = z / this.length;
     const maxR = this.radius * (1 + expansion * 2.0) * 0.9;
 
@@ -528,7 +524,6 @@ export class FireBreathCone {
     positions[i3 + 1] = Math.sin(a) * r;
     positions[i3 + 2] = z;
 
-    // velocità prevalentemente in +Z (asse respiro)
     velocities[i3]     = (Math.random() - 0.5) * 0.22;
     velocities[i3 + 1] = (Math.random() - 0.5) * 0.15;
     velocities[i3 + 2] = 0.6 + Math.random() * 0.9;
@@ -539,7 +534,6 @@ export class FireBreathCone {
   }
 
   /* ========================= UPDATE ========================= */
-
   update(dt = 0) {
     this._time += dt;
 
@@ -559,27 +553,29 @@ export class FireBreathCone {
       this.fireMaterial.uniforms.time.value = this._time;
       this.fireMaterial.uniforms.fade.value = this._fade;
       this.fireMaterial.uniforms.intensity.value = this.intensity;
-      this.fireMaterial.uniforms.length.value = this.length;
+      this.fireMaterial.uniforms.uLen.value = this.length;          // <— uLen
+      if (this.fireMaterial.uniforms.coneRadius)
+        this.fireMaterial.uniforms.coneRadius.value = this.radius;
     }
     if (this.sparkMaterial) {
       this.sparkMaterial.uniforms.time.value = this._time;
       this.sparkMaterial.uniforms.fade.value = this._fade;
+      this.sparkMaterial.uniforms.uLen.value = this.length;
+      this.sparkMaterial.uniforms.coneRadius.value = this.radius;
+      this.sparkMaterial.uniforms.sparkRange.value = this.length; // NEW
     }
+
     if (this.smokeMaterial) {
       this.smokeMaterial.uniforms.time.value = this._time;
       this.smokeMaterial.uniforms.fade.value = this._fade;
-      this.smokeMaterial.uniforms.length.value = this.length;
+      this.smokeMaterial.uniforms.uLen.value = this.length;          // <— uLen
+      this.smokeMaterial.uniforms.coneRadius.value = this.radius;
     }
     if (this.distortMaterial) {
       this.distortMaterial.uniforms.time.value = this._time;
       this.distortMaterial.uniforms.fade.value = this._fade;
     }
-    if (this.flareMaterial) {
-      const base = THREE.MathUtils.clamp(0.35 + 0.12 * (this.intensity / 6.0), 0, 1);
-      this.flareMaterial.opacity = base * this._fade;
-    }
 
-    // Jet core sincronizzato
     this._updateJetSync();
     this.jet?.update?.(dt);
 
@@ -612,7 +608,6 @@ export class FireBreathCone {
       this.distortMesh.geometry.boundingSphere.center.copy(cen);
       this.distortMesh.geometry.boundingSphere.radius = this.length * 1.5;
     }
-    // jet ha boundingSphere propria interna
   }
 
   _updateFireParticles(dt) {
@@ -661,7 +656,6 @@ export class FireBreathCone {
   }
 
   /* ========================= PUBLIC API ========================= */
-
   setActive(flag) { this._active = !!flag; }
   isActive() { return !!this._active; }
 
@@ -670,13 +664,17 @@ export class FireBreathCone {
     this.setActive(true);
   }
 
+  setSparksEnabled(on){
+    if (!this.sparkMesh) return;
+    this.sparkMesh.visible = !!on;
+  }
+
   showHelpers(on = true) {
     this._helpersOn = !!on;
     if (this._helpersOn) this.setVisible(true);
   }
 
   invertForward(flag = true) {
-    // il sistema intero ruota; anche il Jet segue perché è child di group
     this.group.rotation.y = flag ? Math.PI : 0;
   }
 
@@ -686,7 +684,7 @@ export class FireBreathCone {
     if (!parent) return;
     parent.add(this.group);
     this.group.position.copy(this.localOffset);
-    this.group.rotation.set(0, 0, 0); // orientato verso +Z locale
+    this.group.rotation.set(0, 0, 0);
   }
 
   autoscaleFromModelBounds(diagonal, kLen = 0.35, kRad = 0.10) {
@@ -712,7 +710,6 @@ export class FireBreathCone {
     if (this.fireMesh)   this.fireMesh.visible   = vis;
     if (this.sparkMesh)  this.sparkMesh.visible  = vis;
     if (this.smokeMesh)  this.smokeMesh.visible  = vis;
-    if (this.flareSprite)this.flareSprite.visible= vis;
     if (this.distortMesh)this.distortMesh.visible= vis;
     if (this.jet)        this.jet.setVisible(vis);
   }
@@ -721,7 +718,6 @@ export class FireBreathCone {
     this.intensity = Math.max(0, value);
     if (this.fireMaterial) this.fireMaterial.uniforms.intensity.value = this.intensity;
     if (this.jet)          this.jet.setIntensity(this.intensity);
-    // glow sprite gestito in update()
   }
 
   setWindEffect(windVector) {
@@ -730,7 +726,6 @@ export class FireBreathCone {
     if (w < 0.1) return;
     const dir = windVector.clone().normalize();
 
-    // piega scie principali del fuoco esterno
     if (this.fireGeometry) {
       const vel = this.fireGeometry.attributes.velocity.array;
       for (let i = 0; i < this.particleCount; i++) {
@@ -741,7 +736,6 @@ export class FireBreathCone {
       }
       this.fireGeometry.attributes.velocity.needsUpdate = true;
     }
-    // piccola influenza su fumo/scintille
     if (this.smokeGeometry) {
       const velS = this.smokeGeometry.attributes.velocity.array;
       for (let i = 0; i < this.smokeCount; i++) {
@@ -764,10 +758,39 @@ export class FireBreathCone {
     }
   }
 
-  _rebuildGeometry() {
-    if (this.fireMaterial) this.fireMaterial.uniforms.length.value = this.length;
+  // Aggiorna length/radius + respawn coerente
+  setGeometry(length = null, radius = null) {
+    if (length != null)  this.length = Math.max(0.5, length);
+    if (radius != null)  this.radius = Math.max(0.15, radius);
 
-    // distorsione termica
+    if (this.fireMaterial) {
+      this.fireMaterial.uniforms.uLen.value = this.length;         // <— uLen
+      if (this.fireMaterial.uniforms.coneRadius)
+        this.fireMaterial.uniforms.coneRadius.value = this.radius;
+    }
+    if (this.smokeMaterial) {
+      this.smokeMaterial.uniforms.uLen.value = this.length;        // <— uLen
+      if (this.smokeMaterial.uniforms.coneRadius)
+        this.smokeMaterial.uniforms.coneRadius.value = this.radius;
+    }
+    if (this.sparkMaterial) {
+      if (this.sparkMaterial.uniforms.uLen)
+        this.sparkMaterial.uniforms.uLen.value = this.length;
+      if (this.sparkMaterial.uniforms.coneRadius)
+        this.sparkMaterial.uniforms.coneRadius.value = this.radius;
+      if (this.sparkMaterial.uniforms.sparkRange)
+        this.sparkMaterial.uniforms.sparkRange.value = this.length; // NEW
+    }
+
+
+    this._rebuildGeometry();
+    if (this.jet) this.jet.setGeometry(this.length * 0.95, this.radius * 0.55);
+    this._updateBoundingSpheres();
+  }
+  setRadius(r){ this.setGeometry(null, r); }
+
+  _rebuildGeometry() {
+    // aggiorna mesh distorsione
     if (this.distortMesh) {
       this.distortMesh.geometry.dispose?.();
       const g = new THREE.CylinderGeometry(this.radius * 0.9, 0, this.length, 18, 1, true);
@@ -777,13 +800,7 @@ export class FireBreathCone {
       this.distortMesh.geometry = g;
     }
 
-    // flare alla bocca
-    if (this.flareSprite) {
-      this.flareSprite.scale.setScalar(this.radius * 1.4);
-      this.flareSprite.position.set(0, 0, 0.02);
-    }
-
-    // riposiziona batch fiamme esterne
+    // respawn coerente con la nuova geometria
     if (this.fireGeometry) {
       const pos = this.fireGeometry.attributes.position.array;
       const vel = this.fireGeometry.attributes.velocity.array;
@@ -797,10 +814,19 @@ export class FireBreathCone {
       this.fireGeometry.attributes.lifetime.needsUpdate = true;
     }
 
-    // Jet core
-    if (this.jet) this.jet.setGeometry(this.length*0.95, this.radius*0.55);
-
-    this._updateBoundingSpheres();
+    if (this.smokeGeometry) {
+      const posS = this.smokeGeometry.attributes.position.array;
+      const velS = this.smokeGeometry.attributes.velocity.array;
+      const lifeS= this.smokeGeometry.attributes.lifetime.array;
+      const scaS = this.smokeGeometry.attributes.scale.array;
+      const rotS = this.smokeGeometry.attributes.rotation.array;
+      for (let i = 0; i < this.smokeCount; i++) {
+        this._resetSmokeParticle(i, posS, velS, lifeS, scaS, rotS);
+      }
+      this.smokeGeometry.attributes.position.needsUpdate = true;
+      this.smokeGeometry.attributes.velocity.needsUpdate = true;
+      this.smokeGeometry.attributes.lifetime.needsUpdate = true;
+    }
   }
 
   addExplosiveBurst() {
@@ -854,9 +880,8 @@ export class FireBreathCone {
     noPick(this.fireMesh);
     noPick(this.sparkMesh);
     noPick(this.smokeMesh);
-    noPick(this.flareSprite);
     noPick(this.distortMesh);
-    // (il Jet imposta già noPick internamente)
+    this.jet?.group && noPick(this.jet.group);
   }
 
   dispose() {
@@ -872,7 +897,6 @@ export class FireBreathCone {
     safeDispose(this.fireMesh);
     safeDispose(this.sparkMesh);
     safeDispose(this.smokeMesh);
-    safeDispose(this.flareSprite);
     safeDispose(this.distortMesh);
     this.jet?.dispose?.();
     if (this.group?.parent) this.group.parent.remove(this.group);
@@ -893,3 +917,5 @@ export class FireBreathCone {
     };
   }
 }
+
+export default FireBreathCone;

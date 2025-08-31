@@ -149,7 +149,7 @@ export function startLoop(c) {
       updateEnvironment();
       updateWolfStone(delta);
       updatearchersStone(delta);
-      updateFireBreathTest(delta);
+     // updateFireBreathTest(delta);
 
       // ✅ queste usano già gameManager.controller (quindi ok)
       gameManager.controller?.effects?.update(delta);
