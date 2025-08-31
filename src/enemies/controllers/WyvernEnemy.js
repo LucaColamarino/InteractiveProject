@@ -10,7 +10,7 @@ export class WyvernEnemy extends BaseEnemy {
     super({ ...opt, type: 'wyvern' });
 
     // ── Stats
-    this.health = opt.health ?? 300;
+    this.health = opt.health ?? 30;
     this.xp     = opt.xp ?? 250;
 
     // ── Ingaggio

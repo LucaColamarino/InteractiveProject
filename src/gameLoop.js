@@ -61,7 +61,7 @@ export function startLoop(c) {
     const player = ctrl?.player;
 
     // === PAUSA ===
-    if (gameManager?.isPaused && spawner.isGameEnded()) {
+    if (gameManager?.isPaused || gameManager.spawner._gameEnded) {
       hudManager.updatePaused?.(player, ctrl, camera);
       renderer.render(scene, camera);
       stats.end();

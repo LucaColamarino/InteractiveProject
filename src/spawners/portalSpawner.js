@@ -23,7 +23,7 @@ export class PortalSpawner {
     this._ringMesh = null;
     this._light = null;
     this._time = 0;
-    this._radius = 1.6;   // memorizza il raggio per collision detection
+    this._radius = 10;   // memorizza il raggio per collision detection
     this._gameEnded = false;
   }
 
@@ -154,24 +154,39 @@ export class PortalSpawner {
    * Call once per frame with delta time in seconds.
    * @param {number} dt
    */
-  update(dt) {
-    if (!this.group || !this._shaderMesh) return;
-    this._time += dt;
-    
-    // spin the ring very slightly
-    if (this._ringMesh) this._ringMesh.rotation.z += dt * 0.8;
+// portalSpawner.js
 
-    // animate glow pulse
-    if (this._light) this._light.intensity = 0.7 + Math.sin(this._time * 3.0) * 0.15;
+update(dt, playerPos = null) {
+  console.log(playerPos);
+  if (!this.group || !this._shaderMesh) return;
+  this._time += dt;
 
-    // feed shader time
-    this._shaderMesh.material.uniforms.u_time.value = this._time;
+  // animazioni
+  if (this._ringMesh) this._ringMesh.rotation.z += dt * 0.8;
+  if (this._light) this._light.intensity = 0.7 + Math.sin(this._time * 3.0) * 0.15;
+  this._shaderMesh.material.uniforms.u_time.value = this._time;
 
-    // Far guardare sempre il portale verso il player
-    if (this.camera && this.group) {
-      this.group.lookAt(this.camera.position);
+  if (this.camera && this.group) {
+    this.group.lookAt(this.camera.position);
+  }
+
+  // ✅ rileva collisione player–portale
+  if (playerPos && !this._gameEnded) {
+    const portalPos = new THREE.Vector3();
+    this.group.getWorldPosition(portalPos);
+    console.log("PORTAL POS",portalPos);
+
+    const dist = portalPos.distanceTo(playerPos);
+    if (dist <= this._radius) {
+      this._gameEnded = true;
+      console.log("[PortalSpawner] Player touched the portal!");
+
+      if (typeof this.onPlayerEscape === "function") {
+        this.onPlayerEscape();   // callback definita in main.js
+      }
     }
   }
+}
 
   /**
    * Remove current portal from scene.

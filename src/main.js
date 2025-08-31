@@ -32,6 +32,7 @@ import { createBridge } from './objects/bridge.js';
 import { deathScreen } from './ui/deathScreen.js';
 import { initFireBreathTest, updateFireBreathTest } from './testFireBreath.js';
 import { PortalSpawner } from './spawners/portalSpawner.js';
+import { victoryScreen } from './ui/victoryScreen.js';
 const settings = (window.__gameSettings = {
   quality: 'medium',
   shadows: true,
@@ -113,10 +114,25 @@ async function init() {
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
     const spawner = new PortalSpawner(scene, camera, () => {
-      // Il tuo codice personalizzato quando il player scappa
-      console.log("Player escaped through portal!");
-      // Ferma il game loop, mostra menu, riavvia livello, etc.
-      showCustomEscapeScreen?.();
+       console.log("Player escaped through portal!");
+      // Pausa + mostra schermata di vittoria in stile soulslike
+      victoryScreen.show({
+        title: 'YOU ESCAPED',
+        sub: 'L’eco del portale svanisce… ma il destino ti chiama ancora.'
+      });
+    });
+     victoryScreen.init({
+      // “Continua”: ad esempio respawn al falò o teletrasporto in nuova area
+      onContinue: () => {
+        // di default: riprende il gioco dalla situazione corrente
+        if (gameManager) gameManager.isPaused = false;
+        spawner._gameEnded=false;
+        victoryScreen.hide();
+      },
+      // “Torna al menu”
+      onQuit: () => {
+        window.location.href = '/';
+      }
     });
     gameManager.spawner = spawner;
     // spawn un portale di colore "fire" a (0,30,0)
@@ -203,7 +219,7 @@ async function init() {
           saveGame();
           gameManager.paused = false;
           gameManager.running = false;
-          window.dispatchEvent(new Event('game:quit'));
+          window.location.href = '/';
           ui.showStartMenu();
         },
         getSettings: () => ({ ...settings }),
