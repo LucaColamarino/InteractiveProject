@@ -30,7 +30,7 @@ import * as THREE from 'three';
 import { loadGame, saveGame, applyPendingSave } from './managers/saveManager.js';
 import { createBridge } from './objects/bridge.js';
 import { deathScreen } from './ui/deathScreen.js';
-
+import { initFireBreathTest, updateFireBreathTest } from './testFireBreath.js';
 const settings = (window.__gameSettings = {
   quality: 'medium',
   shadows: true,
@@ -102,7 +102,7 @@ async function init() {
     updateLoadingProgress(80, 'Spawn enemies...');
     spawnEnemies();
     await wait(80);
-
+    initFireBreathTest();
     updateLoadingProgress(90, 'Placing objects...');
     spawnCampfireAt(-60, 65);
     spawnChestAt(-65, 60, ironSword);

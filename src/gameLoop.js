@@ -23,6 +23,7 @@ import { updateArrowProjectiles } from './combat/projectiles/ArrowProjectile.js'
 import { updateWolfStone } from './objects/wolfStone.js';
 import { updatearchersStone } from './objects/archerStone.js';
 import { renderXPHud } from './ui/xpHud.js';
+import { updateFireBreathTest } from './testFireBreath.js';
 
 const LEAF_MIN_OPACITY_DURING_COOLDOWN = 0.25;
 
@@ -148,6 +149,7 @@ export function startLoop(c) {
       updateEnvironment();
       updateWolfStone(delta);
       updatearchersStone(delta);
+      updateFireBreathTest(delta);
 
       // ✅ queste usano già gameManager.controller (quindi ok)
       gameManager.controller?.effects?.update(delta);
