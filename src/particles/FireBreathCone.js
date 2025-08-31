@@ -7,7 +7,7 @@ export class FireBreathCone {
     this.parent      = opts.parent || null;
     this.localOffset = (opts.localOffset || new THREE.Vector3(0, 0.6, 2.2)).clone();
     this.length      = opts.length    ?? 8.0;
-    this.radius      = opts.radius    ?? 1.6;
+    this.radius      = opts.radius    ?? 2.5;
     this.intensity   = opts.intensity ?? 6.0;
     this.renderOrder = opts.renderOrder ?? 999;
 

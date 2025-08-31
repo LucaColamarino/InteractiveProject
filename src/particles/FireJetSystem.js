@@ -4,11 +4,12 @@ import * as THREE from 'three';
 export class FireJetSystem {
   constructor(opts = {}) {
     this.length      = opts.length     ?? 7.0;
-    this.radius      = opts.radius     ?? 1.0;
-    this.intensity   = opts.intensity  ?? 6.0;
+    this.radius      = opts.radius     ?? 0.1;
+    this.intensity   = opts.intensity  ?? 3.0;
     this.renderOrder = opts.renderOrder ?? 1001;
 
-    this.particleCount = 0;opts.particleCount ?? 900;
+    // FIX: niente "0;" davanti. Puoi passare 0 per disattivarlo.
+    this.particleCount = 50;//opts.particleCount ?? 900;
 
     this._time   = 0;
     this._active = false;
@@ -30,7 +31,7 @@ export class FireJetSystem {
     const pos  = new Float32Array(this.particleCount * 3);
     const vel  = new Float32Array(this.particleCount * 3);
     const life = new Float32Array(this.particleCount);
-    const size = new Float32Array(this.particleCount);
+    const size = new Float32Array(this.particleCount/10);
     const seed = new Float32Array(this.particleCount);
 
     for (let i = 0; i < this.particleCount; i++) {
@@ -48,8 +49,8 @@ export class FireJetSystem {
       uniforms: {
         time:      { value: 0 },
         fade:      { value: 0 },
-        length:    { value: this.length },
-        radius:    { value: this.radius },
+        uLen:      { value: this.length }, // era "length"
+        uRad:      { value: this.radius }, // per estensioni future
         intensity: { value: this.intensity }
       },
       vertexShader: `
@@ -60,8 +61,8 @@ export class FireJetSystem {
 
         uniform float time;
         uniform float fade;
-        uniform float length;
-        uniform float radius;
+        uniform float uLen;
+        uniform float uRad;
 
         varying float vLife;
         varying float vZ01;
@@ -73,19 +74,19 @@ export class FireJetSystem {
           vLife = lifetime;
           vSeed = pseed;
 
-          // Conveyor: il volume resta fermo, la Z scorre e loopa
+          // Conveyor: Z scorre e loopa dentro il volume
           vec3 pos = position;
-          pos.z = mod(position.z + velocity.z * time, length);
+          pos.z = mod(position.z + velocity.z * time, uLen);
           pos.x += velocity.x * time;
           pos.y += velocity.y * time;
 
-          float z01 = clamp(pos.z / length, 0.0, 1.0);
+          float z01 = clamp(pos.z / uLen, 0.0, 1.0);
           vZ01 = z01;
 
           float spin = (1.6 + sin(time*1.8 + pseed*13.0)*0.4) * (1.0 - z01);
           pos.xy = rot(spin * 0.65) * pos.xy;
 
-          // espansione conica (profilo base del jet)
+          // profilo conico del jet (leggero)
           pos.xy *= (1.0 + z01 * 2.2);
 
           // jitter fine
@@ -190,7 +191,7 @@ export class FireJetSystem {
     const speed = 2.0 + Math.random() * 2.8;
     const sXY   = (Math.random() - 0.5) * 0.5;
     vel[i3]     = sXY * 0.45;
-    vel[i3 + 1] = (Math.random() - 0.5) * 0.25; // no bias verso +Y
+    vel[i3 + 1] = (Math.random() - 0.5) * 0.25;
     vel[i3 + 2] = speed;
 
     life[i] = Math.random();
@@ -211,8 +212,8 @@ export class FireJetSystem {
     if (length != null) this.length = length;
     if (radius != null) this.radius = radius;
     if (this.material) {
-      this.material.uniforms.length.value = this.length;
-      this.material.uniforms.radius.value = this.radius;
+      this.material.uniforms.uLen.value = this.length; // era length
+      this.material.uniforms.uRad.value = this.radius;
     }
     if (this.geometry?.boundingSphere) {
       this.geometry.boundingSphere.center.set(0, 0, this.length * 0.5);

@@ -149,6 +149,7 @@ export function startLoop(c) {
       updateEnvironment();
       updateWolfStone(delta);
       updatearchersStone(delta);
+      gameManager.spawner.update(delta);
      // updateFireBreathTest(delta);
 
       // ✅ queste usano già gameManager.controller (quindi ok)

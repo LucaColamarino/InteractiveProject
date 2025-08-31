@@ -31,6 +31,7 @@ import { loadGame, saveGame, applyPendingSave } from './managers/saveManager.js'
 import { createBridge } from './objects/bridge.js';
 import { deathScreen } from './ui/deathScreen.js';
 import { initFireBreathTest, updateFireBreathTest } from './testFireBreath.js';
+import { PortalSpawner } from './spawners/portalSpawner.js';
 const settings = (window.__gameSettings = {
   quality: 'medium',
   shadows: true,
@@ -111,6 +112,14 @@ async function init() {
     spawnChestAt(-55, 70, ironHelmet);
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
+    const spawner = new PortalSpawner(scene);
+    gameManager.spawner = spawner;
+    // spawn un portale di colore "fire" a (0,30,0)
+    spawner.spawn({
+      position: new THREE.Vector3(-57, 50, 62),
+      color: 0xff4500,   // colore principale → fuoco
+      radius: 6.0        // grandezza opzionale
+    });
     if(gameManager.bridgeCreated)
       createBridge({
                 modelUrl: '/models/props/Bridge.fbx',
