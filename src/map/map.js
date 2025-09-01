@@ -21,6 +21,8 @@ let ambientLight = null;
 let hemiLight = null;
 const WORLD_FORWARD_IS_POS_Z = true;
 let _setExposure = null;
+let _shadowTarget = null;
+export function setShadowCenterTarget(obj) { _shadowTarget = obj; }
 export function setExposureSetter(fn) { _setExposure = fn; }
 
 const _foliage = new Set();
@@ -219,8 +221,10 @@ export function updateSunPosition(delta) {
   sun?.position.copy(sunVector.clone().multiplyScalar(400));
   const moonVector = sunVector.clone().negate();
   moon?.position.copy(moonVector.clone().multiplyScalar(400));
+
   const daylightRaw = (Math.sin(sunAngle) + 1) * 0.5;
   const daylight = THREE.MathUtils.smoothstep(daylightRaw, 0.06, 0.94);
+
   if (sky?.material?.uniforms) {
     const U = sky.material.uniforms;
     U['turbidity'].value       = THREE.MathUtils.lerp(12.0, 2.8, daylight);
@@ -229,6 +233,7 @@ export function updateSunPosition(delta) {
     U['mieDirectionalG'].value = THREE.MathUtils.lerp(0.85, 0.78, daylight);
     U['sunPosition'].value.copy(sunVector);
   }
+
   if (scene.fog && scene.fog.isFogExp2) {
     const fogNight = new THREE.Color(0x0d0f14);
     const fogDay   = new THREE.Color(0x8ea8d6);
@@ -237,9 +242,10 @@ export function updateSunPosition(delta) {
     scene.fog.density = THREE.MathUtils.lerp(0.012, 0.005, daylight);
     scene.background = fogCol;
   }
+
   sun.intensity  = THREE.MathUtils.lerp(0.0, 1.0, daylight);
   moon.intensity = THREE.MathUtils.lerp(0.18, 0.04, daylight);
-  // Ambient/hemisphere
+
   ambientLight.intensity = THREE.MathUtils.lerp(0.14, 0.28, daylight);
   if (hemiLight) {
     hemiLight.intensity = THREE.MathUtils.lerp(0.06, 0.18, daylight);
@@ -248,23 +254,28 @@ export function updateSunPosition(delta) {
     hemiLight.color.copy(skyCol);
     hemiLight.groundColor.copy(groundCol);
   }
+
   if (terrainMaterial?.userData?.shaderRef?.uniforms?.dayFactor) {
     terrainMaterial.userData.shaderRef.uniforms.dayFactor.value = daylight;
   }
+
   if (water?.material?.uniforms?.waterColor) {
     const nightWater = new THREE.Color(0x0b141a);
     const dayWater   = new THREE.Color(0x0a2a1e);
     const mix = new THREE.Color().lerpColors(nightWater, dayWater, daylight);
     water.material.uniforms.waterColor.value = mix;
   }
+
   if (water?.material?.uniforms?.sunDirection) {
     const dir = (daylight > 0.12 ? sunVector : moonVector).clone().normalize();
     water.material.uniforms.sunDirection.value.copy(dir);
   }
+
   if (_setExposure) {
-    const exp = THREE.MathUtils.lerp(0.92, 1.12, daylight); // 0.92 notte → 1.12 giorno
+    const exp = THREE.MathUtils.lerp(0.92, 1.12, daylight);
     _setExposure(exp);
   }
+
   if (moonMesh) {
     moonMesh.position.copy(moonVector.clone().multiplyScalar(5000));
     moonMesh.scale.setScalar(300);
@@ -273,16 +284,28 @@ export function updateSunPosition(delta) {
     moonMesh.material.emissiveIntensity = e;
     moonMesh.material.needsUpdate = true;
   }
-  const camDir = new THREE.Vector3();
-  camera.getWorldDirection(camDir);
-  const focusDist = 55;
-  const ahead = camera.position.clone().add(camDir.multiplyScalar(focusDist));
-  const groundY = getTerrainHeightAt(ahead.x, ahead.z);
-  const center = new THREE.Vector3(ahead.x, groundY + 25, ahead.z);
 
-  const camHeight = Math.max(0, camera.position.y - groundY);
-  const boxHalf = THREE.MathUtils.clamp(80 + camHeight * 0.6, 90, 150);
+  let center;
+  if (_shadowTarget) {
+    const p = _shadowTarget.getWorldPosition(new THREE.Vector3());
+    const gy = getTerrainHeightAt(p.x, p.z);
+    center = new THREE.Vector3(p.x, gy + 25, p.z);
+  } else {
+    const gx = 0, gz = 0;
+    const gy = getTerrainHeightAt(gx, gz);
+    center = new THREE.Vector3(gx, gy + 25, gz);
+  }
+
+  let refHeight = 25;
+  if (_shadowTarget) {
+    const p = _shadowTarget.getWorldPosition(new THREE.Vector3());
+    const gy = getTerrainHeightAt(p.x, p.z);
+    refHeight = Math.max(0, p.y - gy);
+  }
+  const boxHalf = THREE.MathUtils.clamp(80 + refHeight * 0.6, 90, 150);
   const lightDirTowardScene = sunVector.clone().negate();
   fitSunShadowToCenter(center, lightDirTowardScene, boxHalf, 280);
+
   _tuneNightMaterials(daylight);
 }
+

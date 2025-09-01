@@ -90,7 +90,7 @@ export function createSunLight() {
   sun.castShadow = true;
   sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   sun.shadow.radius = 1;
-  sun.shadow.bias = -0.00025;
+  sun.shadow.bias = -0.00001;
   sun.shadow.normalBias = 0.012;
   const box = SHADOW_BOX_HALF_DEFAULT;
   sun.shadow.camera.left   = -box;
