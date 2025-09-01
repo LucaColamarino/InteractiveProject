@@ -87,7 +87,7 @@ export class StatsSystem {
     if (this.mana >= n){ this.mana -= n; this._notify(); return true; }
     return false;
   }
-  regenMana(dt, rate = 3){
+  regenMana(dt, rate = 0.5){
     const before = this.mana;
     this.mana = Math.min(this.maxMana, this.mana + rate * dt);
     if (this.mana !== before) this._notify();
