@@ -73,11 +73,3 @@ function setGroupVisible(list, visible) {
   if (!Array.isArray(list)) return;
   list.forEach(m => { if (m) m.visible = visible; });
 }
-export class Item {
-  constructor(id, name, type, attributes = {}) {
-    this.id = id;
-    this.name = name; 
-    this.type = type; // "weapon", "shield", "helmet"
-    this.attributes = attributes; // {armor: 5 }
-  }
-}

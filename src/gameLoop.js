@@ -21,7 +21,6 @@ import { updateManaTrees } from './objects/manaTree.js';
 import { updateArrowProjectiles } from './combat/projectiles/ArrowProjectile.js';
 import { renderXPHud } from './ui/xpHud.js';
 import { updateRunicStones } from './objects/runicStones.js';
-const LEAF_MIN_OPACITY_DURING_COOLDOWN = 0.25;
 const stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
@@ -36,7 +35,6 @@ export function startLoop(c) {
   hudManager.init();
 
   renderXPHud(gameManager?.controller?.stats);
-  let lastRegenSite = null;
   function animate() {
     stats.begin();
     requestAnimationFrame(animate);
@@ -76,7 +74,7 @@ export function startLoop(c) {
       updateChests(delta);
       updatetorchs(delta);
       updateCamera(player, delta);
-      updateEnvironment();
+      updateEnvironment(); //LOD
       updateRunicStones(delta);
       updateManaTrees(delta);
       gameManager.spawner.update(delta,gameManager.controller.player.model.position);

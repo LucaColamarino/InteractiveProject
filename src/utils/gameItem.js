@@ -1,14 +1,5 @@
 import { gameManager } from "../managers/gameManager";
 export class GameItem {
-  /**
-   * @param {Object} opts
-   *  - id: string univoco
-   *  - name: etichetta (es. "Iron Sword")
-   *  - type: "weapon" | "helmet" | "shield" | ...
-   *  - modelPath: path FBX/GLTF del modello world-pickup
-   *  - meshPrefix: prefisso per collegare all'equipment (es. "wand" -> wand, wand1...)
-   *  - meta: oggetto libero (rarità, danno, difesa, ecc.)
-   */
   constructor({ id, name, type, modelPath, meshPrefix = null, meta = {} }) {
     this.id = id;
     this.name = name;

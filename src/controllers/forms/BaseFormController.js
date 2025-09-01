@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { trees } from '../../spawners/vegetationSpawner.js';
 import { StatsSystem } from '../../systems/StatsSystem.js';
 import { updateVitalsHUD } from '../../ui/hudVitals.js';
-import { PlayerBurnFX } from '../../particles/PlayerBurnFX.js';
 import { resolveObstaclesXZ } from '../../systems/ObstacleSystem.js';
 import { getGroundHeightAtXZ, isBlockedByWater } from '../../systems/GroundSystem.js';
 import { waterHeight } from '../../utils/entities.js';
@@ -165,9 +164,7 @@ export class BaseFormController {
         this._candPos.z += this._n2D.y * push;
       }
     }
-
     resolveObstaclesXZ(this._candPos, PLAYER_RADIUS);
-
     const isAirborne = (this.abilities?.canFly && this.isFlying) === true;
     if (!isAirborne) {
       const fromY = Math.max(this._prePos.y, this._candPos.y) + 2.0;

@@ -70,13 +70,21 @@ async function init() {
     updateLoadingProgress(5, 'Settings configuration...');
     applyMenuSettings(settings);
     await wait(80);
+
+
     updateLoadingProgress(15, 'Loading assets and resources...');
     await preloadAllEntities(Object.keys(abilitiesByForm));
+
+
     updateLoadingProgress(25, 'Controls configuration...');
     setupInput();
     await wait(80);
+
+
     updateLoadingProgress(45, 'Terrain Generation...');
     await createHeightmapTerrain();
+
+
     updateLoadingProgress(55, 'Creating sky and water...');
     createSky();
     const waterY = waterHeight;
@@ -132,6 +140,8 @@ async function init() {
                 rotationY: 10,
                 uvTile: 2,
               });
+
+
     updateLoadingProgress(95, 'Player initialization...');
     if (!gameManager.controller) {
       console.log("CREATING NEW CONTROLLER");
@@ -159,7 +169,7 @@ async function init() {
         window.location.href = '/';
       }
     });
-    applyPendingSave();
+    applyPendingSave(); //apply save
     updateVitalsHUD(gameManager.controller.stats);
     gameManager.inventory.updateEquipmentVisibility();
     gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
@@ -169,6 +179,8 @@ async function init() {
     gameManager.controller._burnFx = new PlayerBurnFX(gameManager.controller.player.model);
     gameManager.controller._burnFx.prewarm(renderer, scene, camera);
     await wait(80);
+
+
     updateLoadingProgress(100, 'Finalizing...')
     renderer.compile(scene, camera);
     await wait(60);
