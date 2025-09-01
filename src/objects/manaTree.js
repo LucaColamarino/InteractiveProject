@@ -163,9 +163,9 @@ export class ManaTree {
         return (this.cooldown <= 0) && (this.currentEssence > 0);
       },
       getPrompt: () => {
-        if (this._isDraining) return { key: 'E', text: 'Ferma assorbimento' };
-        if (this.cooldown > 0) return { key: null, text: 'Albero esausto (in ricarica)' };
-        return { key: 'E', text: 'Assorbi mana' };
+        if (this._isDraining) return { key: 'E', text: 'Stop absorbing' };
+        if (this.cooldown > 0) return { key: null, text: 'Empty Tree(Charging)' };
+        return { key: 'E', text: 'Absorb mana' };
       },
       onInteract: () => {
         if (this._isDraining) { this.stopDrain(); return; }

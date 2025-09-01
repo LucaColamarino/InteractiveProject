@@ -145,7 +145,7 @@ export class FireBreathCone {
           vec3 white  = vec3(1.00);
           vec3 mid    = mix(orange, yellow, smoothstep(0.30, 0.65, t));
           vec3 hot    = mix(mid, white,   smoothstep(0.78, 1.00, t));
-          return mix(red, hot, t);
+          return red;
         }
         void main(){
           vec2 uv = gl_PointCoord - 0.5;
