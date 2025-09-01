@@ -1,6 +1,4 @@
-// ui/victoryScreen.js — Soulslike Victory Screen
 import { gameManager } from '../managers/gameManager.js';
-
 class VictoryScreen {
   constructor() {
     this.el = null;
@@ -9,20 +7,16 @@ class VictoryScreen {
     this._onKey = this._onKey.bind(this);
     this._inited = false;
   }
-
   init(opts = {}) {
     if (this._inited) return;
     this._inited = true;
 
-    this.onContinue = opts.onContinue || null;   // es. “Ricomincia dal checkpoint”
-    this.onQuit     = opts.onQuit     || null;   // es. “Torna al menu iniziale”
+    this.onContinue = opts.onContinue || null;  
+    this.onQuit     = opts.onQuit     || null;  
     this._ensureDom();
   }
-
   _ensureDom() {
     if (this.el) return;
-
-    // Stili (simile alla death screen, palette oro/ambra)
     const styleId = 'vs-style';
     if (!document.getElementById(styleId)) {
       const st = document.createElement('style');
@@ -140,73 +134,50 @@ class VictoryScreen {
     this.el.appendChild(card);
     document.body.appendChild(this.el);
   }
+  show({ title = 'YOU ESCAPED', sub = 'Hai attraversato il portale. Il tuo viaggio continua altrove…' } = {}) {
+    this._ensureDom();
+    if (this.titleEl) this.titleEl.textContent = title;
+    if (this.subEl) this.subEl.textContent = sub;
 
-show({ title = 'YOU ESCAPED', sub = 'Hai attraversato il portale. Il tuo viaggio continua altrove…', playSound = true } = {}) {
-  this._ensureDom();
-  if (this.titleEl) this.titleEl.textContent = title;
-  if (this.subEl) this.subEl.textContent = sub;
+    if (gameManager) gameManager.isPaused = true;
+    this.el.style.display = 'flex';
+    this.el.classList.remove('hidden');
+    this.el.classList.add('active');
+    this.el.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('victory-open');
 
-  if (gameManager) gameManager.isPaused = true;
-
-  // 🔒 forza la visibilità a prescindere dal CSS globale
-  this.el.style.display = 'flex';
-  this.el.classList.remove('hidden');
-  this.el.classList.add('active');
-  this.el.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('victory-open');
-
-  document.addEventListener('keydown', this._onKey);
-  if (playSound) this._playSound();
-}
-
-hide() {
-  if (!this.el) return;
-
-  // 🔓 forza l’occultamento a prescindere dal CSS globale
-  this.el.classList.remove('active');
-  this.el.classList.add('hidden');
-  this.el.setAttribute('aria-hidden', 'true');
-  this.el.style.display = 'none';
-
-  document.body.classList.remove('victory-open');
-  document.removeEventListener('keydown', this._onKey);
-}
-
-
-  _playSound() {
-    // opzionale: breve shimmer/choir – qui lasciamo il placeholder
-    // const audio = new Audio('/audio/victory.ogg'); audio.volume = 0.6; audio.play().catch(()=>{});
+    document.addEventListener('keydown', this._onKey);
   }
+  hide() {
+    if (!this.el) return;
+    this.el.classList.remove('active');
+    this.el.classList.add('hidden');
+    this.el.setAttribute('aria-hidden', 'true');
+    this.el.style.display = 'none';
 
+    document.body.classList.remove('victory-open');
+    document.removeEventListener('keydown', this._onKey);
+  }
   _onKey(e) {
-    // ENTER/SPACE → continua, ESC → menu
     if (e.code === 'Enter' || e.code === 'Space') {
       this._continue();
     } else if (e.code === 'Escape') {
       this._quit();
     }
   }
-
   _continue() {
     this.hide();
-    // Riprendi gioco oppure respawn/teletrasporto a nuova area
     if (typeof this.onContinue === 'function') {
       this.onContinue();
     } else if (gameManager) {
-      // default: riprende
       gameManager.isPaused = false;
     }
   }
-
   _quit() {
     this.hide();
     if (typeof this.onQuit === 'function') {
       this.onQuit();
-    } else {
-      // default: torna al menu iniziale (evento o redirect)
-      window.dispatchEvent(new Event('game:quit'));
     }
   }
 }
-
 export const victoryScreen = new VictoryScreen();

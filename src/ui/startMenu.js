@@ -1,18 +1,4 @@
-// /src/ui/startMenu.js — Soulslike-inspired start menu (with Settings)
 export class StartMenu {
-  /**
-   * @param {{
-   *   onStart?: Function,
-   *   onContinue?: Function,
-   *   onQuit?: Function,
-   *   onSettingsChange?: (settings)=>void,
-   *   initialSettings?: Partial<{
-   *     musicVolume:number, sfxVolume:number,
-   *     fullscreen:boolean, quality:'Low'|'Medium'|'High'|'Ultra',
-   *     shadows:boolean, resolution:string
-   *   }>
-   * }} opts
-   */
   constructor({
     onStart = () => {},
     onQuit = () => {},
@@ -24,13 +10,10 @@ export class StartMenu {
     this.onContinue = onContinue;
     this.onQuit = onQuit;
     this.onSettingsChange = onSettingsChange;
-
     this._settingsKey = 'metamorphosis_settings_v1';
     this.settings = this._loadSettings(initialSettings);
-
     this.particles = [];
     this.animationId = null;
-
     this._build();
     this._startParticles();
   }
@@ -51,7 +34,6 @@ export class StartMenu {
     };
     return { ...defaults, ...fromStore, ...overrides };
   }
-
   _saveSettings() {
     try {
       localStorage.setItem(this._settingsKey, JSON.stringify(this.settings));
@@ -207,75 +189,52 @@ export class StartMenu {
 
     // Events
     this.btnStart.addEventListener('click', () => { 
-      this._playClickSound();
       this.onStart(); 
       this.show(false); 
     });
     
     this.btnContinue.addEventListener('click', () => {
-      this._playClickSound();
-      // Hook your "continue" logic here (e.g., load last save)
       this.onContinue(); 
       this.show(false); 
       console.log('[StartMenu] Continue clicked');
     });
     
     this.btnSettings.addEventListener('click', () => {
-      this._playClickSound();
       this._toggleSettings(true);
     });
     
     this.settingsClose.addEventListener('click', () => {
-      this._playClickSound();
       this._toggleSettings(false);
     });
 
     this.settingsApply.addEventListener('click', () => {
-      this._playClickSound();
       this._applySettings();
     });
-
-    // Live value display for ranges
     this.inMusic.addEventListener('input', () => {
       this.inMusicVal.textContent = `${this.inMusic.value}%`;
     });
     this.inSfx.addEventListener('input', () => {
       this.inSfxVal.textContent = `${this.inSfx.value}%`;
     });
-
-    // ESC to close settings
     this._onKeyDown = (e) => {
       if (e.key === 'Escape' && this._settingsOpen()) this._toggleSettings(false);
     };
     window.addEventListener('keydown', this._onKeyDown);
-
-    // Hover SFX
-    [this.btnStart, this.btnContinue, this.btnSettings, this.btnQuit, this.settingsApply, this.settingsClose].forEach(btn => {
-      btn.addEventListener('mouseenter', () => this._playHoverSound());
-    });
-
-    // If settings want fullscreen on start
     if (this.settings.fullscreen && !document.fullscreenElement) {
-      // avoid auto-request without user gesture; we rely on next user click
       console.log('[StartMenu] Fullscreen preferred; will apply on next user gesture.');
     }
-
     this.show(true);
   }
-
   _settingsOpen() {
     return this.settingsPanel?.classList.contains('open');
   }
-
   _resizeCanvas() {
     if (!this.canvas) return;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
   }
-
   _startParticles() {
     if (this.animationId) return;
-    // Initialize particles
     if (this.particles.length === 0) {
       for (let i = 0; i < 150; i++) {
         this.particles.push(this._createParticle());
@@ -283,7 +242,6 @@ export class StartMenu {
     }
     this._animateParticles();
   }
-
   _createParticle() {
     return {
       x: Math.random() * window.innerWidth,
@@ -297,12 +255,9 @@ export class StartMenu {
       opacity: Math.random() * 0.8 + 0.2
     };
   }
-
   _animateParticles() {
     if (!this.ctx) return;
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
-    // Update and draw particles
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.x += p.vx;
@@ -334,21 +289,6 @@ export class StartMenu {
     
     this.animationId = requestAnimationFrame(() => this._animateParticles());
   }
-
-  _playHoverSound() {
-    // Hook your audio system here
-    // Example: audio.play('ui_hover', this.settings.sfxVolume/100);
-    // For now:
-    // console.log('🔥 Hover sound');
-  }
-
-  _playClickSound() {
-    // Hook your audio system here
-    // Example: audio.play('ui_click', this.settings.sfxVolume/100);
-    // For now:
-    // console.log('⚔️ Click sound');
-  }
-
   _toggleSettings(open) {
     if (!this.settingsPanel) return;
     if (open) {
@@ -361,7 +301,6 @@ export class StartMenu {
   }
 
   async _applySettings() {
-    // Read current UI
     const next = {
       musicVolume: Number(this.inMusic.value),
       sfxVolume: Number(this.inSfx.value),
@@ -371,34 +310,24 @@ export class StartMenu {
       resolution: this.inRes.value
     };
 
-    // Fullscreen handling
     try {
       if (next.fullscreen && !document.fullscreenElement) {
-        // Requires user gesture; we're in a click handler, so ok
         await document.documentElement.requestFullscreen();
       } else if (!next.fullscreen && document.fullscreenElement) {
         await document.exitFullscreen();
       }
     } catch (e) {
       console.warn('Fullscreen request failed:', e);
-      // If denied, keep the toggle in sync with actual state
       next.fullscreen = !!document.fullscreenElement;
       this.inFullscreen.checked = next.fullscreen;
     }
-
-    // Store + update
     this.settings = { ...this.settings, ...next };
     this._saveSettings();
-
-    // Notify outside
     const detail = { settings: { ...this.settings } };
     this.root.dispatchEvent(new CustomEvent('settingsChanged', { detail }));
     this.onSettingsChange({ ...this.settings });
-
-    // Close panel
     this._toggleSettings(false);
   }
-
   show(v) {
     if (v) {
       this.root.style.display = 'block';
@@ -415,7 +344,6 @@ export class StartMenu {
       }, 800);
     }
   }
-
   destroy() {
     if (this.animationId) cancelAnimationFrame(this.animationId);
     window.removeEventListener('resize', this._boundResize);

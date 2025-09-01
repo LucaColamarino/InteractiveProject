@@ -1,4 +1,3 @@
-// particles/FireBreathCone.js - Fire breath con Jet core su +Z (no flare, cone clamp, fix uniform name)
 import * as THREE from 'three';
 import { FireJetSystem } from './FireJetSystem.js';
 
@@ -36,13 +35,13 @@ export class FireBreathCone {
 
     this.setVisible(false);
     this._makeNonPickable();
-this._invertForward = false; // sostituisce il vecchio invertForward()
-this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ'); // offset locale (pitch,yaw,roll)
+
+    this._invertForward = false;
+    this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ');
 
     if (this.parent) this.attachTo(this.parent, this.localOffset);
   }
 
-  /* ========================= FIRE PARTICLES (corona esterna) ========================= */
   _createFireSystem() {
     const fireGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.particleCount * 3);
@@ -69,7 +68,7 @@ this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ'); // offset locale (pitch,y
         time:      { value: 0 },
         fade:      { value: 0 },
         intensity: { value: this.intensity },
-        uLen:      { value: this.length },   // <— era "length"
+        uLen:      { value: this.length },
         coneRadius:{ value: this.radius }
       },
       vertexShader: `
@@ -91,8 +90,6 @@ this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ'); // offset locale (pitch,y
         void main() {
           vLife = lifetime;
           vSeed = uv.x;
-
-          // Conveyor: volume fermo, scorrimento lungo Z
           vec3 pos = position;
           pos.z = mod(position.z + velocity.z * time, uLen);
           pos.x += velocity.x * time;
@@ -108,12 +105,10 @@ this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ'); // offset locale (pitch,y
           pos.x += n1;
           pos.y += n2;
 
-          // Espansione guidata dal radius
           float baseR = 0.8;
           float widen = mix(1.0, coneRadius / baseR, z01);
           pos.xy *= widen;
 
-          // Clamp XY alla sezione del cono
           float maxR = mix(coneRadius * 0.10, coneRadius, z01);
           float m = length(pos.xy);
           if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
@@ -158,7 +153,6 @@ this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ'); // offset locale (pitch,y
           if(d > 0.5) discard;
 
           float radial = pow(1.0 - d*2.0, 1.35);
-
           float baseHeat = 1.0 - vZ;
           float n = fbm(uv*5.0 + vec2(vSeed*13.0, time*1.2));
           float flick = 0.85 + 0.15 * sin(time*20.0 + vSeed*10.0);
@@ -194,43 +188,38 @@ this.aimOffsetEuler = new THREE.Euler(0, 0, 0, 'XYZ'); // offset locale (pitch,y
     this.fireGeometry = fireGeo;
     this.fireMaterial = fireMaterial;
   }
-setRotationOffsetEuler(euler) {
-  this.aimOffsetEuler.copy(euler);
-  this._applyLocalRotation();
-}
 
-setRotationOffsetDegrees(pitchDeg = 0, yawDeg = 0, rollDeg = 0) {
-  console.log("ROTATION SET");
-  this.aimOffsetEuler.set(
-    THREE.MathUtils.degToRad(pitchDeg),
-    THREE.MathUtils.degToRad(yawDeg),
-    THREE.MathUtils.degToRad(rollDeg),
-    'XYZ'
-  );
-  this._applyLocalRotation();
-}
-
-// rimpiazza la vecchia invertForward(flag) che ruotava solo sullo Y
-invertForward(flag = true) {
-  this._invertForward = !!flag;
-  this._applyLocalRotation();
-}
-
-_applyLocalRotation() {
-  // Base: +Z è la direzione del getto
-  const qOffset = new THREE.Quaternion().setFromEuler(this.aimOffsetEuler);
-
-  // Se invertito, aggiungi una rotazione di 180° attorno a Y (inverte la +Z)
-  if (this._invertForward) {
-    const qInv = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI);
-    qInv.multiply(qOffset);
-    this.group.quaternion.copy(qInv);
-  } else {
-    this.group.quaternion.copy(qOffset);
+  setRotationOffsetEuler(euler) {
+    this.aimOffsetEuler.copy(euler);
+    this._applyLocalRotation();
   }
-}
 
-  /* ========================= CORE: Jet ========================= */
+  setRotationOffsetDegrees(pitchDeg = 0, yawDeg = 0, rollDeg = 0) {
+    this.aimOffsetEuler.set(
+      THREE.MathUtils.degToRad(pitchDeg),
+      THREE.MathUtils.degToRad(yawDeg),
+      THREE.MathUtils.degToRad(rollDeg),
+      'XYZ'
+    );
+    this._applyLocalRotation();
+  }
+
+  invertForward(flag = true) {
+    this._invertForward = !!flag;
+    this._applyLocalRotation();
+  }
+
+  _applyLocalRotation() {
+    const qOffset = new THREE.Quaternion().setFromEuler(this.aimOffsetEuler);
+    if (this._invertForward) {
+      const qInv = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI);
+      qInv.multiply(qOffset);
+      this.group.quaternion.copy(qInv);
+    } else {
+      this.group.quaternion.copy(qOffset);
+    }
+  }
+
   _createJetCore() {
     this.jet = new FireJetSystem({
       length: this.length * 0.95,
@@ -250,7 +239,6 @@ _applyLocalRotation() {
     this.jet.setActive(this._active);
   }
 
-  /* ========================= SPARKS ========================= */
   _createSparkSystem() {
     const sparkGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.sparkCount * 3);
@@ -271,48 +259,41 @@ _applyLocalRotation() {
     const sparkMaterial = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 }, fade: { value: 0 },
-        uLen: { value: this.length },         // <— era "length"
+        uLen: { value: this.length },
         coneRadius: { value: this.radius },
-        sparkRange: {value: this.length},
+        sparkRange: { value: this.length },
       },
       vertexShader: `
-       attribute vec3 velocity;
-      attribute float lifetime;
-      attribute float size;
+        attribute vec3 velocity;
+        attribute float lifetime;
+        attribute float size;
 
-      uniform float time;
-      uniform float fade;
-      uniform float uLen;
-      uniform float coneRadius;
-      uniform float sparkRange;
+        uniform float time;
+        uniform float fade;
+        uniform float uLen;
+        uniform float coneRadius;
+        uniform float sparkRange;
 
-      varying float vLife;
+        varying float vLife;
 
-      void main(){
-        vLife = lifetime;
+        void main(){
+          vLife = lifetime;
 
-        float age = clamp(lifetime, 0.0, 1.0);     // 0..1 per particella
-        vec3 pos = position;
+          float age = clamp(lifetime, 0.0, 1.0);
+          vec3 pos = position;
 
-        // Movimento basato sull'età (non sul tempo globale)
-        pos += velocity * (age * sparkRange);
+          pos += velocity * (age * sparkRange);
+          pos.y -= age * age * 0.9 * (sparkRange * 0.03);
+          pos.z = clamp(pos.z, 0.0, uLen);
 
-        // Gravità lieve, scalata sull'età
-        pos.y -= age * age * 0.9 * (sparkRange * 0.03);
+          float z01 = clamp(pos.z / uLen, 0.0, 1.0);
+          float maxR = mix(coneRadius * 0.20, coneRadius, z01);
+          float m = length(pos.xy);
+          if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
 
-        // Limita lungo Z dentro il getto
-        pos.z = clamp(pos.z, 0.0, uLen);
-
-        // Clamp XY alla sezione del cono all'altezza z
-        float z01 = clamp(pos.z / uLen, 0.0, 1.0);
-        float maxR = mix(coneRadius * 0.20, coneRadius, z01);
-        float m = length(pos.xy);
-        if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
-
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
-        gl_PointSize = size * (1.0 - age) * fade * 12.0; // un po' più piccolo (22→12→16→12)
-      }
-
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
+          gl_PointSize = size * (1.0 - age) * fade * 12.0;
+        }
       `,
       fragmentShader: `
         varying float vLife;
@@ -341,7 +322,6 @@ _applyLocalRotation() {
     this.sparkMaterial = sparkMaterial;
   }
 
-  /* ========================= SMOKE ========================= */
   _createSmokeSystem() {
     const smokeGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.smokeCount * 3);
@@ -365,7 +345,7 @@ _applyLocalRotation() {
       uniforms: {
         time:   { value: 0 },
         fade:   { value: 0 },
-        uLen:   { value: this.length },     // <— era "length"
+        uLen:   { value: this.length },
         coneRadius: { value: this.radius }
       },
       vertexShader: `
@@ -389,7 +369,6 @@ _applyLocalRotation() {
           vLife = lifetime;
           vRot  = rotation;
 
-          // Conveyor: scorrimento lungo Z con loop, volume fermo
           vec3 pos = position;
           pos.z = mod(position.z + velocity.z * time, uLen);
           pos.x += velocity.x * time;
@@ -402,7 +381,6 @@ _applyLocalRotation() {
           float ang = time * mix(0.8, 1.6, z01) + rotation;
           pos.xy = rot(ang * swirl) * pos.xy;
 
-          // Clamp al raggio del cono
           float maxR = mix(coneRadius * 0.15, coneRadius, z01);
           float m = length(pos.xy);
           if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
@@ -458,7 +436,6 @@ _applyLocalRotation() {
     this.smokeMaterial = smokeMaterial;
   }
 
-  /* ========================= DISTORTION ========================= */
   _createDistortionEffect() {
     const distortGeo = new THREE.CylinderGeometry(this.radius * 0.9, 0, this.length, 18, 1, true);
     distortGeo.rotateX(Math.PI / 2);
@@ -504,7 +481,6 @@ _applyLocalRotation() {
     this.distortMaterial = distortMaterial;
   }
 
-  /* ========================= RESPAWN HELPERS ========================= */
   _resetFireParticle(index, positions, velocities, lifetimes, scales) {
     const i3 = index * 3;
     const angle = Math.random() * Math.PI * 2;
@@ -570,7 +546,6 @@ _applyLocalRotation() {
     rotations[index] = Math.random() * Math.PI * 2;
   }
 
-  /* ========================= UPDATE ========================= */
   update(dt = 0) {
     this._time += dt;
 
@@ -585,12 +560,11 @@ _applyLocalRotation() {
     this._fade += (target - this._fade) * (1 - Math.exp(-k * dt));
     if (Math.abs(this._fade - target) < 1e-3) this._fade = target;
 
-    // uniforms
     if (this.fireMaterial) {
       this.fireMaterial.uniforms.time.value = this._time;
       this.fireMaterial.uniforms.fade.value = this._fade;
       this.fireMaterial.uniforms.intensity.value = this.intensity;
-      this.fireMaterial.uniforms.uLen.value = this.length;          // <— uLen
+      this.fireMaterial.uniforms.uLen.value = this.length;
       if (this.fireMaterial.uniforms.coneRadius)
         this.fireMaterial.uniforms.coneRadius.value = this.radius;
     }
@@ -599,13 +573,12 @@ _applyLocalRotation() {
       this.sparkMaterial.uniforms.fade.value = this._fade;
       this.sparkMaterial.uniforms.uLen.value = this.length;
       this.sparkMaterial.uniforms.coneRadius.value = this.radius;
-      this.sparkMaterial.uniforms.sparkRange.value = this.length; // NEW
+      this.sparkMaterial.uniforms.sparkRange.value = this.length;
     }
-
     if (this.smokeMaterial) {
       this.smokeMaterial.uniforms.time.value = this._time;
       this.smokeMaterial.uniforms.fade.value = this._fade;
-      this.smokeMaterial.uniforms.uLen.value = this.length;          // <— uLen
+      this.smokeMaterial.uniforms.uLen.value = this.length;
       this.smokeMaterial.uniforms.coneRadius.value = this.radius;
     }
     if (this.distortMaterial) {
@@ -692,7 +665,6 @@ _applyLocalRotation() {
     this.smokeGeometry.attributes.lifetime.needsUpdate = true;
   }
 
-  /* ========================= PUBLIC API ========================= */
   setActive(flag) { this._active = !!flag; }
   isActive() { return !!this._active; }
 
@@ -711,17 +683,13 @@ _applyLocalRotation() {
     if (this._helpersOn) this.setVisible(true);
   }
 
-  invertForward(flag = true) {
-    this.group.rotation.y = flag ? Math.PI : 0;
-  }
-
   attachTo(parent, localOffset = null) {
     this.parent = parent;
     if (localOffset) this.localOffset.copy(localOffset);
     if (!parent) return;
     parent.add(this.group);
     this.group.position.copy(this.localOffset);
-    this._applyLocalRotation();  
+    this._applyLocalRotation();
   }
 
   autoscaleFromModelBounds(diagonal, kLen = 0.35, kRad = 0.10) {
@@ -795,18 +763,17 @@ _applyLocalRotation() {
     }
   }
 
-  // Aggiorna length/radius + respawn coerente
   setGeometry(length = null, radius = null) {
     if (length != null)  this.length = Math.max(0.5, length);
     if (radius != null)  this.radius = Math.max(0.15, radius);
 
     if (this.fireMaterial) {
-      this.fireMaterial.uniforms.uLen.value = this.length;         // <— uLen
+      this.fireMaterial.uniforms.uLen.value = this.length;
       if (this.fireMaterial.uniforms.coneRadius)
         this.fireMaterial.uniforms.coneRadius.value = this.radius;
     }
     if (this.smokeMaterial) {
-      this.smokeMaterial.uniforms.uLen.value = this.length;        // <— uLen
+      this.smokeMaterial.uniforms.uLen.value = this.length;
       if (this.smokeMaterial.uniforms.coneRadius)
         this.smokeMaterial.uniforms.coneRadius.value = this.radius;
     }
@@ -816,18 +783,17 @@ _applyLocalRotation() {
       if (this.sparkMaterial.uniforms.coneRadius)
         this.sparkMaterial.uniforms.coneRadius.value = this.radius;
       if (this.sparkMaterial.uniforms.sparkRange)
-        this.sparkMaterial.uniforms.sparkRange.value = this.length; // NEW
+        this.sparkMaterial.uniforms.sparkRange.value = this.length;
     }
-
 
     this._rebuildGeometry();
     if (this.jet) this.jet.setGeometry(this.length * 0.95, this.radius * 0.55);
     this._updateBoundingSpheres();
   }
+
   setRadius(r){ this.setGeometry(null, r); }
 
   _rebuildGeometry() {
-    // aggiorna mesh distorsione
     if (this.distortMesh) {
       this.distortMesh.geometry.dispose?.();
       const g = new THREE.CylinderGeometry(this.radius * 0.9, 0, this.length, 18, 1, true);
@@ -837,7 +803,6 @@ _applyLocalRotation() {
       this.distortMesh.geometry = g;
     }
 
-    // respawn coerente con la nuova geometria
     if (this.fireGeometry) {
       const pos = this.fireGeometry.attributes.position.array;
       const vel = this.fireGeometry.attributes.velocity.array;

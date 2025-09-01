@@ -1,10 +1,6 @@
-// /src/ui/hudManager.js – HUD ottimizzato con animazioni coerenti e meno reflow
 import * as THREE from 'three';
-
-// ---------- Utils DOM ----------
 const $  = (id) => /** @type {HTMLElement|null} */(document.getElementById(id));
 const $$ = (sel) => /** @type {NodeList} */(document.querySelectorAll(sel));
-
 function withBaseTransform(el) {
   if (!el) return;
   if (!el.dataset.baseTransform) el.dataset.baseTransform = el.style.transform || '';
@@ -14,8 +10,6 @@ function setTransform(el, extra = '') {
   withBaseTransform(el);
   el.style.transform = `${el.dataset.baseTransform || ''} ${extra}`.trim();
 }
-
-// ---------- Math utils ----------
 const M = {
   clamp(v, a, b) { return Math.min(Math.max(v, a), b); },
   lerp(a, b, t) { return a + (b - a) * t; },
@@ -30,7 +24,6 @@ const EASING = {
     ? (Math.pow(2 * t, 2) * (2.7 * 2 * t - 1.7)) / 2
     : (2 - Math.pow(2 - 2 * t, 2) * (2.7 * (2 - 2 * t) + 1.7)) / 2,
 };
-
 function rafValue({ from, to, duration = 300, easing = 'easeOutQuart', onUpdate }) {
   const ease = EASING[easing] || EASING.easeOutQuart;
   const t0 = performance.now();
@@ -42,11 +35,9 @@ function rafValue({ from, to, duration = 300, easing = 'easeOutQuart', onUpdate 
   }
   requestAnimationFrame(step);
 }
-
 const animations = {
   animateValue: (from, to, duration, cb, easing = 'easeOutQuart') =>
     rafValue({ from, to, duration, easing, onUpdate: cb }),
-
   pulseElement(el, intensity = 1.2, duration = 600) {
     if (!el) return;
     withBaseTransform(el);
@@ -57,7 +48,6 @@ const animations = {
       setTimeout(() => { el.style.transition = ''; }, duration);
     }, duration / 2);
   },
-
   shakeElement(el, intensity = 5, duration = 400) {
     if (!el) return;
     withBaseTransform(el);
@@ -72,8 +62,7 @@ const animations = {
     })();
   }
 };
-
-// ---------- Cache elementi ----------
+// ---------- Cache ----------
 const elements = {
   mmEnemies: null, mmTime: null, mmCoords: null, mmLevel: null,
   minimapGrid: null, minimapPlayer: null, compass: null,
@@ -81,12 +70,11 @@ const elements = {
   healthBar: null, healthText: null, manaBar: null, manaText: null,
   staminaBar: null, staminaText: null, xpBar: null, xpText: null
 };
-
 // ---------- Radar ----------
 const radar = {
   initialized: false,
   range: 120,
-  dotMap: new Map(), // enemy -> DOT
+  dotMap: new Map(),
   headingArrow: null,
   compassElement: null,
   gridElement: null,
@@ -98,34 +86,25 @@ const radar = {
     pulseInterval: 1500,
   }
 };
-
 function initializeRadarSystem() {
   elements.minimapGrid = document.querySelector('.minimap-grid');
   elements.minimapPlayer = document.querySelector('.minimap-player');
   elements.compass = document.querySelector('.compass');
-
   if (!elements.minimapGrid) {
     console.warn('[HUD] Minimap assente: radar disabilitato');
     return false;
   }
-
-  // Pulisci eventuali demo
   elements.minimapGrid.querySelectorAll('.minimap-enemy').forEach(el => el.remove());
-
   radar.headingArrow = document.querySelector('.minimap-heading') || null;
-  // dopo: radar.headingArrow = document.querySelector('.minimap-heading') || null;
-
   if (elements.compass) {
     elements.compass.textContent = 'N';
     elements.compass.setAttribute('aria-label', 'Direzione: Nord');
   }
-
   radar.gridElement = elements.minimapGrid;
   radar.compassElement = elements.compass;
   radar.initialized = true;
   return true;
 }
-
 function createEnemyDot() {
   const dot = document.createElement('div');
   dot.className = 'minimap-enemy';
@@ -141,65 +120,45 @@ function createEnemyDot() {
   });
   return dot;
 }
-
 function updateRadarSystem(player, enemies, camera) {
   if (!radar.initialized || !elements.minimapGrid || !player?.model || !camera) return;
-
-  // Dim minimap
   const rect = elements.minimapGrid.getBoundingClientRect();
   const size = Math.min(rect.width || 180, rect.height || 180);
   const maxR = size * 0.5;
-
-  // Yaw camera
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
   const yawDeg = M.toDeg(Math.atan2(dir.x, dir.z))+90;
-
-  // Pos player
   const p = player.model.position;
   const active = new Set();
-
-  // Aggiorna dots
   const frag = document.createDocumentFragment();
   for (const enemy of (enemies || [])) {
     if (!enemy?.alive || !enemy?.model) continue;
-
     const e = enemy.model.position;
     const dx = e.x - p.x, dz = e.z - p.z;
     const dist = Math.hypot(dx, dz);
     if (dist > radar.range) continue;
-
-    // N-up: +Z su
     let rx = (-dx / radar.range) * maxR;
     let ry = (-dz / radar.range) * maxR;
     const rr = Math.hypot(rx, ry);
     if (rr > maxR) { const s = maxR / rr; rx *= s; ry *= s; }
-
     const left = 50 + (rx / size) * 100;
     const top  = 50 + (ry / size) * 100;
-
     let dot = radar.dotMap.get(enemy);
     if (!dot) {
       dot = createEnemyDot();
-      elements.minimapGrid.appendChild(dot); // pochi elementi → ok append diretto
+      elements.minimapGrid.appendChild(dot);
       radar.dotMap.set(enemy, dot);
       requestAnimationFrame(() => { dot.style.transform = 'translate(-50%, -50%) scale(1)'; dot.style.opacity = '0.85'; });
     }
-
     dot.style.left = `${left}%`;
     dot.style.top  = `${top}%`;
-
     const fadeD = radar.range * radar.config.fadeDistance;
     const op = dist > fadeD ? M.lerp(0.85, 0.35, (dist - fadeD) / (radar.range - fadeD)) : 0.85;
     dot.style.opacity = `${op}`;
-
     const scale = M.lerp(1.1, 0.85, dist / radar.range);
     setTransform(dot, `translate(-50%, -50%) scale(${scale})`);
-
     active.add(dot);
   }
-
-  // Rimuovi orfani
   for (const [enemy, dot] of radar.dotMap.entries()) {
     if (!active.has(dot)) {
       dot.style.opacity = '0';
@@ -207,22 +166,15 @@ function updateRadarSystem(player, enemies, camera) {
       setTimeout(() => { dot.remove(); radar.dotMap.delete(enemy); }, 200);
     }
   }
-
-  // Freccia direzione
   if (radar.headingArrow) {
     setTransform(radar.headingArrow, `translate(-85%,-30%) rotate(${-yawDeg}deg) scale(0.7)`);
-    // Freccia direzione
-
   }
-
 }
-
-// ---------- Notifiche ----------
+// ---------- Notification ----------
 const notificationSystem = {
   maxVisible: 5,
   show(text, type = 'info', opt = {}) {
     if (!elements.notificationArea) return null;
-
     const types = {
       info:    { icon: 'ℹ️', cls: 'notification-info',    duration: 4000 },
       success: { icon: '✅', cls: 'notification-success',  duration: 3000 },
@@ -231,7 +183,6 @@ const notificationSystem = {
       levelup: { icon: '🎉', cls: 'notification-levelup',  duration: 4000 },
     };
     const cfg = types[type] || types.info;
-
     const el = document.createElement('div');
     el.className = `notification ${cfg.cls}`;
     el.innerHTML = `
@@ -266,13 +217,11 @@ const notificationSystem = {
     for (let i = 0; i < overflow; i++) this.remove(nodes[i]);
   }
 };
-
 // ---------- Prompt ----------
 const interactionSystem = {
   isVisible: false, currentPrompt: null,
-  show(key = 'E', text = 'Interagisci', opt = {}) {
+  show(key = 'E', text = 'Interact', opt = {}) {
     if (!elements.promptBox || !elements.promptKey || !elements.promptText) return;
-
     elements.promptKey.textContent = key.toUpperCase();
     elements.promptText.textContent = text;
     elements.promptBox.style.borderLeftColor = opt.color || '';
@@ -280,7 +229,6 @@ const interactionSystem = {
       elements.promptBox.classList.add('urgent');
       animations.pulseElement(elements.promptBox, 1.06, 260);
     } else elements.promptBox.classList.remove('urgent');
-
     if (!this.isVisible) {
       elements.promptBox.hidden = false;
       elements.promptBox.style.opacity = '0';
@@ -308,7 +256,6 @@ const interactionSystem = {
   },
   pulse() { if (this.isVisible) animations.pulseElement(elements.promptBox, 1.04, 200); }
 };
-
 // ---------- Vitals ----------
 const vitalsSystem = {
   last: { health: -1, mana: -1, stamina: -1, xp: -1 },
@@ -390,8 +337,6 @@ export const hudManager = {
           if (near > 0) animations.pulseElement(elements.mmEnemies, 1.08, 260);
         }
       }
-
-      // Fake clock (mantieni comportamento)
       if (elements.mmTime) {
         const gameTime = performance.now() / 1000;
         const minutes = Math.floor(gameTime % 60).toString().padStart(2, '0');

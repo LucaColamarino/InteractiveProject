@@ -3,26 +3,17 @@ import * as THREE from 'three';
 import { AnimationComponent } from './AnimationComponent.js';
 
 export class Animator {
-  /**
-   * @param {{mixer:THREE.AnimationMixer, actions:Object<string,THREE.AnimationAction>}} animCompRaw
-   * @param {( )=>Object} stateRefFn
-   */
   constructor(animCompRaw, stateRefFn = () => ({})) {
     this.comp = (animCompRaw instanceof AnimationComponent)
       ? animCompRaw
       : new AnimationComponent(animCompRaw?.mixer, animCompRaw?.actions);
     this._getState = stateRefFn;
-
-    // === Nomi standard con ALIAS aggiornati per le tue clip ===
     this.names = {
       idle:    this._resolve(['idle','Idle','Idle_A','Idle_01','Breathing','DefaultIdle']),
       walk:    this._resolve(['walk','Walk','Walking','Walk_A']),
       run:     this._resolve(['run','Run','Jog','Jogging']),
-      // fly prende prima "flying" poi "flaping"
       fly:     this._resolve(['flying','flaping','fly','Fly','Glide']),
-      // takeoff come overlay (se presente)
       takeoff: this._resolve(['takeoff','Jump','jump','Leap']),
-      // attacco: mappa il breath "fire"
       attack:  this._resolve(['fire','Fire','Attack','Bite','Punch','SwordAttack']),
       sitIdle: this._resolve(['sitIdle','Sit','Sitting','Sit_Idle']),
       back:    this._resolve(['back','Back','WalkBack','Walk_Back']),
@@ -30,7 +21,6 @@ export class Animator {
     };
 
     if (!this.names.idle) this.names.idle = this._findAnyLoopable();
-
     this.kLocom  = 8.0;
     this.kOverlay = 10.0;
     this.fadeIn  = 0.14;

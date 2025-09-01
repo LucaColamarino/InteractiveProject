@@ -1,10 +1,8 @@
-// systems/InputSystem.js – ESC affidabile: in lock apri da pointerlockchange, fuori lock da keydown
 import * as THREE from 'three';
 import { interactionManager } from './interactionManager.js';
 import { gameManager } from '../managers/gameManager.js';
 import { toggleInventory, isInventoryOpen } from '../ui/inventoryUi.js';
 import { refreshInventoryUI } from '../ui/inventoryBridge.js';
-
 import {
   focusNearestEnemy,
   isLockOn,
@@ -14,87 +12,68 @@ import {
   getLockHeadingYaw
 } from '../player/cameraFollow.js';
 import { isCampfireMenuOpen } from '../ui/hudCampfireMenu.js';
+import { camera, renderer } from '../scene.js';
 
-// ======= Helper Main Menu =======
 function isMenuOpen() {
   try { return !!gameManager.menu?.isVisible?.() || isCampfireMenuOpen() } catch { return false; }
 }
 
-// ======= State =======
+//STATE
 let _controller = null;
 let _isSetup = false;
 
 // Camera / look
-let _yawDeg = 0;                 // gradi
-let _pitchDeg = 15;              // gradi
-let _lookSensitivity = 0.10;     // gradi per pixel
+let _yawDeg = 0;
+let _pitchDeg = 15;
+let _lookSensitivity = 0.10;
 let _pitchMin = -60, _pitchMax = 60;
-
 // Pointer lock
 let _pointerLocked = false;
-let _suppressNextAttack = false; // evita attacco sul click dopo l'uscita dal lock
-let _plReqInFlight = false;      // evita SecurityError su richieste ravvicinate
-
-// Movimento
-const _moveVec = new THREE.Vector3();  // vettore input (relativo camera/lock)
-const _fwd = new THREE.Vector3();      // scratch
-const _right = new THREE.Vector3();    // scratch
+let _suppressNextAttack = false;
+let _plReqInFlight = false; 
+// Movement
+const _moveVec = new THREE.Vector3();  // input vec (relative to camera)
+const _fwd = new THREE.Vector3();
+const _right = new THREE.Vector3();
 const _pressed = new Set();            // KeyW, KeyA, ...
 let _isShift = false;
 let _isJump = false;
-
 // Dirty flags
 let _moveDirty = true;  // ricomputa _moveVec
 let _yawDirty  = true;  // aggiorna basi fwd/right solo quando serve
-
 // ======= Helpers =======
 function _updateBasisFromYaw(yawDeg = _yawDeg) {
   const yawRad = THREE.MathUtils.degToRad(yawDeg);
-  // forward lungo +Z (TPS)
   _fwd.set(Math.sin(yawRad), 0, Math.cos(yawRad));
   _right.set(Math.cos(yawRad), 0, -Math.sin(yawRad));
   _yawDirty = false;
 }
-
 function _recomputeMoveVec() {
   if (_controller?.isAttacking || _controller?.isSitting) {
     _moveVec.set(0, 0, 0);
     _moveDirty = false;
     return;
   }
-
-  // yaw per il movimento: lock-on > camera
   let yawForMove = _yawDeg;
   if (isLockOn()) {
     const y = getLockHeadingYaw(_controller?.player);
     if (typeof y === 'number') yawForMove = y;
   }
-
-  // aggiorna le basi con lo yaw scelto
   _updateBasisFromYaw(yawForMove);
-
   _moveVec.set(0, 0, 0);
-
   if (isLockOn()) {
-    // In lock-on: avanti = +fwd, indietro = -fwd
     if (_pressed.has('KeyW')) _moveVec.add(_fwd);
     if (_pressed.has('KeyS')) _moveVec.sub(_fwd);
-
-    // D deve restare “strafe right” → usa -right
     if (_pressed.has('KeyD')) _moveVec.sub(_right);
     if (_pressed.has('KeyA')) _moveVec.add(_right);
   } else {
-    // Default: avanti = -fwd (come prima), laterale “normale”
     if (_pressed.has('KeyW')) _moveVec.sub(_fwd);
     if (_pressed.has('KeyS')) _moveVec.add(_fwd);
     if (_pressed.has('KeyD')) _moveVec.add(_right);
     if (_pressed.has('KeyA')) _moveVec.sub(_right);
   }
-
   _moveDirty = false;
 }
-
-
 let _cachedCanvas = null;
 function _canvasEl() {
   if (_cachedCanvas && document.body.contains(_cachedCanvas)) return _cachedCanvas;
@@ -109,102 +88,78 @@ function _isCanvasFocused() {
   const c = _canvasEl();
   return !!(c && document.activeElement === c);
 }
-
 // ======= Pointer Lock =======
 function _requestPointerLock() {
   const c = _canvasEl();
   if (!c) return;
-  if (isInventoryOpen?.() || isMenuOpen()) return; // evita lock se un menu è aperto
+  if (isInventoryOpen?.() || isMenuOpen()) return; 
   if (document.pointerLockElement === c) return;
   if (_plReqInFlight) return;
 
   _plReqInFlight = true;
-  // piccola pausa per evitare SecurityError subito dopo ESC
   setTimeout(() => {
     try {
       c.requestPointerLock?.({ unadjustedMovement: true });
     } catch {
-      // ignora eventuali errori
     } finally {
       _plReqInFlight = false;
     }
   }, 50);
 }
-
 function _onPointerLockChange() {
   const c = _canvasEl();
   const wasLocked = _pointerLocked;
   _pointerLocked = (document.pointerLockElement === c);
-
   if (_pointerLocked) {
-    // siamo in lock
     if (c) c.style.cursor = 'none';
   } else {
-    // siamo usciti dal lock (≈ utente ha premuto ESC)
-    c?.focus();                           // non perdere focus
+    // (pressed ESC)
+    c?.focus();
     if (c) c.style.cursor = 'crosshair';
-
-    // apri il menu solo se non già in pausa e inventario chiuso
     if (wasLocked && !gameManager.campfiremenu && !gameManager.paused && !isInventoryOpen?.()) {
       gameManager.menu.toggleMenu();
     }
-
-    // evita click fantasma post-uscita
     _suppressNextAttack = true;
   }
 }
-
 function _onPointerLockError() {
   _pointerLocked = false;
 }
-
 // ======= Events =======
 function _onKeyDown(e) {
-  // Se l'inventario è aperto, ignora tutto tranne G/Escape
   if (isInventoryOpen?.() && e.code !== 'KeyG' && e.code !== 'Escape') return;
-  // Se il Main Menu è aperto, ignora tutto (il menu gestisce già ESC)
   if (isMenuOpen()) return;
-
   switch (e.code) {
     case 'KeyW': case 'KeyA': case 'KeyS': case 'KeyD':
       if (!_pressed.has(e.code)) { _pressed.add(e.code); _moveDirty = true; }
       break;
-
     case 'ShiftLeft':
     case 'ShiftRight':
       if (!_isShift) _isShift = true;
       break;
-
     case 'Space':
-      if (_isCanvasFocused()) e.preventDefault(); // evita scroll della pagina
+      if (_isCanvasFocused()) e.preventDefault();
       _isJump = true;
       _controller?.jumpOrFly?.();
       break;
-
     case 'KeyE':
       interactionManager.tryInteract?.(gameManager.controller);
       break;
-
     case 'KeyQ':
       if (_suppressNextAttack) { _suppressNextAttack = false; return; }
       _controller?.specialAttack?.();
       break;
-
     case 'KeyG':
       refreshInventoryUI?.();
       toggleInventory?.();
-      // blocca movimento corrente quando apri l'inventario
       _moveVec.set(0, 0, 0);
       break;
-
     case 'Escape':
       gameManager.menu.toggleMenu();
       return;
-
     default: break;
   }
 }
-
 function _onKeyUp(e) {
   switch (e.code) {
     case 'KeyW': case 'KeyA': case 'KeyS': case 'KeyD':
@@ -220,17 +175,12 @@ function _onKeyUp(e) {
     default: break;
   }
 }
-
 function _onMouseDown(e) {
   if (isInventoryOpen?.() || isMenuOpen()) return;
-
-  // se non in lock e click sul canvas → chiedi lock (il click non deve attaccare)
   if (!_pointerLocked && _isCanvasEvent(e)) {
     _requestPointerLock();
     return;
   }
-
-  // Attacchi
   if (e.button === 0) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
     _controller?.attack?.();
@@ -238,11 +188,9 @@ function _onMouseDown(e) {
     if (_suppressNextAttack) { _suppressNextAttack = false; return; }
     _controller?.blockStart?.();
   } else if (e.button === 1) {
-    // Tasto centrale: prima spegni eventuale focus cinematografico (falò)
     if (isCinematicFocus()) {
       clearCameraFocus();
     }
-    // Poi toggle del lock-on
     if (isLockOn()) {
       clearLockOn();
     } else {
@@ -250,7 +198,6 @@ function _onMouseDown(e) {
     }
   }
 }
-
 function _onMouseMove(e) {
   if (!_pointerLocked || isMenuOpen()) return;
   const dx = e.movementX || 0;
@@ -272,33 +219,29 @@ function _onMouseUp(_e) {
     _controller?.blockEnd?.();
   }
 }
-
 // ======= Bootstrap =======
 export function setupInput() {
   if (_isSetup) return;
   _isSetup = true;
-
-  // Listener tastiera/mouse
   window.addEventListener('keydown', _onKeyDown, { passive: false });
   window.addEventListener('keyup', _onKeyUp, { passive: true });
   window.addEventListener('mousedown', _onMouseDown, { passive: true });
   window.addEventListener('mouseup', _onMouseUp, { passive: true });
   window.addEventListener('mousemove', _onMouseMove, { passive: true });
-
-  // Reset input quando la finestra perde focus (niente stuck keys)
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
   window.addEventListener('blur', () => {
     _pressed.clear();
     _isShift = _isJump = false;
     _moveDirty = true;
   });
-
   document.addEventListener('pointerlockchange', _onPointerLockChange);
   document.addEventListener('pointerlockerror', _onPointerLockError);
-
-  // Canvas QoL
   const c = _canvasEl();
   if (c) {
-    // libera RMB per secondAttack
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.style.cursor = 'crosshair';
     c.title = 'Click per entrare in mouse-lock (ESC per uscire)';
@@ -306,34 +249,27 @@ export function setupInput() {
     c.tabIndex = c.tabIndex || 0;
   }
 }
-
 // ======= Pump =======
 export function pumpActions(controller) {
   _controller = controller ?? gameManager.controller ?? null;
-
-  // se inventario o main menu aperti → stop movimento
   if (isInventoryOpen?.() || isMenuOpen()) {
     if (_moveVec.lengthSq() !== 0) _moveVec.set(0, 0, 0);
   } else if (_moveDirty) {
     _recomputeMoveVec();
   }
-
   _controller?.setInputState?.({
     moveVec: _moveVec,
     isShiftPressed: _isShift,
     isJumpPressed: _isJump,
   });
-
   return getCameraAngles();
 }
-
 // ======= Camera API =======
 export function getCameraAngles() { return { yaw: _yawDeg, pitch: _pitchDeg }; }
 export function setCameraAngles({ yaw = _yawDeg, pitch = _pitchDeg } = {}) {
   _yawDeg = yaw; _pitchDeg = pitch;
   _yawDirty = true; _moveDirty = true;
 }
-
 // ======= Misc API =======
 export function isPointerLocked() { return _pointerLocked; }
 export function setLookOptions({ sensitivity, pitchMin, pitchMax } = {}) {

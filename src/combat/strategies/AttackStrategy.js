@@ -16,21 +16,13 @@ const BASE_SWORD_ARC = {
 export class AttackStrategy {
   constructor(arcOverrides = {}) {
     this._arcDebugMesh = null;
-
-    // Stato attacco overlay
     this._attackState = null;
-
-    // Arc corrente (può essere cambiato da onEquip/arma o da sottoclasse)
     this._arc = { ...BASE_SWORD_ARC, ...arcOverrides };
-
     this.debug = false;
-
-    // Stato parata (overlay looped)
     this._blockClipName = null;
   }
 
   onEquip(controller, weaponItem) {
-    // weaponItem?.meta può sovrascrivere reach/arcDeg ecc.
     const m = weaponItem?.meta || {};
     if (m.reach != null) this._arc.reach = m.reach;
     if (m.arcDeg != null) this._arc.arcDeg = m.arcDeg;
@@ -41,33 +33,23 @@ export class AttackStrategy {
 
   attack(_controller) { /* override */ }
   specialAttack(_controller) { /* override */ }
-
-  // ---- Attacco base comune (overlay) ----
-  // preferredNames: lista di possibili nomi clip (in ordine di preferenza)
   baseAttack(controller, ...preferredNames) {
     if (this._attackState) return false;
-
     const animator = controller.player.animator;
     if (!animator) return false;
-
-    // Alias comuni: sword-attack / generic attack
     const aliases = [
       ...(preferredNames?.length ? preferredNames : []),
       'swordAttack', 'SwordAttack', 'attack', 'Attack', 'Slash', 'Melee', 'Hit'
     ];
-
-    // Prova ad avviare una clip overlay fra gli alias
     let usedName = null;
     for (const name of aliases) {
       if (animator.playOverlay?.(name, { loop: 'once', mode: 'full' })){
         usedName = name; break;
       }
     }
-    if (!usedName) return false;  // nessuna clip trovata
+    if (!usedName) return false;
 
     const dur = Math.max(0.15, animator.getClipDuration?.(usedName) || 0.8);
-
-    // Blocca movimento per la durata della clip
     controller.lockMovementFor?.(dur);
     controller.isAttacking = true;
 
@@ -79,26 +61,19 @@ export class AttackStrategy {
       enemiesHit: new Set(),
       clipName: usedName,
       prevFrac: 0,
-      // Non servono action/clip: usiamo t/dur
     };
 
     this._updateArcDebug(controller);
     if (this._arcDebugMesh) this._arcDebugMesh.visible = this.debug;
-    // Colore iniziale blu
     this._setDebugWindow(false);
     return true;
   }
-
-  // ---- Update: gestione finestre e fine overlay ----
   update(controller, dt) {
     if (!this._attackState) return;
-
     const s = this._attackState;
     const prev = s.prevFrac ?? 0;
     s.t += dt;
     const curr = s.dur > 0 ? THREE.MathUtils.clamp(s.t / s.dur, 0, 1) : 1;
-
-    // finestre di hit (usa overlap tra [prev,curr] e [start,end])
     for (let i = 0; i < s.windows.length; i++) {
       const w = s.windows[i];
       const a1 = Math.max(prev, w.start);
@@ -110,9 +85,6 @@ export class AttackStrategy {
     }
 
     s.prevFrac = curr;
-
-
-    // fine clip
     if (s.t >= s.dur) {
       this._attackState = null;
       controller.isAttacking = false;
@@ -122,12 +94,9 @@ export class AttackStrategy {
       }
       return;
     }
-
-    // aggiorna gizmo e colore
     if (this._arcDebugMesh?.visible) this._updateArcDebug(controller);
     this._setDebugWindow(this._isInHitWindow());
   }
-
   cancel(controller) {
     this._attackState = null;
     controller.isAttacking = false;
@@ -136,7 +105,7 @@ export class AttackStrategy {
     if (this._arcDebugMesh) this._arcDebugMesh.visible = false;
   }
 
-  // ================== ARCO DI COLPO ==================
+  // ARC
   _setArc(reach, arcDeg) {
     if (typeof reach === 'number') this._arc.reach = reach;
     if (typeof arcDeg === 'number') this._arc.arcDeg = arcDeg;
@@ -150,8 +119,6 @@ export class AttackStrategy {
     if (!playerObj || !enemyObj) return false;
 
     const { reach, arcDeg, yOffset } = this._arc;
-
-    // WORLD positions
     const Pw = playerObj.getWorldPosition(new THREE.Vector3());
     Pw.y += yOffset;
     const Ew = enemyObj.getWorldPosition(new THREE.Vector3());
@@ -161,16 +128,11 @@ export class AttackStrategy {
     if (dist > reach) return false;
 
     toEnemy.normalize();
-
-    // WORLD slash dir
     const slashDirWorld = worldSlashDir(playerObj, this._arc);
 
     const dot = THREE.MathUtils.clamp(slashDirWorld.dot(toEnemy), -1, 1);
     const angle = THREE.MathUtils.radToDeg(Math.acos(dot));
-
-    // === DEBUG LOG ===
     const dy = (Ew.y - Pw.y).toFixed(2);
-    // =================
     return angle <= arcDeg * 0.5;
   }
 
@@ -206,7 +168,7 @@ export class AttackStrategy {
 
     const { reach, arcDeg } = this._arc;
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x3AA7FF,               // blu di base
+      color: 0x3AA7FF,
       transparent: true,
       opacity: 0.35,
       side: THREE.DoubleSide,
@@ -225,8 +187,6 @@ export class AttackStrategy {
     this._arcDebugMesh = mesh;
     return mesh;
   }
-
-  // ================== BLOCCO (Overlay looped) ==================
   blockStart(controller) {
     if (controller.isAttacking || controller.isBlocking) return false;
 
@@ -240,7 +200,6 @@ export class AttackStrategy {
 
     let used = null;
     for (const n of aliases) {
-      // shield o non shield:
       if (animator.playOverlay?.(n, { loop: 'repeat', mode: 'upper' })) { used = n; break; }
     }
     if (!used) return false;
@@ -259,8 +218,6 @@ export class AttackStrategy {
   }
 
   block(controller) { return controller.isBlocking ? this.blockEnd(controller) : this.blockStart(controller); }
-
-  // === helper: sei nella finestra di impatto? ===
   _isInHitWindow() {
     const s = this._attackState;
     if (!s) return false;
@@ -268,18 +225,13 @@ export class AttackStrategy {
     const wins = s.windows || HIT_WINDOWS;
     return wins.some(w => frac >= w.start && frac <= w.end);
   }
-
-  // === helper: colora il gizmo in base allo stato ===
   _setDebugWindow(on) {
     const m = this._arcDebugMesh;
     if (!m || !m.material) return;
-    // rosso in window, blu fuori
     m.material.color.setHex(on ? 0xFF3B30 : 0x3AA7FF);
     m.material.needsUpdate = true;
   }
 }
-
-// ---------------- helpers ----------------
 function makeArcGeometry(reach, arcDeg, segments = 32) {
   const verts = [0, 0, 0];
   const half = THREE.MathUtils.degToRad(arcDeg * 0.5);

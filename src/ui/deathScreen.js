@@ -1,4 +1,3 @@
-// ui/deathScreen.js
 import { gameManager } from '../managers/gameManager.js';
 import './css/deathscreen.css';
 
@@ -9,11 +8,9 @@ class DeathScreen {
     this.causeEl = null;
     this.audio = null;
     this.callbacks = { onRespawn: null, onLoad: null, onQuit: null };
-
     this._onKey = this._onKey.bind(this);
     this._onClick = this._onClick.bind(this);
   }
-
   mount() {
     if (this.el) return;
     const wrap = document.createElement('div');
@@ -41,35 +38,27 @@ class DeathScreen {
 
     this.el.addEventListener('click', this._onClick);
   }
-
   /**
-   * Inizializza i callback.
    * @param {{onRespawn?:Function,onLoad?:Function,onQuit?:Function}} callbacks
    */
   init(callbacks = {}) {
     this.mount();
     this.callbacks = { ...this.callbacks, ...callbacks };
   }
-
   /**
-   * Mostra la death screen.
    * @param {{cause?:string, playSound?:boolean}} opts
    */
   show(opts = {}) {
     const { cause = '', playSound = true } = opts;
     this.mount();
-
     if (this.causeEl) this.causeEl.textContent = cause;
     if (gameManager) gameManager.isPaused = true;
-
     this.el.classList.remove('hidden');
     this.el.setAttribute('aria-hidden', 'false');
     document.addEventListener('keydown', this._onKey);
     document.body.classList.add('deathscreen-open');
-
     if (playSound) this._playSound();
   }
-
   hide() {
     if (!this.el) return;
     this.el.classList.add('hidden');
@@ -77,7 +66,6 @@ class DeathScreen {
     document.removeEventListener('keydown', this._onKey);
     document.body.classList.remove('deathscreen-open');
   }
-
   _onKey(e) {
     if (e.repeat) return;
     const k = e.key.toLowerCase();
@@ -85,13 +73,11 @@ class DeathScreen {
     else if (k === 'l') { e.preventDefault(); this._do('load'); }
     else if (k === 'q') { e.preventDefault(); this._do('quit'); }
   }
-
   _onClick(e) {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     this._do(btn.getAttribute('data-action'));
   }
-
   _do(action) {
     if (action === 'respawn' && typeof this.callbacks.onRespawn === 'function') {
       this.callbacks.onRespawn();
@@ -106,11 +92,9 @@ class DeathScreen {
       return;
     }
   }
-
   _playSound() {
     try {
       if (!this.audio) {
-        // Sostituisci con il tuo path audio se diverso
         this.audio = new Audio('/assets/audio/you_died.ogg');
         this.audio.preload = 'auto';
         this.audio.volume = 0.65;
@@ -120,5 +104,4 @@ class DeathScreen {
     } catch (_) {}
   }
 }
-
 export const deathScreen = new DeathScreen();

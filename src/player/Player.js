@@ -6,18 +6,14 @@ import { instantiateEntity, buildMixerAndActions } from '../utils/entityFactory.
 import { getTerrainHeightAt } from '../map/map.js';
 import { HumanFormController } from '../controllers/forms/HumanFormController.js';
 import { scene } from '../scene.js';
-import { Animator } from '../components/Animator.js'; // <-- nuovo
+import { Animator } from '../components/Animator.js';
 import { spawnPoint } from '../managers/gameManager.js';
 export class Player {
   constructor(model, mixer, actions) {
     this.model = model;
-    this.anim = new AnimationComponent(mixer, actions); // compatibilità
-    // nuovo orchestratore centralizzato
+    this.anim = new AnimationComponent(mixer, actions);
     this.animator = new Animator({ mixer, actions }, () => this.state,true);
-
     this.state = { speed:0, isFlying:false, isSitting:false, isAttacking:false, isSprinting:false };
-
-    // hitbox (ok com’è)
     this.swordHitbox = new THREE.Mesh(
       new THREE.BoxGeometry(0.3, 1, 1.5),
       new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, visible: false })
@@ -25,13 +21,10 @@ export class Player {
     this.model.add(this.swordHitbox);
     this.swordHitbox.position.set(0, 1, 1);
   }
-
   update(dt) {
-    // delega all’orchestratore
     this.animator.update(dt);
   }
 }
-
 export function createAbilities(formName, overrides = {}) {
   const config = ENTITY_CONFIG[formName];
   return {

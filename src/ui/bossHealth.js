@@ -1,28 +1,20 @@
-// ui/bossHealth.js — Soulslike Boss Health Bar
-import { gameManager } from '../managers/gameManager.js';
-
 class BossHealthUI {
   constructor() {
     this.el = null;
     this.nameEl = null;
     this.fillEl = null;
     this.hpTextEl = null;
-    this._activeId = null; // id logico del boss attuale
+    this._activeId = null;
     this._max = 1;
     this._cur = 1;
     this._inited = false;
-
-    // bind
     this._onEngage = this._onEngage.bind(this);
     this._onUpdate = this._onUpdate.bind(this);
     this._onDisengage = this._onDisengage.bind(this);
   }
-
   init() {
     if (this._inited) return;
     this._inited = true;
-
-    // Styles
     const styleId = 'bossbar-style';
     if (!document.getElementById(styleId)) {
       const st = document.createElement('style');
@@ -67,42 +59,31 @@ class BossHealthUI {
       document.head.appendChild(st);
     }
 
-    // DOM
     this.el = document.createElement('div');
     this.el.className = 'bossbar-wrap';
     this.el.style.transform = 'translateX(-50%) translateY(-6px)';
-
     const card = document.createElement('div');
     card.className = 'bossbar-card';
-
     this.nameEl = document.createElement('div');
     this.nameEl.className = 'bossbar-name';
     this.nameEl.textContent = 'AZHARYX, ASH VORTEX';
-
     const bar = document.createElement('div');
     bar.className = 'bossbar-bar';
-
     this.fillEl = document.createElement('div');
     this.fillEl.className = 'bossbar-fill';
-
     this.hpTextEl = document.createElement('div');
     this.hpTextEl.className = 'bossbar-hptext';
     this.hpTextEl.textContent = '— / —';
-
     bar.appendChild(this.fillEl);
     bar.appendChild(this.hpTextEl);
-
     card.appendChild(this.nameEl);
     card.appendChild(bar);
     this.el.appendChild(card);
     document.body.appendChild(this.el);
-
-    // Event wiring
     window.addEventListener('boss:engage', this._onEngage);
     window.addEventListener('boss:update', this._onUpdate);
     window.addEventListener('boss:disengage', this._onDisengage);
   }
-
   _onEngage(e) {
     const { id, name, max, cur } = e.detail || {};
     this._activeId = id ?? 'boss';
@@ -112,29 +93,24 @@ class BossHealthUI {
     this._render();
     this.show();
   }
-
   _onUpdate(e) {
     const { id, cur } = e.detail || {};
     if (!this._activeId || id !== this._activeId) return;
     this._cur = Math.max(0, Math.min(this._max, Number(cur ?? this._cur)));
     this._render();
   }
-
   _onDisengage(e) {
     const { id } = e.detail || {};
     if (!this._activeId || (id && id !== this._activeId)) return;
     this.hide();
     this._activeId = null;
   }
-
   _render() {
     const ratio = this._max > 0 ? (this._cur / this._max) : 0;
     if (this.fillEl) this.fillEl.style.transform = `scaleX(${ratio})`;
     if (this.hpTextEl) this.hpTextEl.textContent = `${Math.ceil(this._cur)} / ${Math.ceil(this._max)}`;
   }
-
   show()  { this.el?.classList.add('active'); }
   hide()  { this.el?.classList.remove('active'); }
 }
-
 export const bossHealth = new BossHealthUI();

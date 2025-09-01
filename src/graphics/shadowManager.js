@@ -3,26 +3,16 @@ import { scene } from '../scene.js';
 
 export let sun;
 export let moon;
-
-/**
- * SHADOW SETTINGS (puoi ritoccarli)
- * - SHADOW_BOX_HALF: metà lato dell'ortho-box; più piccolo = più qualità, ma rischi di tagliare oggetti.
- * - SHADOW_DIST: quanto è lontano il sole dal centro del box (lungo -lightDirTowardScene).
- */
 const SHADOW_MAP_SIZE = 4096;
 const SHADOW_BOX_HALF_DEFAULT = 120;
 const SHADOW_DIST_DEFAULT = 280;
 const SHADOW_NEAR = 1;
-const SHADOW_FAR  = 700;
-
-/** Stabilizza la luce allineando pos/target ai texel della shadow map: riduce "shimmering". */
+const SHADOW_FAR  = 700
 function stabilizeDirectionalLight(light) {
   const cam = light.shadow.camera;
   const mapW = Math.max(1, light.shadow.mapSize.x);
   const width = (cam.right - cam.left);
   const worldUnitsPerTexel = Math.max(1e-5, width / mapW);
-
-  // Base ortonormale della camera d'ombra
   const rot = new THREE.Matrix4().extractRotation(cam.matrixWorld);
   const right = new THREE.Vector3(1,0,0).applyMatrix4(rot);
   const up    = new THREE.Vector3(0,1,0).applyMatrix4(rot);
@@ -49,18 +39,10 @@ function stabilizeDirectionalLight(light) {
   light.target.updateMatrixWorld();
 }
 
-/**
- * Fitta il frustum d’ombra attorno a "center".
- * @param {THREE.Vector3} center - punto centrale della zona d'interesse
- * @param {THREE.Vector3} lightDirTowardScene - direzione **da cui arriva** la luce (dal sole verso la scena)
- * @param {number} boxHalf - metà lato ortho-box
- * @param {number} dist - distanza della luce dal center (lungo -lightDirTowardScene)
- */
 export function fitSunShadowToCenter(center, lightDirTowardScene, boxHalf = SHADOW_BOX_HALF_DEFAULT, dist = SHADOW_DIST_DEFAULT) {
   if (!sun) return;
 
   const L = lightDirTowardScene.clone().normalize();
-  // Il sole sta "dietro" rispetto al center, quindi sposto nella direzione opposta alla luce in arrivo
   const pos = center.clone().sub(L.multiplyScalar(dist));
   sun.position.copy(pos);
   sun.target.position.copy(center);
@@ -104,19 +86,12 @@ export function createMoonLight() {
 }
 
 export function createSunLight() {
-  // Sole caldo in stile Souls
   sun = new THREE.DirectionalLight(0xffe6cc, 1.0);
   sun.castShadow = true;
-
-  // Shadow map HQ
   sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   sun.shadow.radius = 1;
-
-  // Bias bilanciati (PCF). Se passi a VSM, imposta entrambi a 0.
   sun.shadow.bias = -0.00025;
   sun.shadow.normalBias = 0.012;
-
-  // Ortho-box iniziale (verrà sovrascritto dal fit)
   const box = SHADOW_BOX_HALF_DEFAULT;
   sun.shadow.camera.left   = -box;
   sun.shadow.camera.right  =  box;
@@ -125,9 +100,7 @@ export function createSunLight() {
   sun.shadow.camera.near   = SHADOW_NEAR;
   sun.shadow.camera.far    = SHADOW_FAR;
   sun.shadow.camera.updateProjectionMatrix();
-
   scene.add(sun);
-
   const target = new THREE.Object3D();
   target.position.set(0, 0, 0);
   scene.add(target);

@@ -6,7 +6,6 @@ import { hudManager } from '../../ui/hudManager.js';
 
 export class HandMeleeStrategy extends AttackStrategy {
   constructor() {
-    // Arc più corto e stretto per i pugni
     super({
       reach: 1.7,
       arcDeg: 120,
@@ -19,16 +18,9 @@ export class HandMeleeStrategy extends AttackStrategy {
   onEquip(controller, weaponItem) {
     super.onEquip(controller, weaponItem);
   }
-
-  // Attacco base = pugno
-  attack(controller) { return this.baseAttack(controller, 'punch', 'Punch', 'attack'); } // (baseAttack ora già passa mode:'full')
-
-
-  // Nessun speciale di default (si può aggiungere)
+  attack(controller) { return this.baseAttack(controller, 'punch', 'Punch', 'attack'); }
   specialAttack(_controller) {
      console.log("NO SPECIAL ATTACK");return false; }
-
-  // Override: danno dello slash base
   _applyHits(controller) {
     const playerObj = controller.player.model;
     const Pw = playerObj.getWorldPosition(new THREE.Vector3());

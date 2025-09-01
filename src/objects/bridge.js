@@ -1,11 +1,9 @@
-// BridgeSimple.js (ottimizzato)
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { scene } from '../scene';
 import { registerWalkable } from '../systems/GroundSystem';
 import { gameManager } from '../managers/gameManager';
 
-// --- Cache semplice per le texture ---
 const _texCache = new Map();
 function loadColorTex(tl, url) {
   if (_texCache.has(url)) return _texCache.get(url);
@@ -25,8 +23,6 @@ function loadLinearTex(tl, url) {
   _texCache.set(url, t);
   return t;
 }
-
-/** Crea i materiali specifici per il tuo bridge */
 function makeBridgeMaterials(basePath) {
   const tl = new THREE.TextureLoader();
 
@@ -37,7 +33,6 @@ function makeBridgeMaterials(basePath) {
     roughness:  1.0,
     metalness:  0.0,
   });
-
   const steel = new THREE.MeshStandardMaterial({
     name: 'steel_mat',
     map:           loadColorTex(tl, `${basePath}/steel_diffuse.png`),
@@ -47,7 +42,6 @@ function makeBridgeMaterials(basePath) {
     roughness:     0.5,
     metalness:     1.0,
   });
-
   const rock = new THREE.MeshStandardMaterial({
     name: 'rock_mat',
     map:        loadColorTex(tl, `${basePath}/rock_diffuse.png`),
@@ -55,7 +49,6 @@ function makeBridgeMaterials(basePath) {
     roughness:  1.0,
     metalness:  0.0,
   });
-
   const cobble = new THREE.MeshStandardMaterial({
     name: 'cobblestone_mat',
     map:           loadColorTex(tl, `${basePath}/cobblestone_diffuse.jpg`),
@@ -65,12 +58,10 @@ function makeBridgeMaterials(basePath) {
     metalness:     0.0,
   });
 
-  const rock1 = rock; // alias
+  const rock1 = rock;
 
   return { wood, steel, rock, rock1, cobblestone: cobble };
 }
-
-/** Seleziona il materiale giusto in base al nome originale */
 function pickMatByName(name, mats) {
   const n = (name || '').toLowerCase();
   if (n.includes('cobblestone')) return mats.cobblestone;
@@ -80,7 +71,6 @@ function pickMatByName(name, mats) {
   if (n.includes('wood'))        return mats.wood;
   return mats.wood;
 }
-
 export async function createBridge({
   scale = 0.01,
   position = new THREE.Vector3(0, 0, 0),
@@ -94,10 +84,7 @@ export async function createBridge({
   const texturesPath = '/textures/bridge';
   const loader = new FBXLoader();
   const root = await loader.loadAsync(modelUrl);
-
   const mats = makeBridgeMaterials(texturesPath);
-
-  // tiling UV (applica a tutte le mappe esistenti)
   const tile = (uvTile instanceof THREE.Vector2) ? uvTile : new THREE.Vector2(uvTile, uvTile);
   Object.values(mats).forEach((mat) => {
     [mat.map, mat.normalMap, mat.roughnessMap, mat.metalnessMap, mat.aoMap].forEach((t) => {
@@ -107,10 +94,8 @@ export async function createBridge({
 
   root.traverse((o) => {
     if (!o.isMesh) return;
-
     o.castShadow = castShadow;
     o.receiveShadow = receiveShadow;
-
     if (Array.isArray(o.material)) {
       const original = o.material;
       o.material = original.map((m) => {
@@ -118,33 +103,25 @@ export async function createBridge({
         chosen.needsUpdate = true;
         return chosen;
       });
-
-      // ❌ Fallback gruppi rimosso: se non ci sono groups, non forziamo niente.
     } else {
       const chosen = pickMatByName(o.material?.name || o.name, mats);
       chosen.needsUpdate = true;
       o.material = chosen;
     }
   });
-
-  // trasformazioni e culling
   root.scale.setScalar(scale);
   root.position.copy(position);
   root.rotation.set(0, rotationY, 0);
   root.traverse((o) => {
     if (o.isMesh && o.geometry) {
-      // BoundingSphere usata dal frustum culling
       if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-      // La boundingBox non è necessaria per il culling; puoi commentarla:
-      // if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
       o.frustumCulled = true;
     }
   });
-
   const group = new THREE.Group();
   group.name = 'BridgeRoot';
   group.add(root);
   scene.add(group);
-  registerWalkable(group, { padding: 0.75 }); // padding per coprire un filo i bordi
+  registerWalkable(group, { padding: 0.75 });
   return group;
 }

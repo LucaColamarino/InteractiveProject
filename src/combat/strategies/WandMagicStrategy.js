@@ -1,4 +1,3 @@
-// combat/strategies/WandMagicStrategy.js
 import * as THREE from 'three';
 import { AttackStrategy } from './AttackStrategy.js';
 import { getEnemies, damageEnemy } from '../../enemies/EnemyManager.js';
@@ -23,7 +22,6 @@ const isFiniteVec3 = (v) => v && Number.isFinite(v.x) && Number.isFinite(v.y) &&
 
 export class WandMagicStrategy extends AttackStrategy {
   constructor() {
-    // Arc stretto (gesto con bacchetta)
     super({
       reach: 2.2,
       arcDeg: 130,
@@ -33,7 +31,7 @@ export class WandMagicStrategy extends AttackStrategy {
 
     Object.assign(this, DEFAULTS);
     this._cd = 0;
-    this._castState = null; // { t, dur, clipName, fired }
+    this._castState = null;
     this._pool = [];
     this._poolSize = 24;
     this.debug = false;
@@ -47,52 +45,41 @@ export class WandMagicStrategy extends AttackStrategy {
     this.damage=40;
     this.spDamage=70;
   }
+  onEquip(controller, weaponItem) {
+    super.onEquip(controller, weaponItem);
+    const m = weaponItem?.meta || {};
 
-// --- onEquip() aggiornato ---
-onEquip(controller, weaponItem) {
-  super.onEquip(controller, weaponItem);
-  const m = weaponItem?.meta || {};
+    for (const k of Object.keys(DEFAULTS)) {
+      if (k === 'muzzleOffset') continue;
+      if (m[k] !== undefined) this[k] = m[k];
+    }
+    const mo = m.muzzleOffset;
+    if (mo instanceof THREE.Vector3) {
+      this.muzzleOffset.copy(mo);
+    } else if (Array.isArray(mo) && mo.length === 3) {
+      const [x, y, z] = mo.map(Number);
+      this.muzzleOffset.set(
+        Number.isFinite(x) ? x : 0,
+        Number.isFinite(y) ? y : 1.3,
+        Number.isFinite(z) ? z : 0.5
+      );
+    } else if (mo && typeof mo === 'object'
+            && Number.isFinite(mo.x) && Number.isFinite(mo.y) && Number.isFinite(mo.z)) {
+      this.muzzleOffset.set(mo.x, mo.y, mo.z);
+    } else {
+      // fallback sicuro
+      this.muzzleOffset.set(0, 1.3, 0.5);
+    }
 
-  // 1) copia i meta tranne 'muzzleOffset' (che gestiamo a parte)
-  for (const k of Object.keys(DEFAULTS)) {
-    if (k === 'muzzleOffset') continue;
-    if (m[k] !== undefined) this[k] = m[k];
+    if (!Number.isFinite(this.muzzleOffset.x)
+    || !Number.isFinite(this.muzzleOffset.y)
+    || !Number.isFinite(this.muzzleOffset.z)) {
+      this.muzzleOffset.set(0, 1.3, 0.5);
+    }
+
+    this._ensurePool();
   }
-
-  // 2) normalizza m.muzzleOffset → Vector3
-  //    accettiamo: THREE.Vector3 | [x,y,z] | {x,y,z}
-  const mo = m.muzzleOffset;
-  if (mo instanceof THREE.Vector3) {
-    this.muzzleOffset.copy(mo);
-  } else if (Array.isArray(mo) && mo.length === 3) {
-    const [x, y, z] = mo.map(Number);
-    this.muzzleOffset.set(
-      Number.isFinite(x) ? x : 0,
-      Number.isFinite(y) ? y : 1.3,
-      Number.isFinite(z) ? z : 0.5
-    );
-  } else if (mo && typeof mo === 'object'
-          && Number.isFinite(mo.x) && Number.isFinite(mo.y) && Number.isFinite(mo.z)) {
-    this.muzzleOffset.set(mo.x, mo.y, mo.z);
-  } else {
-    // fallback sicuro
-    this.muzzleOffset.set(0, 1.3, 0.5);
-  }
-
-  if (!Number.isFinite(this.muzzleOffset.x)
-   || !Number.isFinite(this.muzzleOffset.y)
-   || !Number.isFinite(this.muzzleOffset.z)) {
-    this.muzzleOffset.set(0, 1.3, 0.5);
-  }
-
-  this._ensurePool();
-}
-
-
-  // Attacco base condiviso (slash) → click sinistro (fa un colpo ravvicinato “di bacchetta”)
   attack(controller) { return this.baseAttack(controller, 'wandSlash', 'attack'); }
-
-  // Cast (proiettili) → tasto speciale (overlay)
   specialAttack(controller, clipName = 'wandCast') {
     if (controller.stats.useMana(15)) {  
     } else {
@@ -124,10 +111,7 @@ onEquip(controller, weaponItem) {
   }
 
   update(controller, dt) {
-    // 1) finestra di hit dello slash base (se attivo)
     super.update(controller, dt);
-
-    // 2) gestione cooldown e clip del cast
     if (this._cd > 0) this._cd = Math.max(0, this._cd - dt);
 
     if (this._castState) {
@@ -145,8 +129,6 @@ onEquip(controller, weaponItem) {
         controller.player.animator?.stopOverlay?.();
       }
     }
-
-    // 3) proiettili
     for (const p of this._pool) {
       if (!p.active) continue;
       if (this.homing > 0 && p.target && p.target.alive) p.steerToTarget(this.homing, dt);
@@ -154,8 +136,6 @@ onEquip(controller, weaponItem) {
       const hit = p.checkCollision();
       if (hit) { this._onHitEnemy(hit); p.deactivate(); }
     }
-
-    // cleanup debug pips
     if (this._debugPips.length) {
       for (let i = this._debugPips.length - 1; i >= 0; i--) {
         const o = this._debugPips[i];
@@ -164,85 +144,60 @@ onEquip(controller, weaponItem) {
       }
     }
   }
-
   cancel(controller) {
     super.cancel(controller);
     this._castState = null;
     for (const p of this._pool) if (p.active) p.deactivate();
   }
-
-  // ---- internals wand ----
   _fireBoltsNow(controller) {
     if (!this._pool.length) this._ensurePool();
-
     const model = controller.player.model;
     model.updateMatrixWorld(true);
-
     model.getWorldPosition(this._tmp.posWorld);
     model.getWorldQuaternion(this._tmp.qWorld);
-
     const upWorld    = this._tmp.upWorld.set(0,1,0).applyQuaternion(this._tmp.qWorld).normalize();
     const fwdWorld   = this._tmp.fwd.set(0,0,1).applyQuaternion(this._tmp.qWorld).normalize();
     const rightWorld = this._tmp.rightWorld.set(1,0,0).applyQuaternion(this._tmp.qWorld).normalize();
-
     const offX = this.muzzleOffset?.x ?? 0;
     const offY = this.muzzleOffset?.y ?? 1.3;
     const offZ = this.muzzleOffset?.z ?? 0.5;
-
     const muzzle = this._tmp.muzzleWorld.copy(this._tmp.posWorld)
       .addScaledVector(upWorld, offY)
       .addScaledVector(fwdWorld, offZ)
       .addScaledVector(rightWorld, offX);
-
     if (this.debug && isFiniteVec3(muzzle)) this._spawnDebugPip(muzzle);
-
     const n = Math.max(1, this.multishot | 0);
     const half = (n - 1) * 0.5;
-
     for (let i = 0; i < n; i++) {
       const t = (n === 1) ? 0 : (i - half) / half;
       const yaw = THREE.MathUtils.degToRad((this.spreadDeg || 0) * t);
       this._spawnProjectile(muzzle, fwdWorld, upWorld, yaw);
     }
   }
-
   _spawnProjectile(origin, forward, upWorld, yawOffsetRad = 0) {
-          // dentro _spawnProjectile(origin, forward, upWorld, yawOffsetRad = 0)
       const p = this._acquire();
       if (!p) { console.warn('[WandMagicStrategy] no free projectile'); return; }
-
-      // dir “piatta” con eventuale spread, come fallback
       const qYaw = this._tmp.qYaw.setFromAxisAngle(upWorld, yawOffsetRad);
       const flatDir = this._tmp.dir.copy(forward).applyQuaternion(qYaw).normalize();
-
-      // prova a prendere un target col lock (usa già il cono che hai)
       const target = this._acquireTarget(origin, flatDir);
-
-      // ➜ Se ho un target, calcolo la direzione **3D** verso di lui (inclusa Y);
-      //    altrimenti uso la flatDir di fallback.
       let shotDir = flatDir;
       if (target?.model?.position) {
-        // mira leggermente più in alto del pivot del modello
         const aimPoint = target.model.position.clone();
-        aimPoint.y += 1.2; // offset verticale (regolabile)
+        aimPoint.y += 1.2;
         shotDir = new THREE.Vector3()
           .subVectors(aimPoint, origin)
           .normalize();
       }
-
-
-      // spawn
       p.radius = this.boltRadius;
       p.activate(
         origin,
-        shotDir,            // ← ora ha componente Y se il target è in alto/basso
+        shotDir,
         this.speed,
         this.lifetime,
-        target || null      // passa anche il lock così l’homing segue lo stesso bersaglio
+        target || null
       );
 
   }
-
   _ensurePool() {
     const need = this._poolSize;
     const have = this._pool.length;
@@ -251,9 +206,7 @@ onEquip(controller, weaponItem) {
       this._pool.push(new MagicProjectile(scene, { radius: this.boltRadius, size: 0.28, color: 0xffffff }));
     }
   }
-
   _acquire() { return this._pool.find(p => !p.active) || null; }
-
   _acquireTarget(origin, dir) {
     const enemies = getEnemies();
     const maxDist = this.lockRange;
@@ -273,8 +226,6 @@ onEquip(controller, weaponItem) {
     }
     return best;
   }
-
-
   _onHitEnemy(enemy) {
     damageEnemy(enemy,this.spDamage)
     if (typeof window !== 'undefined' && typeof window.giveXP === 'function') {
@@ -282,7 +233,6 @@ onEquip(controller, weaponItem) {
     }
     hudManager.showNotification('Magic Hit!');
   }
-
   _spawnDebugPip(worldPos) {
     const g = new THREE.SphereGeometry(0.06, 10, 10);
     const m = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
@@ -291,8 +241,6 @@ onEquip(controller, weaponItem) {
     scene.add(pip);
     this._debugPips.push({ mesh: pip, life: 0.35 });
   }
-
-  // opzionale: colpo “melee” della bacchetta (usa stesso schema dello slash)
   _applyHits(controller) {
     const playerObj = controller.player.model;
     const Pw = playerObj.getWorldPosition(new THREE.Vector3());

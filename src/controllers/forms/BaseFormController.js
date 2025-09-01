@@ -1,4 +1,3 @@
-// controllers/forms/BaseFormController.js
 import * as THREE from 'three';
 import { trees } from '../../spawners/vegetationSpawner.js';
 import { StatsSystem } from '../../systems/StatsSystem.js';
@@ -6,15 +5,7 @@ import { updateVitalsHUD } from '../../ui/hudVitals.js';
 import { PlayerBurnFX } from '../../particles/PlayerBurnFX.js';
 import { resolveObstaclesXZ } from '../../systems/ObstacleSystem.js';
 import { getGroundHeightAtXZ, isBlockedByWater } from '../../systems/GroundSystem.js';
-
-// Utils/entities/animator
-import { instantiateEntity, buildMixerAndActions } from '../../utils/entityFactory.js';
-import { ENTITY_CONFIG, waterHeight } from '../../utils/entities.js';
-import { Animator } from '../../components/Animator.js';
-
-// Camera (se il path non combacia, aggiorna)
-import { offset as camOffset } from '../../player/cameraFollow.js';
-import { gameManager } from '../../managers/gameManager.js';
+import { waterHeight } from '../../utils/entities.js';
 
 const PLAYER_RADIUS = 0.4;
 const TREE_RADIUS   = 0.6;
@@ -25,10 +16,8 @@ const STAMINA_REGEN_RATE  = 8;
 const MANA_REGEN_RATE     = 0;
 const BURNING_TIME = 5;
 const BURN_DPS = 1;
-
-// Margini verticali minimi rispetto a terreno/acqua quando si vola
-const WATER_CLEARANCE  = 1.0; // distanza minima dalla superficie dell'acqua
-const GROUND_CLEARANCE = 0.6; // distanza minima dal terreno (creste/colline)
+const WATER_CLEARANCE  = 1.0;
+const GROUND_CLEARANCE = 0.6;
 
 export class BaseFormController {
   constructor(player, abilities) {
@@ -38,15 +27,13 @@ export class BaseFormController {
     this._drainSite = null;
     this._manaPerSecFromTree = 18;
 
-    this.stats = new StatsSystem(120,80,50);
+    this.stats = new StatsSystem(120, 80, 50);
     this.stats.onChange((stats) => { updateVitalsHUD(stats); });
 
-    // Dinamica orizzontale
     this.currentVelocity = new THREE.Vector3();
     this.accel = 30;
     this.decel = 20;
 
-    // Stato generale
     this.velY = 0;
     this.isFlying = false;
     this.isOnGround = false;
@@ -56,36 +43,30 @@ export class BaseFormController {
     this.attackFreezesMovement = true;
     this._moveLockT = 0;
 
-    // Input
     this._zeroVec = new THREE.Vector3();
     this._input = { moveVec: new THREE.Vector3(), isShiftPressed: false, isJumpPressed: false };
 
-    // tmp
     this._desired = new THREE.Vector3();
     this._step    = new THREE.Vector3();
     this._prePos  = new THREE.Vector3();
     this._candPos = new THREE.Vector3();
     this._n2D     = new THREE.Vector2();
 
-    // FX burning
     this._isBurning = false;
     this._burningLeft = 0;
     this._burnFx = null;
-    this.isBlocking=false;
+    this.isBlocking = false;
   }
 
-  // --- Burning / HUD ---
   startBurning() { this._isBurning = true; this._burningLeft = BURNING_TIME; this.startBurningEffect(); }
   stopBurning()  { this._isBurning = false; this._burningLeft = 0; this.stopBurningEffect(); }
   startBurningEffect(){ if (!this._burnFx) this._burnFx = new PlayerBurnFX(this.player.model); this._burnFx.setEnabled(true); }
   stopBurningEffect(){ this._burnFx?.setEnabled(false); }
   takeDamage(damage){ this.stats.damage(damage); }
 
-  // --- Drain ---
   tryStartDrain(site){ if (!site || this.isAttacking) return false; this.isDraining = true; this._drainSite = site; return true; }
   stopDrain(){ this.isDraining = false; this._drainSite = null; }
 
-  // --- Utils ---
   lockMovementFor(sec=0){ this._moveLockT = Math.max(this._moveLockT, sec); }
   setInputState(st){ this._input.moveVec.copy(st.moveVec || this._zeroVec); this._input.isShiftPressed=!!st.isShiftPressed; this._input.isJumpPressed=!!st.isJumpPressed; }
   sitToggle(){ this.isSitting = !this.isSitting; }
@@ -104,19 +85,17 @@ export class BaseFormController {
   }
 
   update(dt) {
-    if(this.isBlocking) {
-      const enough = gameManager.controller.stats.useStamina(10*dt);
-      if(!enough) this.isBlocking=false;
+    if (this.isBlocking) {
+      const enough = this.stats.useStamina(10 * dt);
+      if (!enough) this.isBlocking = false;
     }
 
-    // FX burning
     if (this._burnFx) this._burnFx.update(dt);
     if (this._isBurning) {
       if (this._burningLeft <= 0) this.stopBurning();
       else { this.takeDamage(BURN_DPS * dt); this._burningLeft -= dt; }
     }
 
-    // Drain distance guard
     if (this.isDraining && this._drainSite) {
       const posD = this.player?.model?.position;
       if (posD) {
@@ -130,13 +109,11 @@ export class BaseFormController {
     const movementLocked = this._moveLockT > 0 || this.isBlocking || (this.attackFreezesMovement && this.isAttacking);
     if (this._moveLockT > 0) this._moveLockT -= dt;
 
-    // Sprint + stamina
     const inputVec = movementLocked ? this._zeroVec : this._input.moveVec;
     const moving = inputVec.lengthSq() > 0;
     const wantsSprint = this._input.isShiftPressed && this.isOnGround && !this.isSitting && !this.isAttacking && moving;
     this.isSprinting = wantsSprint ? this.stats.drainStaminaForSprint(dt, SPRINT_COST_PER_SEC) : false;
 
-    // Movimento orizzontale
     const baseSpeed   = this.abilities?.speed ?? 5;
     const targetSpeed = this.isSprinting ? baseSpeed * 1.8 : baseSpeed;
     this._desired.copy(inputVec).normalize().multiplyScalar(targetSpeed);
@@ -148,7 +125,6 @@ export class BaseFormController {
     this._prePos.copy(pos);
     this._candPos.copy(pos).add(this._step);
 
-    // Collisione alberi + slide
     if (trees?.getNearbyTrees) {
       const nearby = trees.getNearbyTrees(this._prePos.x, this._prePos.z, BROADPHASE_R);
       const minDist = TREE_RADIUS + PLAYER_RADIUS;
@@ -186,11 +162,8 @@ export class BaseFormController {
       }
     }
 
-    // Ostacoli generici
     resolveObstaclesXZ(this._candPos, PLAYER_RADIUS);
 
-    // ===== Muro invisibile sull’acqua + slide =====
-    // Se il form può volare ed è in volo, NON blocchiamo sull'acqua (può sorvolarla).
     const isAirborne = (this.abilities?.canFly && this.isFlying) === true;
     if (!isAirborne) {
       const fromY = Math.max(this._prePos.y, this._candPos.y) + 2.0;
@@ -210,10 +183,8 @@ export class BaseFormController {
       }
     }
 
-    // Applica posizione finale XZ
     pos.copy(this._candPos);
 
-    // Yaw verso direzione di marcia
     if (!movementLocked && this.currentVelocity.lengthSq() > 1e-3) {
       const yaw = Math.atan2(this.currentVelocity.x, this.currentVelocity.z);
       const cur = this.player.model.rotation.y;
@@ -221,15 +192,12 @@ export class BaseFormController {
       this.player.model.rotation.y += d * 0.15;
     }
 
-    // ===== Movimento verticale =====
     const g = this.abilities?.gravity ?? -30;
     if (this.abilities?.canFly && this.isFlying) {
-      // input verticali
-      if (this._input.isJumpPressed)  this.velY += 30 * dt; // su
-      if (this._input.isShiftPressed) this.velY -= 30 * dt; // giù
+      if (this._input.isJumpPressed)  this.velY += 30 * dt;
+      if (this._input.isShiftPressed) this.velY -= 30 * dt;
       this.velY += g * 0.2 * dt;
 
-      // Limite minimo = max(terreno, acqua) + margini
       const groundY = getGroundHeightAtXZ(pos.x, pos.z, { fromY: pos.y + 2.0 });
       const waterY  = waterHeight;
       const minFlyY = Math.max(groundY + GROUND_CLEARANCE, waterY + WATER_CLEARANCE);
@@ -242,19 +210,15 @@ export class BaseFormController {
         pos.y = nextY;
       }
     } else {
-      // terrestre / salto normale
       this.velY += g * dt;
       pos.y += this.velY * dt;
     }
 
-    // Snap al suolo / gestione atterraggio
     this._ensureAboveGround();
 
-    // Regen
     this.stats.regenStamina(dt, STAMINA_REGEN_RATE);
     this.stats.regenMana(dt, MANA_REGEN_RATE);
 
-    // Stato per Animator
     Object.assign(this.player.state, {
       speed: this.currentVelocity.length(),
       isFlying: this.isFlying,
@@ -267,8 +231,6 @@ export class BaseFormController {
   _ensureAboveGround() {
     const p = this.player.model.position;
 
-    // Se vola (ed è abilitato a volare), NON “incollare” al terreno,
-    // ma rispetta comunque la quota minima rispetto a terreno/acqua.
     if (this.abilities?.canFly && this.isFlying) {
       const groundY = getGroundHeightAtXZ(p.x, p.z, { fromY: p.y + 2.0 });
       const waterY  = waterHeight;
@@ -281,7 +243,6 @@ export class BaseFormController {
       return;
     }
 
-    // Comportamento standard terrestre
     const groundY = getGroundHeightAtXZ(p.x, p.z, { fromY: p.y + 2.0 });
     if (p.y < groundY) {
       p.y = groundY; this.velY = 0; this.isOnGround = true;
@@ -295,9 +256,5 @@ export class BaseFormController {
     }
   }
 
-  // --- Placeholder: la trasformazione ora vive nei controller specifici ---
-  async transform(formKey = 'wyvern') {
-    console.warn('[BaseFormController]Missing transform Function override.');
-    return this;
-  }
+  async transform(formKey = 'wyvern') { return this; }
 }

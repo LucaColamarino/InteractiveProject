@@ -7,14 +7,12 @@ import { scene } from '../../scene.js';
 
 export class SwordMeleeStrategy extends AttackStrategy {
   constructor() {
-    // Arc più ampio e un po' più lungo per la spada
     super({
       reach: 2.7,
       arcDeg: 130,
       pitchOffsetDeg: -6,
       yOffset: 1.1
     });
-    // shockwave params (opzionale speciale)
     this.shockCooldown = 2.0;
     this.shockFireFrac = 0.35;
     this.shockMaxRadius = 12;
@@ -22,20 +20,16 @@ export class SwordMeleeStrategy extends AttackStrategy {
     this.shockThickness = 1.2;
     this.shockDamageXP = 40;
     this._shockCd = 0;
-    this._shockState = null; // { t, dur, clipName, fired }
+    this._shockState = null;
     this._shockwaves = [];
     this.damage =60;
     this.spDamage = 30;
   }
 
   onEquip(controller, weaponItem) {
-    super.onEquip(controller, weaponItem); // consente override da arma
+    super.onEquip(controller, weaponItem);
   }
-
-  // Attacco base (slash sinistro)
   attack(controller) { return this.baseAttack(controller, 'swordAttack', 'Slash', 'attack'); }
-
-  // --- Attacco speciale: SHOCKWAVE (overlay) ---
   specialAttack(controller, clipName = 'shockwave') {
     if (controller.stats.useMana(15)) {  
     } else {
@@ -64,18 +58,12 @@ export class SwordMeleeStrategy extends AttackStrategy {
   }
 
   update(controller, dt) {
-    // 1) gestione slash base
     super.update(controller, dt);
-
-    // 2) cooldown shockwave
     if (this._shockCd > 0) this._shockCd = Math.max(0, this._shockCd - dt);
-
-    // 3) stato clip shockwave
     if (this._shockState) {
       const s = this._shockState;
       s.t += dt;
       const frac = s.dur > 0 ? THREE.MathUtils.clamp(s.t / s.dur, 0, 1) : 1;
-
       if (!s.fired && frac >= this.shockFireFrac) {
         this._spawnShockwave(controller);
         s.fired = true;
@@ -86,8 +74,6 @@ export class SwordMeleeStrategy extends AttackStrategy {
         controller.player.animator?.stopOverlay?.();
       }
     }
-
-    // 4) integrazione delle onde
     for (let i = this._shockwaves.length - 1; i >= 0; i--) {
       const sw = this._shockwaves[i];
       sw.radius += this.shockSpeed * dt;
@@ -120,29 +106,22 @@ export class SwordMeleeStrategy extends AttackStrategy {
       }
     }
   }
-
   cancel(controller) {
     super.cancel(controller);
     this._shockState = null;
     for (const sw of this._shockwaves) sw.mesh?.parent?.remove(sw.mesh);
     this._shockwaves.length = 0;
   }
-  // ---- applica danni in finestra ----
   _applyHits(controller) {
     const playerObj = controller.player.model;
     if (!playerObj) return;
-
-    // world pos del player
     const Pw = playerObj.getWorldPosition(new THREE.Vector3());
-
-    // prendi solo nemici “ragionevolmente vicini” in world-space
     const NEAR_R = Math.max( this._arc?.reach + 1.0, 6 );
     const near = getEnemies().filter(e => {
       if (!e.alive || !e.model) return false;
       const Ew = e.model.getWorldPosition(new THREE.Vector3());
       return Ew.distanceTo(Pw) < NEAR_R;
     });
-
     for (const enemy of near) {
       const key = enemy.model?.uuid || String(enemy);
       if (this._attackState.enemiesHit.has(key)) continue;
@@ -157,7 +136,6 @@ export class SwordMeleeStrategy extends AttackStrategy {
       }
     }
   }
-
   _spawnShockwave(controller) {
     const model = controller.player.model;
     model.updateMatrixWorld(true);
@@ -172,7 +150,6 @@ export class SwordMeleeStrategy extends AttackStrategy {
     ring.position.copy(origin).add(new THREE.Vector3(0, 0.05, 0));
     ring.renderOrder = 999;
     scene.add(ring);
-
     this._shockwaves.push({ origin: origin.clone(), radius: 0.01, hit: new Set(), mesh: ring });
   }
 }

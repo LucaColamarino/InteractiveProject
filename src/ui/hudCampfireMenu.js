@@ -1,8 +1,4 @@
-// /src/ui/hudCampfireMenu.js
-// Overlay stile Soulslike per potenziare HP / Stamina / Mana al falò
-
 import { gameManager } from "../managers/gameManager";
-
 let $root = null;
 let escHandler = null;
 let prevBodyOverflow = null;
@@ -11,10 +7,6 @@ let _wasPointerLocked = false;
 function _canvasEl() {
   return document.getElementById('three-canvas') || document.querySelector('canvas');
 }
-
-/**
- * Utility: prova varie chiavi per estrarre un valore dagli stats
- */
 function pickStat(obj, keys, fallback = 0) {
   for (const k of keys) {
     const v = obj?.[k];
@@ -22,10 +14,6 @@ function pickStat(obj, keys, fallback = 0) {
   }
   return fallback;
 }
-
-/**
- * Recupera i valori utili dagli stats (compatibile con varie naming)
- */
 function readStats(stats) {
   return {
     points:   pickStat(stats, ['levelPoints','points','availablePoints'], 0),
@@ -38,9 +26,6 @@ function readStats(stats) {
   };
 }
 
-/**
- * Crea (se manca) la struttura DOM del menù. Ritorna l'elemento radice .campfire-menu
- */
 function ensureDom() {
   if ($root) return $root;
 
@@ -134,10 +119,8 @@ function ensureDom() {
 
   return $root;
 }
-
 /**
- * Mostra il menù e collega i pulsanti allo StatsSystem del player
- * @param {StatsSystem} stats  gameManager.controller.player.stats
+ * @param {StatsSystem} stats  
  * @param {{onClose?:()=>void, onUpgrade?: (key:string)=>void}} [opt]
  */
 export function showCampfireMenu(stats, opt = {}) {
@@ -239,9 +222,6 @@ export function showCampfireMenu(stats, opt = {}) {
   gameManager.campfiremenu = true;
 }
 
-/**
- * Nasconde il menù e ripristina lo stato UI
- */
 export function hideCampfireMenu() {
   if (!$root) return;
 
@@ -265,9 +245,6 @@ export function hideCampfireMenu() {
   if (_wasPointerLocked) _canvasEl()?.requestPointerLock?.();
 }
 
-/**
- * True se il menù è attualmente visibile
- */
 export function isCampfireMenuOpen() {
   return !!$root && $root.classList.contains('is-open');
 }

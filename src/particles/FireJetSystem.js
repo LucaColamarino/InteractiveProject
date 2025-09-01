@@ -1,4 +1,3 @@
-// particles/FireJetSystem.js - Jet di fuoco "core" su +Z (additivo, white-hot)
 import * as THREE from 'three';
 
 export class FireJetSystem {
@@ -7,9 +6,7 @@ export class FireJetSystem {
     this.radius      = opts.radius     ?? 0.1;
     this.intensity   = opts.intensity  ?? 3.0;
     this.renderOrder = opts.renderOrder ?? 1001;
-
-    // FIX: niente "0;" davanti. Puoi passare 0 per disattivarlo.
-    this.particleCount = 50;//opts.particleCount ?? 900;
+    this.particleCount = opts.particleCount ?? 50;
 
     this._time   = 0;
     this._active = false;
@@ -31,7 +28,7 @@ export class FireJetSystem {
     const pos  = new Float32Array(this.particleCount * 3);
     const vel  = new Float32Array(this.particleCount * 3);
     const life = new Float32Array(this.particleCount);
-    const size = new Float32Array(this.particleCount/10);
+    const size = new Float32Array(this.particleCount);
     const seed = new Float32Array(this.particleCount);
 
     for (let i = 0; i < this.particleCount; i++) {
@@ -49,8 +46,8 @@ export class FireJetSystem {
       uniforms: {
         time:      { value: 0 },
         fade:      { value: 0 },
-        uLen:      { value: this.length }, // era "length"
-        uRad:      { value: this.radius }, // per estensioni future
+        uLen:      { value: this.length },
+        uRad:      { value: this.radius },
         intensity: { value: this.intensity }
       },
       vertexShader: `
@@ -74,7 +71,6 @@ export class FireJetSystem {
           vLife = lifetime;
           vSeed = pseed;
 
-          // Conveyor: Z scorre e loopa dentro il volume
           vec3 pos = position;
           pos.z = mod(position.z + velocity.z * time, uLen);
           pos.x += velocity.x * time;
@@ -86,10 +82,8 @@ export class FireJetSystem {
           float spin = (1.6 + sin(time*1.8 + pseed*13.0)*0.4) * (1.0 - z01);
           pos.xy = rot(spin * 0.65) * pos.xy;
 
-          // profilo conico del jet (leggero)
           pos.xy *= (1.0 + z01 * 2.2);
 
-          // jitter fine
           float j1 = sin(time*3.2 + pseed*21.0 + pos.x*8.0) * 0.10;
           float j2 = cos(time*2.7 + pseed*19.0 + pos.y*7.0) * 0.08;
           pos.x += j1;
@@ -180,8 +174,6 @@ export class FireJetSystem {
 
   _reset(i, pos, vel, life, size, seed) {
     const i3 = i * 3;
-
-    // spawn distribuito su tutto il getto
     const a = Math.random() * Math.PI * 2;
     const r = Math.random() * Math.max(0.18, this.radius * 0.22);
     pos[i3]     = Math.cos(a) * r;
@@ -212,7 +204,7 @@ export class FireJetSystem {
     if (length != null) this.length = length;
     if (radius != null) this.radius = radius;
     if (this.material) {
-      this.material.uniforms.uLen.value = this.length; // era length
+      this.material.uniforms.uLen.value = this.length;
       this.material.uniforms.uRad.value = this.radius;
     }
     if (this.geometry?.boundingSphere) {

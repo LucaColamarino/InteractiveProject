@@ -1,26 +1,5 @@
 import { gameManager } from "../managers/gameManager";
-
-// /src/ui/mainMenu.js — Pause/Main Menu (Soulslike style, with live Settings)
 export class MainMenu {
-  /**
-   * @param {{
-   *   onResume?: Function,
-   *   onQuit?: Function,
-   *   getSettings?: ()=>Partial<{
-   *     quality:'Low'|'Medium'|'High'|'Ultra'|string,
-   *     shadows:boolean,
-   *     resScale:number,
-   *     volume:number
-   *   }>,
-   *   applySettings?: (settings: {
-   *     quality:'Low'|'Medium'|'High'|'Ultra'|string,
-   *     shadows:boolean,
-   *     resScale:number,
-   *     volume:number
-   *   })=>void,
-   *   pointerLockTarget?: HTMLElement | HTMLCanvasElement | null
-   * }} opts
-   */
   constructor({
     onResume = () => {},
     onQuit = () => {},
@@ -33,10 +12,8 @@ export class MainMenu {
     this.getSettings = getSettings;
     this.applySettings = applySettings;
     this.pointerLockTarget = pointerLockTarget;
-
     this._build();
   }
-
   _build() {
     const root = document.createElement('div');
     root.id = 'main-menu';
@@ -106,7 +83,7 @@ export class MainMenu {
         <div class="mm-section">
           <button id="mm-quit" class="mm-btn mm-danger">
             <span class="mm-btn-icon">💀</span>
-            <span class="mm-btn-text">QUIT TO TITLE</span>
+            <span class="mm-btn-text">SAVE AND QUIT</span>
             <div class="mm-btn-ember"></div>
           </button>
         </div>
@@ -114,20 +91,15 @@ export class MainMenu {
     `;
     document.body.appendChild(root);
     this.root = root;
-
-    // Cache nodes
     this.btnResume     = root.querySelector('#mm-resume');
     this.btnQuit       = root.querySelector('#mm-quit');
     this.btnApply      = root.querySelector('#mm-apply');
-
     this.selQuality    = root.querySelector('#mm-quality');
     this.chkShadows    = root.querySelector('#mm-shadows');
     this.rangeResScale = root.querySelector('#mm-res-scale');
     this.resScaleVal   = root.querySelector('#mm-res-scale-val');
     this.rangeVolume   = root.querySelector('#mm-volume');
     this.volumeVal     = root.querySelector('#mm-volume-val');
-
-    // Events
     this._onKeyDown = (e) => {
       if (this.isVisible()) {
         if (e.key === 'Escape') {
@@ -136,36 +108,18 @@ export class MainMenu {
       }
     };
     window.addEventListener('keydown', this._onKeyDown);
-
     this.btnResume.addEventListener('click', () => this._resume());
     this.btnQuit.addEventListener('click', () => this.onQuit());
     this.btnApply.addEventListener('click', () => this._apply());
-
-    // Live labels
     this.rangeResScale.addEventListener('input', () => {
       const pct = Math.round(parseFloat(this.rangeResScale.value) * 100);
       this.resScaleVal.textContent = `${pct}%`;
-      this._playHoverSound();
     });
     this.rangeVolume.addEventListener('input', () => {
       const pct = Math.round(parseFloat(this.rangeVolume.value) * 100);
       this.volumeVal.textContent = `${pct}%`;
-      this._playHoverSound();
     });
-
-    // Change events (instant apply optional; we keep manual Apply)
-    this.selQuality.addEventListener('change', () => this._playHoverSound());
-    this.chkShadows.addEventListener('change', () => this._playHoverSound());
-
-    // Hover SFX
-    [this.btnResume, this.btnApply, this.btnQuit].forEach(btn =>
-      btn.addEventListener('mouseenter', () => this._playHoverSound())
-    );
-
-    // Init from current settings
     this._syncFromSettings();
-
-    // Start hidden
     this.show(false);
   }
 
@@ -176,7 +130,6 @@ export class MainMenu {
 
   show(v) {
     if (v) {
-      // Refresh from source each time we open
       this._syncFromSettings();
       this.root.style.display = 'block';
       this.root.classList.add('mm-show');
@@ -201,7 +154,6 @@ export class MainMenu {
 
   _syncFromSettings() {
     const s = this.getSettings?.() || {};
-    // Accept both lower/upper case quality values
     const qual = (s.quality || 'High');
     const normalizedQ = typeof qual === 'string'
       ? qual[0].toUpperCase() + qual.slice(1).toLowerCase()
@@ -212,13 +164,10 @@ export class MainMenu {
     } else {
       this.selQuality.value = 'High';
     }
-
     this.chkShadows.checked = (typeof s.shadows === 'boolean') ? s.shadows : true;
-
     const rs = (typeof s.resScale === 'number') ? s.resScale : 1;
     this.rangeResScale.value = String(rs);
     this.resScaleVal.textContent = `${Math.round(rs * 100)}%`;
-
     const vol = (typeof s.volume === 'number') ? s.volume : 0.7;
     this.rangeVolume.value = String(vol);
     this.volumeVal.textContent = `${Math.round(vol * 100)}%`;
@@ -226,17 +175,13 @@ export class MainMenu {
 
   _apply() {
     const settings = {
-      quality: this.selQuality.value,               // 'Low' | 'Medium' | 'High' | 'Ultra'
+      quality: this.selQuality.value,
       shadows: !!this.chkShadows.checked,
       resScale: parseFloat(this.rangeResScale.value),
       volume: parseFloat(this.rangeVolume.value),
     };
-
-    // Notify external
     this.applySettings?.(settings);
     this.root.dispatchEvent(new CustomEvent('settingsChanged', { detail: { settings } }));
-
-    this._playClickSound();
   }
 
   async _requestPointerLockIfAny(el) {
@@ -245,23 +190,11 @@ export class MainMenu {
   }
 
   _resume() {
-    this._playClickSound();
     this.onResume?.();
     this.show(false);
     gameManager.isPaused=false;
     this._requestPointerLockIfAny(this.pointerLockTarget);
   }
-
-  _playHoverSound() {
-    // Hook your audio system here (ui_hover, volume based on current settings)
-    // e.g., audio.play('ui_hover');
-  }
-
-  _playClickSound() {
-    // Hook your audio system here (ui_click)
-    // e.g., audio.play('ui_click');
-  }
-
   destroy() {
     window.removeEventListener('keydown', this._onKeyDown);
     this.root?.remove();

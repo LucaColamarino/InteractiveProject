@@ -3,14 +3,13 @@ import { deathScreen } from "../ui/deathScreen";
 import { hudManager } from "../ui/hudManager";
 import { renderXPHud } from "../ui/xpHud";
 export let xp = null;
-// systems/StatsSystem.js
 export class StatsSystem {
   constructor(maxHP = 100, maxStamina = 100, maxMana = 50,armor = 0) {
     this.maxHP = maxHP;   this.hp = maxHP;
     this.maxStamina = maxStamina; this.stamina = maxStamina;
     this.maxMana = maxMana; this.mana = maxMana;
     this.armor = armor;
-    this.levelPoints = 5; // punti iniziali disponibili per upgrade
+    this.levelPoints = 5;
     this._listeners = [];
     this._staminaCd = 0;
     this._staminaCdDefault = 0.6;

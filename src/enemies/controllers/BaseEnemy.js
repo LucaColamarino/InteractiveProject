@@ -1,4 +1,3 @@
-// BaseEnemy.js
 import * as THREE from 'three';
 import { getTerrainHeightAt } from '../../map/map.js';
 import { gameManager } from '../../managers/gameManager.js';
@@ -37,7 +36,6 @@ export class BaseEnemy {
   get player() { return gameManager.controller?.player || null; }
   setTarget(obj3D) { this.target = obj3D; }
 
-  // <<< NEW: utility >>>
   faceTarget(turnSpeed = 6.0, dt = 1/60) {
     const t = this.target?.model || this.target;
     if (!t) return;
@@ -49,10 +47,8 @@ export class BaseEnemy {
     if (!t) return Infinity;
     return this.model.position.distanceTo(t.position);
   }
-
   preUpdate(_dt) {}
   postUpdate(_dt) {}
-
   update(dt) {
     this.preUpdate(dt);
     this.wanderOnGround(dt);
@@ -62,7 +58,6 @@ export class BaseEnemy {
     this.animator?.update?.(dt);
     this.postUpdate(dt);
   }
-
   faceDirection(dir, turnSpeed = 6.0, dt = 1/60) {
     if (!this.model) return;
     this._tmpV.copy(this.model.position).add(dir);

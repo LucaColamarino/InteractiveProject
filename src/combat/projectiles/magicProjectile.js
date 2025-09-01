@@ -1,31 +1,20 @@
-// combat/projectiles/magicProjectile.js
 import * as THREE from 'three';
 import { getEnemies } from '../../enemies/EnemyManager.js';
-
-const TAG = '[MagicProjectile]';
-const dlog = (...a) => {
-  if (typeof window !== 'undefined' && window.__WAND_DEBUG__) console.log(TAG, ...a);
-};
-
-// util: distanza^2 punto->segmento + parametro t del closest point
 function _closestPointParamAndDistSqToSegment(p, a, b) {
   const ab = new THREE.Vector3().subVectors(b, a);
   const ap = new THREE.Vector3().subVectors(p, a);
   const abLenSq = ab.lengthSq();
-  let t = abLenSq > 1e-12 ? ap.dot(ab) / abLenSq : 0; // evita div/0
+  let t = abLenSq > 1e-12 ? ap.dot(ab) / abLenSq : 0;
   t = Math.max(0, Math.min(1, t));
   const closest = new THREE.Vector3().copy(a).addScaledVector(ab, t);
   const distSq = p.distanceToSquared(closest);
   return { t, distSq };
 }
-
-// util: stima raggio collisione nemico (cached su enemy)
 function _enemyRadius(e) {
   if (e._colRadius) return e._colRadius;
-  let r = 0.6; // fallback
+  let r = 0.6;
   const obj = e.model;
   if (obj) {
-    // prova boundingSphere (più economico) o boundingBox
     const geom = obj.geometry;
     if (geom?.boundingSphere) {
       r = Math.max(r, geom.boundingSphere.radius * obj.scale.length() / Math.sqrt(3));
@@ -34,7 +23,6 @@ function _enemyRadius(e) {
       const halfDiag = new THREE.Vector3().subVectors(bb.max, bb.min).multiplyScalar(0.5).length();
       r = Math.max(r, halfDiag * obj.scale.length() / Math.sqrt(3));
     } else {
-      // fallback su boundingBox world del model se è un Group
       const box = new THREE.Box3().setFromObject(obj);
       if (box.isEmpty() === false) {
         const halfDiag = new THREE.Vector3().subVectors(box.max, box.min).multiplyScalar(0.5).length();
@@ -45,30 +33,19 @@ function _enemyRadius(e) {
   e._colRadius = r;
   return r;
 }
-
 export class MagicProjectile {
-  /**
-   * @param {THREE.Object3D} sceneRoot
-   * @param {object} [opts]
-   * @param {number} [opts.radius=0.5]   // raggio di collisione del proiettile
-   * @param {number} [opts.size=0.18]    // scala visuale
-   * @param {THREE.ColorRepresentation} [opts.color=0x66ccff]
-   */
   constructor(sceneRoot, opts = {}) {
     this.radius = opts.radius ?? 0.5;
     const size = opts.size ?? 0.18;
     this.baseColor = new THREE.Color(opts.color ?? 0x66ccff);
-
     this.group = new THREE.Group();
     this.group.visible = false;
     sceneRoot.add(this.group);
-
     this.createCore(size);
     this.createEnergyRing(size);
     this.createParticles(size);
     this.createGlow(size);
     this.createTrail();
-
     this.active = false;
     this.life = 0;
     this.speed = 0;
@@ -76,13 +53,8 @@ export class MagicProjectile {
     this.target = null;
     this.time = 0;
     this.trailPoints = [];
-
-    // NEW: posizione precedente per swept test
     this._prevPos = new THREE.Vector3();
-
-    dlog('created magical projectile', { radius: this.radius, size });
   }
-
   createCore(size) {
     const coreGeom = new THREE.SphereGeometry(1, 16, 16);
     const coreMat = new THREE.MeshBasicMaterial({
@@ -95,7 +67,6 @@ export class MagicProjectile {
     this.core = new THREE.Mesh(coreGeom, coreMat);
     this.core.scale.setScalar(size);
     this.group.add(this.core);
-
     const innerGeom = new THREE.SphereGeometry(1, 12, 12);
     const innerMat = new THREE.MeshBasicMaterial({
       color: this.baseColor.clone().multiplyScalar(1.5),
@@ -108,7 +79,6 @@ export class MagicProjectile {
     this.innerCore.scale.setScalar(size * 0.6);
     this.group.add(this.innerCore);
   }
-
   createEnergyRing(size) {
     const ringGeom = new THREE.TorusGeometry(1.5, 0.1, 8, 16);
     const ringMat = new THREE.MeshBasicMaterial({
@@ -155,7 +125,6 @@ export class MagicProjectile {
     this.particles = new THREE.Points(particleGeom, particleMat);
     this.group.add(this.particles);
   }
-
   createGlow(size) {
     const glowGeom = new THREE.SphereGeometry(1, 12, 12);
     const glowMat = new THREE.MeshBasicMaterial({
@@ -170,7 +139,6 @@ export class MagicProjectile {
     this.glow.scale.setScalar(size * 3);
     this.group.add(this.glow);
   }
-
   createTrail() {
     this.trailGeometry = new THREE.BufferGeometry();
     this.trailMaterial = new THREE.LineBasicMaterial({
@@ -186,10 +154,9 @@ export class MagicProjectile {
     this.trailPoints = [];
     this.maxTrailPoints = 15;
   }
-
   activate(origin, dir, speed, lifetime, target = null) {
     this.group.position.copy(origin);
-    this._prevPos.copy(origin); // NEW: inizializza prev
+    this._prevPos.copy(origin);
     this.vel.copy(dir).multiplyScalar(speed);
     this.speed = speed;
     this.life = lifetime;
@@ -199,17 +166,9 @@ export class MagicProjectile {
     this.time = 0;
     this.trailPoints = [];
     this.updateTrail();
-    dlog('activate magical projectile', {
-      origin: origin.toArray(),
-      dir: dir.toArray(),
-      speed, lifetime,
-      target: target ? (target.model?.uuid || 'enemy') : null
-    });
   }
-
   deactivate() {
     if (!this.active) return;
-    dlog('deactivate magical projectile at', this.group.position.toArray(), 'life=', this.life);
     this.active = false;
     this.group.visible = false;
     this.target = null;
@@ -219,29 +178,22 @@ export class MagicProjectile {
     this.time = 0;
     this.trailPoints = [];
   }
-
   steerToTarget(homing, dt) {
     if (!this.target || !this.target.alive || homing <= 0) return;
-
     const desiredDir = new THREE.Vector3()
       .subVectors(this.target.model.position, this.group.position)
       .normalize();
-
     const curDir = this.vel.lengthSq() > 1e-12
       ? this.vel.clone().normalize()
       : desiredDir.clone();
-
     const dot = THREE.MathUtils.clamp(curDir.dot(desiredDir), -1, 1);
     const angle = Math.acos(dot);
     if (angle < 1e-5) { this.vel.copy(desiredDir).multiplyScalar(this.speed); return; }
-
-    const maxTurn = Math.max(0, homing) * dt;      // rad/s → rad/frame
-    const t = Math.min(1, maxTurn / angle);        // frazione di rotazione
+    const maxTurn = Math.max(0, homing) * dt;
+    const t = Math.min(1, maxTurn / angle);
     const newDir = curDir.lerp(desiredDir, t).normalize();
     this.vel.copy(newDir).multiplyScalar(this.speed);
   }
-
-
   updateVisualEffects(dt) {
     if (!this.active) return;
     this.time += dt;
@@ -258,7 +210,6 @@ export class MagicProjectile {
     this.glow.material.opacity = Math.max(0.05, glowOpacity);
     this.updateTrail();
   }
-
   updateTrail() {
     this.trailPoints.unshift(this.group.position.clone());
     if (this.trailPoints.length > this.maxTrailPoints) this.trailPoints.pop();
@@ -275,48 +226,29 @@ export class MagicProjectile {
       this.trailMaterial.opacity = trailOpacity;
     }
   }
-
   integrate(dt) {
-    // NEW: memorizza posizione precedente per swept test
     this._prevPos.copy(this.group.position);
-
     this.group.position.addScaledVector(this.vel, dt);
     this.life -= dt;
-
     this.updateVisualEffects(dt);
-
     if (this.life <= 0) {
-      dlog('magical projectile life expired');
       this.deactivate();
     }
   }
-
-  /**
-   * Continuous collision: controlla l'intersezione del segmento prevPos->currPos
-   * con una sfera attorno a ciascun nemico (r = enemyR + projectileR).
-   * Ritorna l'enemy colpito più vicino lungo il segmento, o null.
-   */
   checkCollision() {
     if (!this.active) return null;
-
     const p0 = this._prevPos;
     const p1 = this.group.position;
     const almostStatic = p0.distanceToSquared(p1) < 1e-10;
-
     let bestEnemy = null;
     let bestT = Infinity;
     const projR = this.radius;
-
-    // helper interno
     const _testEnemy = (e, label) => {
       if (!e?.alive || !e.model) return;
       const center = e.model.position;
       const r = projR + _enemyRadius(e);
       if (almostStatic) {
-        // fallback: test puntuale
         if (center.distanceTo(p1) <= r) {
-          dlog(`hit ${label} (static)`);
-          // t=1 per coerenza
           if (1 < bestT) { bestT = 1; bestEnemy = e; }
         }
         return;
@@ -326,25 +258,16 @@ export class MagicProjectile {
         if (t < bestT) { bestT = t; bestEnemy = e; }
       }
     };
-
-    // priorità: target lockato
     if (this.target) _testEnemy(this.target, 'locked target');
-
-    // broadphase molto semplice: tutti i nemici
     const enemies = getEnemies();
     for (const e of enemies) {
-      // evita di testare due volte lo stesso oggetto quando è target
       if (e === this.target) continue;
       _testEnemy(e, 'enemy');
     }
-
     if (bestEnemy) {
-      dlog('hit enemy with magic (swept), t=', bestT.toFixed(3));
       return bestEnemy;
     }
     return null;
   }
-
-  // Getter compatibilità
   get mesh() { return this.group; }
 }

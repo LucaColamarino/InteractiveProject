@@ -1,5 +1,4 @@
 import {WeaponItem, HelmetItem, ShieldItem, SpecialItem} from './gameItem.js';
-
 export const ironSword = new WeaponItem({
   id: 'sword_iron_01',
   name: 'Iron Sword',
@@ -7,7 +6,6 @@ export const ironSword = new WeaponItem({
   meshPrefix: 'sword',
   meta: { damage: 12, rarity: 'common', weaponKind: 'sword', reach: 2.7, arcDeg: 90 }
 });
-
 export const magicWand = new WeaponItem({
   id: 'wand_magic_01',
   name: 'Magic Wand',
@@ -20,7 +18,6 @@ export const magicWand = new WeaponItem({
     muzzleOffset: [0, 1.3, 0.5]
   }
 });
-
 export const ironHelmet = new HelmetItem({
   id: 'helmet_iron_01',
   name: 'Iron Helmet',
@@ -45,17 +42,12 @@ export const dragonheart = new SpecialItem({
   meta: { armor: 10 }
 });
 
-// elenco globale
 export const allItems = [ironSword, magicWand, ironHelmet, ironShield, dragonheart];
-
-/** Restituisce un item casuale dall'elenco */
 export function getRandomItem() {
   const index = Math.floor(Math.random() * allItems.length);
   console.log("getRandomItem:", allItems[index].name);
   return allItems[index];
 }
-
-/** Restituisce l'item con id corrispondente (oppure null se non trovato) */
 export function getItemById(id) {
   if (!id) return null;
   return allItems.find(it => it.id === id) || null;

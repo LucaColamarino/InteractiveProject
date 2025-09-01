@@ -26,6 +26,7 @@ export const wolfObjective=0;
    effects = null;
    isPaused = false;
    bridgeCreated = false;
+   manaTree = null;
   }
 export function createGameManager() {
   

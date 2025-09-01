@@ -1,44 +1,37 @@
-// WyvernEnemy.js — Idle (start) → Ground Fire → Takeoff → Air Assault (cicli) → Landing → Ground Fire (loop)
 import * as THREE from 'three';
 import { BaseEnemy } from './BaseEnemy.js';
 import { getTerrainHeightAt } from '../../map/map.js';
 import { gameManager } from '../../managers/gameManager.js';
 import { FireBreathCone } from '../../particles/FireBreathCone.js';
 
-const BOSS_NAME = 'AZHARYX, VORTICE CINERINO';
+const BOSS_NAME = 'AZHARYX, ASH VORTEX';
 
 export class WyvernEnemy extends BaseEnemy {
   constructor(opt = {}) {
     super({ ...opt, type: 'wyvern' });
 
-    // ── Stats
     this.health = opt.health ?? 30;
-    this.maxHealth = this.health;          // <<< per boss bar
-    this._prevHealth = this.health;        // <<< tracking HP per update evento
-    this._deathNotified = false;           // <<< evita doppio disengage
-    this.xp     = opt.xp ?? 250;
-
-    // ── Ingaggio
+    this.maxHealth = this.health;
+    this._prevHealth = this.health;
+    this._deathNotified = false;
+    this.xp = opt.xp ?? 250;
     this.engageRange = opt.engageRange ?? 45;
-    this._engagedBoss = false;             // <<< stato bossbar
-    this._bossUiId = `wyvern-${(Math.random()*1e9|0).toString(16)}`; // <<< id logico
+    this._engagedBoss = false;
+    this._bossUiId = `wyvern-${(Math.random() * 1e9 | 0).toString(16)}`;
 
-    // ── Movimento / volo
     this.altitudeMin = opt.altitudeMin ?? 15;
     this.altitudeMax = opt.altitudeMax ?? 20;
-    this.flySpeed    = opt.flySpeed    ?? 6.5;
-    this.turnK       = opt.turnK       ?? 6.0;
-    this.yOffset     = opt.yOffset     ?? 0;
+    this.flySpeed = opt.flySpeed ?? 6.5;
+    this.turnK = opt.turnK ?? 6.0;
+    this.yOffset = opt.yOffset ?? 0;
 
-    // Orbita in aria
-    this.orbitRadius     = opt.orbitRadius ?? 20;
-    this.minAirDistance  = opt.minAirDistance ?? Math.max(15, this.orbitRadius * 0.9);
-    this.orbitTightenK   = opt.orbitTightenK ?? 2.5;
+    this.orbitRadius = opt.orbitRadius ?? 20;
+    this.minAirDistance = opt.minAirDistance ?? Math.max(15, this.orbitRadius * 0.9);
+    this.orbitTightenK = opt.orbitTightenK ?? 2.5;
 
-    // ── Fuoco
-    const fireLength  = opt.fireLength ?? 30;
-    const fireRadius  = opt.fireRadius ?? 1.5;
-    this.fireDps      = opt.fireDps ?? 15;
+    const fireLength = opt.fireLength ?? 30;
+    const fireRadius = opt.fireRadius ?? 1.5;
+    this.fireDps = opt.fireDps ?? 15;
     this.breathIntensity = opt.breathIntensity ?? 10;
 
     this._fire = new FireBreathCone({
@@ -48,42 +41,36 @@ export class WyvernEnemy extends BaseEnemy {
       renderOrder: 1000
     });
 
-    // ── Animazioni (nomi effettivi del tuo rig)
     this.animClips = {
-      idle:       'metarig|metarig|metarig|idle',
+      idle: 'metarig|metarig|metarig|idle',
       groundFire: 'metarig|metarig|metarig|fire',
-      takeoff:    'metarig|metarig|metarig|takeoff',
-      airFlame:   'metarig|flapingFiring'
+      takeoff: 'metarig|metarig|metarig|takeoff',
+      airFlame: 'metarig|flapingFiring'
     };
     this._activeAnim = null;
 
-    // ── Stato principale
     this.behaviorState = 'idle';
     this.stateTimer = 0;
     this._altitude = this._randAltitude();
     this._mouthRef = null;
 
-    // ── Timeline attacco fuoco
     this._atkT = 0;
-    this._ATK_WARMUP   = 0.20;
-    this._ATK_BURST    = 0.50;
-    this._ATK_SUSTAIN  = 1.60;
+    this._ATK_WARMUP = 0.20;
+    this._ATK_BURST = 0.50;
+    this._ATK_SUSTAIN = 1.60;
     this._ATK_WINDDOWN = 0.60;
-    this._ATK_TOTAL    = this._ATK_WARMUP + this._ATK_BURST + this._ATK_SUSTAIN + this._ATK_WINDDOWN;
+    this._ATK_TOTAL = this._ATK_WARMUP + this._ATK_BURST + this._ATK_SUSTAIN + this._ATK_WINDDOWN;
 
-    // ── Ciclo aria (anti “volo infinito”)
     this.airBurstsPerCycle = opt.airBurstsPerCycle ?? 2;
-    this.airMaxTime        = opt.airMaxTime ?? 14.0; // hard cap in aria
-    this._airBurstsDone    = 0;
-    this._airPause         = 0.6;
-    this._airPauseLeft     = 0;
-    this._airTime          = 0;
+    this.airMaxTime = opt.airMaxTime ?? 14.0;
+    this._airBurstsDone = 0;
+    this._airPause = 0.6;
+    this._airPauseLeft = 0;
+    this._airTime = 0;
 
-    // ── Bocca / orientamento
     this.mouthBoneName = opt.mouthBoneName ?? null;
     this.invertForward = !!opt.invertForward;
 
-    // ── Hit capsule player (fix danni in volo) + velocità
     this._lastPlayerPos = new THREE.Vector3();
     this._playerCapsule = {
       height: opt.playerHeight ?? 1.7,
@@ -91,18 +78,16 @@ export class WyvernEnemy extends BaseEnemy {
       centerYOffset: opt.playerCenterYOffset ?? 0.9
     };
 
-    // temp
     this._tmpDir = new THREE.Vector3();
     this._tmpPos = new THREE.Vector3();
-    this._up     = new THREE.Vector3(0,1,0);
+    this._up = new THREE.Vector3(0, 1, 0);
   }
 
-  // ────────────────────────────────────────────────────────────────────────────
   onModelReady() {
     this._tryHookMouth();
     this.model.traverse(o => { o.frustumCulled = false; });
     this._fire.setIntensity(this.breathIntensity);
-    this._fire.setRotationOffsetDegrees?.(-35, 0, 0); // punta leggermente in giù
+    this._fire.setRotationOffsetDegrees?.(-35, 0, 0);
     this._enterIdle(true);
   }
 
@@ -111,9 +96,7 @@ export class WyvernEnemy extends BaseEnemy {
     this._fire.update?.(dt);
     this.stateTimer += dt;
 
-    // --- BOSS BAR: aggiornamenti HP e morte ---
     if (this.health !== this._prevHealth) {
-      // se prende danno prima dell'aggro, forza l'aggro UI (classico souls)
       if (!this._engagedBoss) this._dispatchBossEngage();
       window.dispatchEvent(new CustomEvent('boss:update', {
         detail: { id: this._bossUiId, cur: this.health }
@@ -121,24 +104,21 @@ export class WyvernEnemy extends BaseEnemy {
       this._prevHealth = this.health;
     }
     if (!this._deathNotified && this.health <= 0) {
-      window.dispatchEvent(new CustomEvent('boss:disengage', {
-        detail: { id: this._bossUiId }
-      }));
+      window.dispatchEvent(new CustomEvent('boss:disengage', { detail: { id: this._bossUiId } }));
       this._deathNotified = true;
       this._engagedBoss = false;
     }
 
     switch (this.behaviorState) {
-      case 'idle':            this._updateIdle(dt);          break;
-      case 'ground_fire':     this._updateGroundFire(dt);    break;
-      case 'takeoff':         this._updateTakeoff(dt);       break;
-      case 'air_assault':     this._updateAirAssault(dt);    break;
-      case 'landing_ground':  this._updateLandingGround(dt); break;
+      case 'idle': this._updateIdle(dt); break;
+      case 'ground_fire': this._updateGroundFire(dt); break;
+      case 'takeoff': this._updateTakeoff(dt); break;
+      case 'air_assault': this._updateAirAssault(dt); break;
+      case 'landing_ground': this._updateLandingGround(dt); break;
     }
   }
 
-  // ── IDLE ───────────────────────────────────────────────────────────────────
-  _enterIdle(first=false) {
+  _enterIdle(first = false) {
     this.behaviorState = 'idle';
     this.stateTimer = 0;
     this.state.isFlying = false;
@@ -147,6 +127,7 @@ export class WyvernEnemy extends BaseEnemy {
     if (!first) this._altitude = this._randAltitude();
     this._setAnim(this.animClips.idle, { loop: 'repeat' });
   }
+
   _updateIdle(dt) {
     const p = this.model.position;
     const groundY = this._terrainY();
@@ -154,13 +135,11 @@ export class WyvernEnemy extends BaseEnemy {
 
     const dist = this._distanceToPlayer();
     if (dist <= this.engageRange) {
-      // primo contatto: mostra boss bar
       this._dispatchBossEngage();
       this._enterGroundFire();
     }
   }
 
-  // ── GROUND FIRE ─────────────────────────────────────────────────────────────
   _enterGroundFire() {
     this.behaviorState = 'ground_fire';
     this.stateTimer = 0;
@@ -168,20 +147,18 @@ export class WyvernEnemy extends BaseEnemy {
     this._beginFireTimeline();
     this._setAnim(this.animClips.groundFire, { loop: 'once' });
   }
+
   _updateGroundFire(dt) {
     const p = this.model.position;
     p.y = THREE.MathUtils.lerp(p.y, this._terrainY() + this.yOffset, Math.min(1, dt * 8));
-
     const player = this.player?.model;
     if (player) {
       const toP = this._tmpDir.subVectors(player.position, p).normalize();
       this.faceDirection(toP, this.turnK * 1.2, dt);
     }
-
     if (this._updateFireTimeline(dt)) this._enterTakeoff();
   }
 
-  // ── TAKEOFF ────────────────────────────────────────────────────────────────
   _enterTakeoff() {
     this.behaviorState = 'takeoff';
     this.stateTimer = 0;
@@ -189,6 +166,7 @@ export class WyvernEnemy extends BaseEnemy {
     this._fire.setActive(false);
     this._setAnim(this.animClips.takeoff, { loop: 'once' });
   }
+
   _updateTakeoff(dt) {
     const p = this.model.position;
     const targetH = this._terrainY() + this._altitude;
@@ -206,7 +184,6 @@ export class WyvernEnemy extends BaseEnemy {
     }
   }
 
-  // ── AIR ASSAULT ────────────────────────────────────────────────────────────
   _enterAirAssault() {
     this.behaviorState = 'air_assault';
     this.stateTimer = 0;
@@ -214,9 +191,10 @@ export class WyvernEnemy extends BaseEnemy {
     this._airPauseLeft = 0;
     this._airBurstsDone = 0;
     this.state.isFlying = true;
-    this._beginFireTimeline(); // parte subito
+    this._beginFireTimeline();
     this._setAnim(this.animClips.airFlame, { loop: 'repeat' });
   }
+
   _updateAirAssault(dt) {
     const player = this.player?.model;
     if (!player) { this._enterLandingGround(); return; }
@@ -224,34 +202,26 @@ export class WyvernEnemy extends BaseEnemy {
 
     const p = this.model.position;
     const center = player.position;
-
-    // quota
     const targetH = this._terrainY() + this._altitude + Math.sin(this.stateTimer * 1.6) * 0.8;
     p.y = THREE.MathUtils.lerp(p.y, targetH, Math.min(1, dt * 2.5));
 
-    // orbita con guardia di distanza
     const fromCenter = this._tmpDir.subVectors(p, center);
     let dist = fromCenter.length(); if (dist < 0.001) dist = 0.001;
     const outward = fromCenter.clone().normalize();
     const tangent = this._up.clone().cross(fromCenter).normalize();
-
     const desired = Math.max(this.orbitRadius, this.minAirDistance);
     const tangentialSpeed = this.flySpeed * THREE.MathUtils.clamp(dist / desired, 0.5, 1.0);
     p.addScaledVector(tangent, tangentialSpeed * dt);
-
     const radialErr = dist - desired;
     p.addScaledVector(outward, -radialErr * this.orbitTightenK * dt);
-
     if (dist < this.minAirDistance) {
       const push = (this.minAirDistance - dist) * (this.orbitTightenK * 2.5);
       p.addScaledVector(outward, push * dt);
     }
 
-    // orientamento
     const toPlayer = this._tmpPos.subVectors(center, p).normalize();
     this.faceDirection(toPlayer, this.turnK * 1.15, dt);
 
-    // ciclo fuoco
     if (this._atkT > 0) {
       const finished = this._updateFireTimeline(dt);
       if (finished) {
@@ -266,41 +236,37 @@ export class WyvernEnemy extends BaseEnemy {
       }
     }
 
-    // disingaggio lontano o timeout di sicurezza
     const far = this._distanceToPlayer() > Math.max(this.engageRange * 1.8, this._fire.length * 1.4);
     if (far || this._airTime >= this.airMaxTime) this._enterLandingGround();
   }
 
-  // ── LANDING ────────────────────────────────────────────────────────────────
   _enterLandingGround() {
     this.behaviorState = 'landing_ground';
     this.stateTimer = 0;
     this._fire.setActive(false);
-    this.state.isFlying = true; // rimane “in volo” finché non tocca terra
+    this.state.isFlying = true;
   }
+
   _updateLandingGround(dt) {
     const p = this.model.position;
     const targetY = this._terrainY() + this.yOffset;
     p.y = THREE.MathUtils.lerp(p.y, targetY, Math.min(1, dt * 4.0));
-
     const pl = this.player?.model;
     if (pl) {
       const toP = this._tmpDir.subVectors(pl.position, p).normalize();
       this.faceDirection(toP, this.turnK, dt);
     }
-
     if (Math.abs(p.y - targetY) < 0.2 || this.stateTimer > 1.2) {
-      // ciclo garantito: rientra nel loop terrestre
       this._altitude = this._randAltitude();
       this._enterGroundFire();
     }
   }
 
-  // ── Timeline fuoco + DPS continuo ──────────────────────────────────────────
   _beginFireTimeline() {
     this._atkT = 0;
     this._fire.setActive(true);
   }
+
   _updateFireTimeline(dt) {
     this._atkT += dt;
 
@@ -325,7 +291,7 @@ export class WyvernEnemy extends BaseEnemy {
     if (this._atkT >= this._ATK_TOTAL) {
       this._fire.setActive(false);
       this._atkT = 0;
-      return true; // sequenza finita
+      return true;
     }
     return false;
   }
@@ -336,40 +302,32 @@ export class WyvernEnemy extends BaseEnemy {
     if (dmg > 0) gameManager?.controller?.stats?.damage?.(dmg);
   }
 
-  // === FIX DANNI IN VOLO: capsule + matrici aggiornate + margine velocità ===
   _playerInFireVolume(dt = 0) {
     if (!this._fire?.group || !this.player?.model) return false;
 
-    // Assicura world-space corretto del cono (collo/mandibola animati)
     this._fire.group.updateMatrixWorld(true);
-
-    // Origine + asse del cono (+Z per FireBreathCone; se fosse -Z vedi nota sotto)
     const origin = new THREE.Vector3().setFromMatrixPosition(this._fire.group.matrixWorld);
     const q = new THREE.Quaternion(); this._fire.group.getWorldQuaternion(q);
-    let axis = new THREE.Vector3(0,0,1).applyQuaternion(q).normalize(); // forward del cono
+    let axis = new THREE.Vector3(0, 0, 1).applyQuaternion(q).normalize();
 
     const L = this._fire.length;
     const baseR = this._fire.radius;
-
-    // Capsule del player: piedi, busto, testa
     const pp = this.player.model.position;
-    const h  = this._playerCapsule.height;
-    const r  = this._playerCapsule.radius;
+    const h = this._playerCapsule.height;
+    const r = this._playerCapsule.radius;
 
-    const pFeet  = new THREE.Vector3(pp.x, pp.y, pp.z);
+    const pFeet = new THREE.Vector3(pp.x, pp.y, pp.z);
     const pChest = new THREE.Vector3(pp.x, pp.y + this._playerCapsule.centerYOffset, pp.z);
-    const pHead  = new THREE.Vector3(pp.x, pp.y + h, pp.z);
+    const pHead = new THREE.Vector3(pp.x, pp.y + h, pp.z);
 
-    // Margine dinamico per velocità (anti "salto")
     const prev = this._lastPlayerPos;
-    const speed = prev.distanceTo(pp) / Math.max(dt || 1/60, 1e-5);
-    const speedMargin = Math.min(0.6, speed * 0.03); // ~3cm per m/s, max 60cm
+    const speed = prev.distanceTo(pp) / Math.max(dt || 1 / 60, 1e-5);
+    const speedMargin = Math.min(0.6, speed * 0.03);
 
     const insideCone = (P) => {
       const v = new THREE.Vector3().subVectors(P, origin);
       const z = v.dot(axis);
       if (z < 0 || z > L) return false;
-
       const radial = v.sub(axis.clone().multiplyScalar(z)).length();
       const z01 = z / L;
       const maxR = THREE.MathUtils.lerp(baseR * 0.10, baseR, z01);
@@ -377,32 +335,28 @@ export class WyvernEnemy extends BaseEnemy {
     };
 
     const hit = insideCone(pFeet) || insideCone(pChest) || insideCone(pHead);
-
-    // salva posizione per il calcolo della velocità al frame successivo
     this._lastPlayerPos.copy(pp);
     return hit;
   }
-  // Nota: se il tuo FireBreathCone “spara” lungo -Z, cambia la riga sopra con:
-  // let axis = new THREE.Vector3(0,0,-1).applyQuaternion(q).normalize();
 
-  // ── Utils ──────────────────────────────────────────────────────────────────
   _breathEngageRange() { return this._fire.length * 1.15; }
   _randAltitude() { return this.altitudeMin + Math.random() * (this.altitudeMax - this.altitudeMin); }
   _terrainY() { const p = this.model.position; return getTerrainHeightAt(p.x, p.z); }
   _distanceToPlayer() { if (!this.player?.model) return Infinity; return this.model.position.distanceTo(this.player.model.position); }
 
-  _setAnim(name, opts={}) {
+  _setAnim(name, opts = {}) {
     if (!name || this._activeAnim === name) return;
     this._activeAnim = name;
-    try { this.animator?.play?.(name, { mode:'full', fade:0.18, ...opts }); } catch(_) {}
+    try { this.animator?.play?.(name, { mode: 'full', fade: 0.18, ...opts }); } catch (_) {}
   }
 
   _tryHookMouth() {
     if (!this.model || this._mouthRef) return;
 
     const exact = [
-      this.mouthBoneName, 'Mouth','mouth','Mouth_end','mouth_end','Head','head','Head_end','head_end',
-      'metarigHead','metarig.head','metarig_Head','jaw','Jaw','jaw_end','Jaw_end','Snout','snout','muzzle','Muzzle'
+      this.mouthBoneName, 'Mouth', 'mouth', 'Mouth_end', 'mouth_end', 'Head', 'head',
+      'Head_end', 'head_end', 'metarigHead', 'metarig.head', 'metarig_Head',
+      'jaw', 'Jaw', 'jaw_end', 'Jaw_end', 'Snout', 'snout', 'muzzle', 'Muzzle'
     ].filter(Boolean);
 
     for (const name of exact) {
@@ -411,7 +365,7 @@ export class WyvernEnemy extends BaseEnemy {
     }
 
     if (!this._mouthRef) {
-      const keywords = ['mouth','muzzle','jaw','head','snout','face','teeth','skull'];
+      const keywords = ['mouth', 'muzzle', 'jaw', 'head', 'snout', 'face', 'teeth', 'skull'];
       let best = null, bestScore = 0;
       this.model.traverse(obj => {
         if (!obj?.name) return;
@@ -449,17 +403,11 @@ export class WyvernEnemy extends BaseEnemy {
     return (Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.z)) / 3;
   }
 
-  // --- Boss UI helpers ---
   _dispatchBossEngage() {
     if (this._engagedBoss) return;
     this._engagedBoss = true;
     window.dispatchEvent(new CustomEvent('boss:engage', {
-      detail: {
-        id: this._bossUiId,
-        name: BOSS_NAME,
-        max: this.maxHealth,
-        cur: this.health
-      }
+      detail: { id: this._bossUiId, name: BOSS_NAME, max: this.maxHealth, cur: this.health }
     }));
   }
 }

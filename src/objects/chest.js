@@ -7,13 +7,11 @@ import { interactionManager } from '../systems/interactionManager.js';
 import { hudManager } from '../ui/hudManager.js';
 import { gameManager } from '../managers/gameManager.js';
 import { getRandomItem } from '../utils/items.js';
-import { registerObstacle, unregisterObstacle /*, makeDebugHitbox*/ } from '../systems/ObstacleSystem.js';
+import { registerObstacle, unregisterObstacle} from '../systems/ObstacleSystem.js';
 
 const loader = new FBXLoader();
 const texLoader = new THREE.TextureLoader();
 export const chests = [];
-
-/** Carica una texture con settaggi consigliati */
 function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   if (!path) return null;
   const t = texLoader.load(path);
@@ -23,8 +21,6 @@ function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
   return t;
 }
-
-/** Crea un MeshStandardMaterial PBR dalle mappe disponibili */
 function makePBR({
   basecolor, normal, roughness, metallic,
   metalness = 0.0, roughnessVal = 1.0, envMapIntensity = 1.0,
@@ -41,16 +37,13 @@ function makePBR({
   if (mat.normalMap) mat.normalMapType = THREE.TangentSpaceNormalMap;
   return mat;
 }
-
-/** Effetto veloce "puff" di particelle additive */
 function spawnPuffFX(worldPos) {
   const tex = loadTex('/textures/fx/puff_soft.png', { srgb: false });
   const mat = new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending });
   const sprite = new THREE.Sprite(mat);
-  sprite.scale.setScalar(0.01); // verrà “pompato”
+  sprite.scale.setScalar(0.01);
   sprite.position.copy(worldPos);
   scene.add(sprite);
-
   let t = 0;
   const ttl = 0.35;
   sprite.userData._update = (dt) => {
@@ -68,30 +61,22 @@ function spawnPuffFX(worldPos) {
   };
   Chest._fx.push(sprite);
 }
-
 export class Chest {
-  /** @param {THREE.Vector3} position */
   constructor(position = new THREE.Vector3(0, 0, 0)) {
     this.yoffset = 0.3;
     position.y += this.yoffset;
     this.position = position.clone();
-
     this.modelPath = '/models/props/chest.fbx';
     this.scale = 0.01;
-
-    // hitbox (cylinder in XZ)
     this.collider = null;
-    this.colliderRadius = 0.55;    // ← tweak: raggio di blocco
-    this.colliderHalfH = 0.35;     // solo per debug mesh (visivo)
-
-    // set di mappe
+    this.colliderRadius = 0.55;
+    this.colliderHalfH = 0.35;
     const camp = {
       basecolor: '/textures/chest/chest_basecolor.png',
       normal:    '/textures/chest/chest_normal.png',
       roughness: '/textures/chest/chest_roughness.png',
-      specular:  '/textures/chest/chest_specular.png', // usata come metalnessMap
+      specular:  '/textures/chest/chest_specular.png',
     };
-
     this.chestMat = makePBR({
       basecolor:  loadTex(camp.basecolor,  { srgb: true }),
       normal:     loadTex(camp.normal),
@@ -101,46 +86,33 @@ export class Chest {
       roughnessVal: 0.9,
       envMapIntensity: 1.0,
     });
-
     this.isOpen = false;
     this.isOpening = false;
     this.model = null;
     this.mixer = null;
     this.actions = {};
     this.isLoaded = false;
-
-    // timing spawn rispetto all’animazione
-    this.spawnProgress = 0.6; // 60% della clip
+    this.spawnProgress = 0.6;
     this._spawnAtTime = null;
     this._lootSpawned = false;
     this._spawnCallback = null;
-
-    // FX luce interna
     this.glowLight = null;
   }
-
   async load() {
     const base = await loader.loadAsync(this.modelPath);
     const fbx = SkeletonUtils.clone(base);
-
     this.model = fbx;
     this.model.scale.setScalar(this.scale);
     this.model.position.copy(this.position);
-
-    // Applica PBR a tutte le mesh del forziere
     this.model.traverse((child) => {
       if (!child.isMesh) return;
       child.castShadow = true;
       child.receiveShadow = true;
       child.material = this.chestMat;
     });
-
-    // Luce interna molto soft (cresce durante l’apertura)
-    this.glowLight = new THREE.PointLight(0xffd080, 0, 1.2); // intensity 0 -> animata
+    this.glowLight = new THREE.PointLight(0xffd080, 0, 1.2);
     this.glowLight.position.set(0, 0.15, 0);
     this.model.add(this.glowLight);
-
-    // Anima apertura se il file ha una clip
     if (base.animations && base.animations.length) {
       this.mixer = new THREE.AnimationMixer(this.model);
       const clip = base.animations[0];
@@ -156,22 +128,15 @@ export class Chest {
         }
       });
     }
-
     this.isLoaded = true;
     return this.model;
   }
-
-  /**
-   * Avvia l’apertura e programma lo spawn del loot
-   * @param {Function} spawnCallback funzione che esegue lo spawn reale dell’oggetto
-   */
   open(spawnCallback) {
     if (this.isOpen || this.isOpening) return;
     this.isOpen = true;
     this.isOpening = true;
     this._lootSpawned = false;
     this._spawnCallback = spawnCallback || null;
-
     if (this.actions.open) {
       const action = this.actions.open.reset();
       const duration = action.getClip().duration || 1.0;
@@ -180,17 +145,12 @@ export class Chest {
     } else {
       this._spawnAtTime = 0;
     }
-
     this.glowLight.intensity = 0.0;
     this._glowUp = true;
-
     hudManager.showNotification?.('Chest Opening...');
   }
-
   update(delta) {
     if (this.mixer) this.mixer.update(delta);
-
-    // gestione glow
     if (this._glowUp && this.glowLight) {
       this.glowLight.intensity = Math.min(this.glowLight.intensity + 4.0 * delta, 2.4);
     }
@@ -198,15 +158,12 @@ export class Chest {
       this.glowLight.intensity = Math.max(this.glowLight.intensity - 1.5 * delta, 0.0);
       if (this.glowLight.intensity === 0) this._fadeGlowOut = false;
     }
-
-    // trigger dello spawn al giusto timestamp
     if (this.isOpening && !this._lootSpawned && this._spawnAtTime != null) {
       const t = this.actions.open ? this.actions.open.time : this._spawnAtTime;
       if (t >= this._spawnAtTime) {
         this._lootSpawned = true;
         const spawnPos = new THREE.Vector3(0, 0.25, 0);
         this.model.localToWorld(spawnPos);
-
         spawnPuffFX(spawnPos);
         if (this._spawnCallback) this._spawnCallback(spawnPos);
 
@@ -215,17 +172,12 @@ export class Chest {
           this._glowUp = false;
           this._fadeGlowOut = true;
         }
-
         hudManager.showNotification?.('You found something!');
       }
     }
-
-    // tick debug mesh (se creata)
     if (this.collider?._debugMesh?.userData?._tick) {
       this.collider._debugMesh.userData._tick();
     }
-
-    // FX transienti
     if (Chest._fx.length) {
       for (let i = Chest._fx.length - 1; i >= 0; --i) {
         const fx = Chest._fx[i];
@@ -234,7 +186,6 @@ export class Chest {
       }
     }
   }
-
   dispose() {
     if (this.collider) {
       unregisterObstacle(this.collider);
@@ -252,28 +203,20 @@ export class Chest {
   }
 }
 Chest._fx = [];
-
 export async function spawnChestAt(x, z, dropItem = null) {
   const terrainY = getTerrainHeightAt(x, z);
   const pos = new THREE.Vector3(x, terrainY, z);
-
   const chest = new Chest(pos);
   await chest.load();
   scene.add(chest.model);
   chests.push(chest);
-
-  // ==== Collider registrato (cylinder in XZ) ====
   chest.collider = registerObstacle({
     type: 'cylinder',
-    positionRef: chest.model.position,     // riferimento vivo
+    positionRef: chest.model.position,
     radius: chest.colliderRadius,
     halfHeight: chest.colliderHalfH,
     userData: { kind: 'chest', chest },
   });
-  // Debug (facoltativo):
-  // makeDebugHitbox(chest.collider, scene);
-
-  // ==== Interaction ====
   interactionManager.register({
     getWorldPosition: (out = new THREE.Vector3()) => {
       const p = chest.model?.position ?? chest.position;
@@ -299,21 +242,17 @@ export async function spawnChestAt(x, z, dropItem = null) {
       chest.open(spawnLoot);
     }
   });
-
   return chest;
 }
-
 export function updateChests(delta) {
   for (const c of chests) c.update(delta);
 }
-
 export function disposeAllChests() {
   while (chests.length) {
     const c = chests.pop();
     c.dispose();
   }
 }
-
 export function getNearestChest(pos, radius = 2.0) {
   let best = null, bestD2 = radius * radius;
   for (const c of chests) {

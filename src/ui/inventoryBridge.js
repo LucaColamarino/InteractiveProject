@@ -1,17 +1,11 @@
-// src/ui/inventoryBridge.js
-import {
-  getInventoryEls, setInventorySlot, setEquipment
-} from './inventoryUi.js';
+import {getInventoryEls, setInventorySlot, setEquipment} from './inventoryUi.js';
 import { gameManager } from '../managers/gameManager.js';
-
-// helper per capire quante celle ha la griglia
 function getGridSize() {
   const { invGrid } = getInventoryEls();
   return invGrid ? invGrid.children.length : 0;
 }
-
 export function refreshInventoryUI() {
-  const inv = gameManager.inventory; // << tua reference già esistente
+  const inv = gameManager.inventory;
   if (!inv) return;
   const n = getGridSize();
   const items = inv.items || [];
@@ -25,14 +19,11 @@ export function refreshInventoryUI() {
       iconText: item.attributes?.iconText ?? iconFromType(item.type),
     });
   }
-
-  // Equipment (mappo helmet→head per la UI)
   const eq = inv.equipment || {};
   setEquipment('weapon',    eq.weapon ? fmt(eq.weapon) : null);
   setEquipment('shield',    eq.shield ? fmt(eq.shield) : null);
   setEquipment('head',      eq.helmet ? fmt(eq.helmet) : null); // helmet→head
 }
-
 function fmt(item) {
   return { name: item.name, type: capitalize(item.type || 'Equipment'), iconText: item.attributes?.iconText ?? iconFromType(item.type) };
 }

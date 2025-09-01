@@ -1,4 +1,3 @@
-// src/utils/EntityFactory.js
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -8,10 +7,8 @@ import { scene, camera, renderer } from '../scene.js';
 
 const fbxLoader = new FBXLoader();
 const textureLoader = new THREE.TextureLoader();
-
 const baseModelCache = new Map();
 const cloneWarmCache = new Map();
-
 function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   if (!path) return null;
   const t = textureLoader.load(path);
@@ -21,10 +18,8 @@ function loadTex(path, { srgb = false, repeat = 1 } = {}) {
   t.anisotropy = 8;
   return t;
 }
-
 function buildStandardMaterialFromMaps(tex, { skinning = false, nameHint = '' } = {}) {
   const hasAlpha = !!(tex?.opacity || tex?.alphaMap);
-
   const map          = loadTex(tex?.diffuse, { srgb: true });
   const normalMap    = loadTex(tex?.normal);
   const metalnessMap = loadTex(tex?.metallic);
@@ -32,10 +27,8 @@ function buildStandardMaterialFromMaps(tex, { skinning = false, nameHint = '' } 
   const aoMap        = loadTex(tex?.ao);
   const alphaMap     = loadTex(tex?.opacity || tex?.alphaMap);
   const emissiveMap  = loadTex(tex?.emissive);
-
   const metalness = tex?.metalnessValue ?? (metalnessMap ? 1.0 : 0.0);
   const roughness = tex?.roughnessValue ?? (roughnessMap ? 0.7 : 0.65);
-
   const mat = new THREE.MeshStandardMaterial({
     map,
     normalMap,
@@ -55,10 +48,8 @@ function buildStandardMaterialFromMaps(tex, { skinning = false, nameHint = '' } 
   if (skinning) mat.skinning = true;
   mat.name = nameHint || mat.name || 'EntityMat';
   if (normalMap) mat.normalMapType = THREE.TangentSpaceNormalMap;
-
   return mat;
 }
-
 function isSimpleTexRoot(root) {
   if (!root || typeof root !== 'object') return false;
   return (
@@ -67,11 +58,9 @@ function isSimpleTexRoot(root) {
     'ao' in root || 'opacity' in root || 'alphaMap' in root || 'emissive' in root
   );
 }
-
 function resolveTexForNames(matName, meshName, root) {
   if (!root) return null;
   if (isSimpleTexRoot(root)) return { matchedKey: '(single)', texConfig: root };
-
   const m = (matName || '').toLowerCase();
   const n = (meshName || '').toLowerCase();
   const keys = Object.keys(root).sort((a, b) => b.length - a.length);
@@ -83,7 +72,6 @@ function resolveTexForNames(matName, meshName, root) {
   }
   return null;
 }
-
 export function applyExternalMaterials(root, config) {
   const rootTex = config?.textures;
   if (!rootTex) return;
@@ -137,8 +125,6 @@ export function applyExternalMaterials(root, config) {
     child.receiveShadow = true;
   });
 }
-
-// helper: trova child per nome (partial, case-insensitive)
 export function findChildByNameCI(root, search) {
   const s = (search || '').toLowerCase();
   let found = null;
@@ -149,47 +135,37 @@ export function findChildByNameCI(root, search) {
   });
   return found;
 }
-
 export async function preloadEntity(key) {
   if (baseModelCache.has(key)) return baseModelCache.get(key);
   const cfg = ENTITY_CONFIG[key];
   if (!cfg) throw new Error(`ENTITY_CONFIG mancante per "${key}"`);
-
   const base = await fbxLoader.loadAsync(cfg.modelPath);
   baseModelCache.set(key, base);
-
   const cloned = SkeletonUtils.clone(base);
   applyExternalMaterials(cloned, cfg);
   cloneWarmCache.set(key, cloned);
-
   const dummy = SkeletonUtils.clone(cloned);
   dummy.visible = false;
   if (cfg.scale) dummy.scale.copy(cfg.scale);
   scene.add(dummy);
   renderer.render(scene, camera);
   scene.remove(dummy);
-
   return base;
 }
-
 export async function preloadAllEntities(keys = Object.keys(ENTITY_CONFIG)) {
   for (const k of keys) {
     try { await preloadEntity(k); } catch (e) { console.warn('[EntityFactory] preload fallito:', k, e); }
   }
   renderer.compile(scene, camera);
 }
-
 export function instantiateEntity(key) {
   const source = cloneWarmCache.get(key) || baseModelCache.get(key);
   if (!source) throw new Error(`Entity "${key}" non pre-caricata: chiama preloadEntity/preloadAllEntities prima.`);
-
   const cfg = ENTITY_CONFIG[key];
   const fbx = SkeletonUtils.clone(source);
   fbx.animations = source.animations || fbx.animations;
   if (cfg?.scale) fbx.scale.copy(cfg.scale);
-
   if (!cloneWarmCache.has(key)) applyExternalMaterials(fbx, cfg);
-
   fbx.traverse(c => {
     if (c.isMesh || c.isSkinnedMesh) {
       c.castShadow = true;
@@ -200,36 +176,28 @@ export function instantiateEntity(key) {
       }
     }
   });
-
   // --- Attachments specifici per tipo ---
   fbx.userData.attachments = fbx.userData.attachments || {};
-
   if (key === 'archer') {
     // prova a rilevare la mesh "arrow" (mesh o skinnedMesh)
     const arrowMesh = findChildByNameCI(fbx, 'arrow');
     if (arrowMesh && (arrowMesh.isMesh || arrowMesh.isSkinnedMesh)) {
-      // Assicura corretti flag per alpha cutout (piume/coda freccia con alpha)
       if (arrowMesh.material) {
         const m = arrowMesh.material;
         m.transparent = true;
         m.alphaTest = Math.max(m.alphaTest ?? 0.0, 0.5);
         m.depthWrite = false;
-        arrowMesh.renderOrder = 2; // dietro\avanti al bow se serve
+        arrowMesh.renderOrder = 2;
         if (m.aoMap && !arrowMesh.geometry.attributes.uv2) {
           arrowMesh.geometry.setAttribute('uv2', arrowMesh.geometry.attributes.uv);
         }
       }
-      // tienila visibile nello stato base (freccia nell’arco)
       arrowMesh.visible = true;
-
-      // esponi per i controller (per show/hide o per clonarci il proiettile)
       fbx.userData.attachments.arrow = arrowMesh;
     }
   }
-
   return fbx;
 }
-
 export function buildMixerAndActions(targetFBX, cfg) {
   if (cfg?.animationIndices) {
     const mixer = new THREE.AnimationMixer(targetFBX);

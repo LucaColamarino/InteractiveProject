@@ -1,11 +1,4 @@
-// src/objects/worldPickup.js
 import * as THREE from 'three';
-
-/* ------------------------------------------------------------------
-   LightPool: mantiene un numero fisso di PointLight visibili in scena.
-   I pickup "acquisiscono" una luce e la rilasciano mettendo intensity=0.
-   Così il numero di luci visibili NON cambia e gli shader non ricompilano.
-------------------------------------------------------------------- */
 class LightPool {
   constructor(scene, size = 8, {
     color = 0xc8fff2, intensity = 0, distance = 4, decay = 1.5, yOffset = 0.65,
@@ -18,9 +11,9 @@ class LightPool {
     this._free = [];
     for (let i = 0; i < size; i++) {
       const L = new THREE.PointLight(color, intensity, distance, decay);
-      L.castShadow = false;          // niente shadow per evitare allocazioni
-      L.position.set(0, yOffset, 0); // altezza "tipica"
-      L.visible = true;              // ⚠ visibile TRUE per fissare il conteggio luci
+      L.castShadow = false;
+      L.position.set(0, yOffset, 0);
+      L.visible = true;
       this.group.add(L);
       this._lights.push(L);
       this._free.push(L);
@@ -29,8 +22,8 @@ class LightPool {
   acquire() { return this._free.pop() || null; }
   release(light) {
     if (!light) return;
-    light.intensity = 0;             // spegni ma resta visibile (conteggio invariato)
-    light.position.set(0, light.position.y, 0); // opzionale: reset XZ
+    light.intensity = 0; 
+    light.position.set(0, light.position.y, 0);
     this._free.push(light);
   }
 }
@@ -41,13 +34,9 @@ function ensureLightPool(scene, size = 8) {
   return __sharedLightPool;
 }
 
-// ---------- easing per la scale-in ----------
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-
-/* ----------------------------- WorldPickup ----------------------------- */
 export class WorldPickup {
   constructor(opts = {}) {
-    // ---- config & stato ----
     this.scene        = opts.scene || null;
     this.item         = opts.item || {};
     this.pickupRadius = opts.pickupRadius ?? 1.6;
@@ -57,9 +46,9 @@ export class WorldPickup {
 
     this._hover       = opts.hover ?? true;
     this._hoverAmp    = opts.hoverAmp ?? 0.06;
-    this._hoverFreq   = opts.hoverFreq ?? 0.6;   // Hz
+    this._hoverFreq   = opts.hoverFreq ?? 0.6;  
     this._rotate      = opts.rotate ?? true;
-    this._rotSpeed    = opts.rotateSpeed ?? 0.9; // rad/s
+    this._rotSpeed    = opts.rotateSpeed ?? 0.9;
 
     this._enableRing  = opts.enableRing ?? true;
     this._ringRadius  = opts.ringRadius ?? 0.6;
@@ -69,17 +58,12 @@ export class WorldPickup {
     this._enableLight = opts.enableLight ?? true;
     this._lightNear   = opts.lightNear ?? 1.15;
     this._lightFar    = opts.lightFar ?? 0.75;
-
-    // ---- parametri scale-in (generali) ----
-    this._scaleInEnabled = opts.scaleInEnabled ?? true;   // ON di default
+    this._scaleInEnabled = opts.scaleInEnabled ?? true; 
     this._scaleInFrom    = Math.max(0.01, opts.scaleInFrom ?? 0.1);
     this._scaleInDur     = Math.max(0.01, opts.scaleInDuration ?? 0.55);
     this._scaleInT       = 0;
     this._scaleInActive  = false;
-
     this.onPicked     = (typeof opts.onPicked === 'function') ? opts.onPicked : null;
-
-    // ---- root & model ----
     this.root = new THREE.Group();
     this.root.name = `WorldPickup_${this.item?.id ?? 'item'}`;
 
@@ -87,16 +71,11 @@ export class WorldPickup {
     model.rotation.set(0, 0, 0);
     this.model = model;
     this.root.add(model);
-
-    // applica eventuale scala o posizione passata dal chiamante
     if (opts.scale)    model.scale.copy(opts.scale);
     if (opts.position) this.root.position.copy(opts.position);
     this._baseY = this.root.position.y;
-
-    // === inizializza l'animazione di materializzazione (solo sul modello) ===
     this._scaleTarget = this.model.scale.clone();
     if (this._scaleInEnabled) {
-      // parte piccolo -> scala target
       const s = this._scaleInFrom;
       this.model.scale.set(
         this._scaleTarget.x * s,
@@ -106,12 +85,10 @@ export class WorldPickup {
       this._scaleInT = 0;
       this._scaleInActive = true;
     }
-
-    // ---- ring (materiale per-istanza per colore dinamico) ----
     this.ring = null;
     if (this._enableRing) {
       const g = WorldPickup._ringGeo(this._ringRadius);
-      const m = WorldPickup._ringMat().clone(); // colore per-istanza
+      const m = WorldPickup._ringMat().clone();
       m.depthWrite = false; m.transparent = true; m.opacity = 0.85;
       this.ring = new THREE.Mesh(g, m);
       this.ring.rotation.x = -Math.PI * 0.5;
@@ -120,28 +97,22 @@ export class WorldPickup {
       this.ring.material.color.set(this._ringFar);
       this.root.add(this.ring);
     }
-
-    // ---- light via pool (nessuna variazione di conteggio luci) ----
     this._light = null;
     if (this._enableLight && this.scene) {
       const pool = ensureLightPool(this.scene, opts.lightPoolSize ?? 8);
-      this._light = pool.acquire();               // se finisce, semplicemente non illumina
-      if (this._light) this._light.intensity = this._lightFar; // livello base
+      this._light = pool.acquire();
+      if (this._light) this._light.intensity = this._lightFar;
     }
 
     if (this.scene) this.scene.add(this.root);
-
-    // ---- runtime cache ----
     this._t = Math.random() * 10;
     this._lastInRange = false;
-    this._worldPos = new THREE.Vector3(); // riuso per posizionare la luce
+    this._worldPos = new THREE.Vector3();
   }
 static warmLightPool(scene, size = 8) {
-  // forza la creazione del LightPool subito (non al primo spawn)
   ensureLightPool(scene, size);
 }
 
-  // === API per interactionManager ===
   getWorldPosition(out) { return out ? out.copy(this.root.position) : this.root.position; }
   canInteract() { return !this._dead; }
   getPrompt() {
@@ -155,26 +126,16 @@ static warmLightPool(scene, size = 8) {
 
     const payload = this.item?.getPickupPayload?.() ?? { id: this.item?.id, qty: 1 };
     try { this.onPicked && this.onPicked(payload, this.item); } catch {}
-
-    // nascondi subito
     this.root.visible = false;
     if (this.ring) this.ring.visible = false;
-
-    // rilascia luce al pool (NON cambia il numero di luci visibili)
     if (this._light && __sharedLightPool) {
       __sharedLightPool.release(this._light);
       this._light = null;
     }
-
-    // rimuovi dal scene-graph
     const p = this.root?.parent; if (p) p.remove(this.root);
   }
-
-  // === Update per frame ===
   update(dt, playerPos) {
     if (this._dead) return;
-
-    // --- animazione di materializzazione (scale-in sul MODEL, non sul ring) ---
     if (this._scaleInActive) {
       this._scaleInT += dt;
       const k = Math.min(this._scaleInT / this._scaleInDur, 1);
@@ -186,19 +147,15 @@ static warmLightPool(scene, size = 8) {
         this._scaleTarget.z * s
       );
       if (k >= 1) {
-        this.model.scale.copy(this._scaleTarget); // chiusura precisa
+        this.model.scale.copy(this._scaleTarget);
         this._scaleInActive = false;
       }
     }
-
-    // animazioni leggere
     this._t += dt;
     if (this._hover) {
       this.root.position.y = this._baseY + Math.sin(this._t * 2 * Math.PI * this._hoverFreq) * this._hoverAmp;
     }
     if (this._rotate) this.model.rotation.y += this._rotSpeed * dt;
-
-    // feedback + pickup
     if (!playerPos) return;
 
     const d2 = this.root.position.distanceToSquared(playerPos);
@@ -209,8 +166,6 @@ static warmLightPool(scene, size = 8) {
       if (this._light) this._light.intensity = inRange ? this._lightNear : this._lightFar;
       this._lastInRange = inRange;
     }
-
-    // posiziona la luce del pool sul pickup (in world space)
     if (this._light) {
       this.root.getWorldPosition(this._worldPos);
       this._light.position.set(this._worldPos.x, this._worldPos.y + 0.65, this._worldPos.z);
@@ -221,8 +176,6 @@ static warmLightPool(scene, size = 8) {
 
   setVisible(v) { this.root.visible = !!v; }
   get isDead() { return this._dead; }
-
-  // === risorse condivise ===
   static _icoGeo() {
     if (!WorldPickup.__icoGeo) WorldPickup.__icoGeo = new THREE.IcosahedronGeometry(0.18, 1);
     return WorldPickup.__icoGeo;

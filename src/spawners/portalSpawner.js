@@ -1,43 +1,19 @@
-// PortalSpawner.js — Minimal 3D single-portal spawner for Three.js
-// Usage:
-//   import { PortalSpawner } from './PortalSpawner.js';
-//   const spawner = new PortalSpawner(scene, camera); // aggiungi camera
-//   spawner.spawn({ position: new THREE.Vector3(10, 2, -5) });
-//   // in your game loop: spawner.update(deltaSeconds);
-//   // to remove: spawner.remove();
-
 import * as THREE from 'three';
 
 export class PortalSpawner {
-  /**
-   * @param {THREE.Scene} scene
-   * @param {THREE.Camera} camera - Necessaria per far guardare il portale verso il player
-   * @param {Function} [onPlayerEscape] - Callback chiamata quando il player tocca il portale
-   */
   constructor(scene, camera, onPlayerEscape = null) {
     this.scene = scene;
     this.camera = camera;
     this.onPlayerEscape = onPlayerEscape;
-    this.group = null;    // THREE.Group containing the portal
+    this.group = null;
     this._shaderMesh = null;
     this._ringMesh = null;
     this._light = null;
     this._time = 0;
-    this._radius = 10;   // memorizza il raggio per collision detection
+    this._radius = 10; 
     this._gameEnded = false;
     this._active = true; 
   }
-
-  /**
-   * Spawn (or replace) the single portal.
-   * @param {Object} opt
-   * @param {THREE.Vector3} [opt.position=new THREE.Vector3()]  World position
-   * @param {boolean} [opt.lookAtPlayer=true] Se true, il portale guarda sempre il player
-   * @param {number} [opt.radius=1.6]  Outer radius in meters
-   * @param {number} [opt.thickness=0.15] Ring thickness (outer - inner)
-   * @param {THREE.Color|number|string} [opt.color=0x8a2be2] Main color
-   * @param {number} [opt.emissive=2.0] Emissive intensity (visual glow)
-   */
   spawn(opt = {}) {
     const {
       position = new THREE.Vector3(),
@@ -47,15 +23,9 @@ export class PortalSpawner {
       color = 0x8a2be2,
       emissive = 2.0,
     } = opt;
-
-    // Remove previous portal if any
     this.remove();
-
-    // Group (for easy transform)
     this.group = new THREE.Group();
     this.group.position.copy(position);
-
-    // Simple ring frame (geometry-only, no post)
     const innerR = Math.max(0.01, radius - thickness);
     const ringGeo = new THREE.RingGeometry(innerR, radius, 96, 1);
     const ringMat = new THREE.MeshStandardMaterial({
@@ -67,8 +37,6 @@ export class PortalSpawner {
     });
     this._ringMesh = new THREE.Mesh(ringGeo, ringMat);
     this.group.add(this._ringMesh);
-
-    // Inner disk con geometria circolare invece di quadrata
     const circleGeo = new THREE.CircleGeometry(innerR, 64);
     const portalMat = new THREE.ShaderMaterial({
       transparent: true,
@@ -135,64 +103,36 @@ export class PortalSpawner {
     });
     this._shaderMesh = new THREE.Mesh(circleGeo, portalMat);
     this.group.add(this._shaderMesh);
-
-    // Subtle point light to sell the glow (optional, cheap)
     this._light = new THREE.PointLight(new THREE.Color(color), 0.8, radius * 6.0, 2.0);
-    this._light.position.set(0, 0, 0.05); // just in front of the disk
+    this._light.position.set(0, 0, 0.05);
     this.group.add(this._light);
-
-    // Orienta il portale verso il player se richiesto
     if (lookAtPlayer && this.camera) {
       this.group.lookAt(this.camera.position);
     }
-
-    // Add to scene
     this.scene.add(this.group);
   }
-
-  /**
-   * Advance the portal animation.
-   * Call once per frame with delta time in seconds.
-   * @param {number} dt
-   */
-// portalSpawner.js
-
-update(dt, playerPos = null) {
-  console.log(playerPos);
-  if (!this.group || !this._shaderMesh) return;
-  this._time += dt;
-
-  // animazioni
-  if (this._ringMesh) this._ringMesh.rotation.z += dt * 0.8;
-  if (this._light) this._light.intensity = 0.7 + Math.sin(this._time * 3.0) * 0.15;
-  this._shaderMesh.material.uniforms.u_time.value = this._time;
-
-  if (this.camera && this.group) {
-    this.group.lookAt(this.camera.position);
-  }
-
-  // ✅ rileva collisione player–portale
-  if (this._active && playerPos && !this._gameEnded ) {
-    const portalPos = new THREE.Vector3();
-    this.group.getWorldPosition(portalPos);
-    console.log("PORTAL POS",portalPos);
-
-    const dist = portalPos.distanceTo(playerPos);
-    if (dist <= this._radius) {
-      this._gameEnded = true;
-      this._active = false; 
-      console.log("[PortalSpawner] Player touched the portal!");
-
-      if (typeof this.onPlayerEscape === "function") {
-        this.onPlayerEscape();   // callback definita in main.js
+  update(dt, playerPos = null) {
+    if (!this.group || !this._shaderMesh) return;
+    this._time += dt;
+    if (this._ringMesh) this._ringMesh.rotation.z += dt * 0.8;
+    if (this._light) this._light.intensity = 0.7 + Math.sin(this._time * 3.0) * 0.15;
+    this._shaderMesh.material.uniforms.u_time.value = this._time;
+    if (this.camera && this.group) {
+      this.group.lookAt(this.camera.position);
+    }
+    if (this._active && playerPos && !this._gameEnded ) {
+      const portalPos = new THREE.Vector3();
+      this.group.getWorldPosition(portalPos);
+      const dist = portalPos.distanceTo(playerPos);
+      if (dist <= this._radius) {
+        this._gameEnded = true;
+        this._active = false; 
+        if (typeof this.onPlayerEscape === "function") {
+          this.onPlayerEscape();
+        }
       }
     }
   }
-}
-
-  /**
-   * Remove current portal from scene.
-   */
   remove() {
     if (!this.group) return;
     this.scene.remove(this.group);
@@ -212,9 +152,5 @@ update(dt, playerPos = null) {
     this._light = null;
     this._time = 0;
   }
-
-  /**
-   * @returns {THREE.Group|null} The portal group (read-only) or null
-   */
   get() { return this.group; }
 }

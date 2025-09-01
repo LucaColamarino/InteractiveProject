@@ -1,6 +1,4 @@
-// terrainShader.js
 import * as THREE from 'three';
-
 export function createTerrainMaterial(textureLoader) {
   function loadTexture(path) {
     const tex = textureLoader.load(path);
@@ -9,30 +7,24 @@ export function createTerrainMaterial(textureLoader) {
     tex.minFilter = THREE.LinearMipMapLinearFilter;
     return tex;
   }
-
   const baseMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     fog: true,
     side: THREE.FrontSide,
   });
-
   baseMaterial.onBeforeCompile = (shader) => {
-    // ==== VERTEX ====
     shader.vertexShader = shader.vertexShader.replace(
       '#include <common>',
       `#include <common>
        varying vec3 vWorldPosition;
        varying vec2 vUv;`
     );
-
     shader.vertexShader = shader.vertexShader.replace(
       '#include <uv_vertex>',
       `#include <uv_vertex>
        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
        vUv = uv;`
     );
-
-    // ==== FRAGMENT (uniforms & varyings) ====
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <common>',
       `#include <common>
@@ -79,7 +71,7 @@ export function createTerrainMaterial(textureLoader) {
       `
     );
 
-    // ==== FRAGMENT (color/ao/normal maps blend + TINT) ====
+    //(color/ao/normal maps blend)
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
       `
@@ -134,8 +126,6 @@ export function createTerrainMaterial(textureLoader) {
         blendedTangentNormal = normalize(grassBlend * gN + rockBlend * rN + snowBlend * sN);
       `
     );
-
-    // ==== FRAGMENT (inject blended normals using proper TBN) ====
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <normal_fragment_maps>',
       `
@@ -155,8 +145,6 @@ export function createTerrainMaterial(textureLoader) {
       normal = normalize( mix( Nview, nViewFromMaps, detailStrength ) );
       `
     );
-
-    // Uniforms
     shader.uniforms.grassColor = { value: loadTexture('/textures/terrain/grass_color.jpg') };
     shader.uniforms.rockColor  = { value: loadTexture('/textures/terrain/rock_color.jpg') };
     shader.uniforms.snowColor  = { value: loadTexture('/textures/terrain/snow_color.jpg') };
@@ -175,6 +163,5 @@ export function createTerrainMaterial(textureLoader) {
 
     baseMaterial.userData.shaderRef = shader;
   };
-
   return baseMaterial;
 }

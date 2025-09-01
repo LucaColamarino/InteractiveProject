@@ -1,4 +1,3 @@
-// src/managers/PickableManager.js
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { WorldPickup } from '../objects/worldPickup.js';
@@ -14,10 +13,10 @@ function _hasSkinnedMesh(root) {
 export class PickableManager {
   constructor({
     scene,
-    inventory = null,     // se passato, aggiunge automaticamente all'inventario
-    onPickup = null,      // callback(payload, item)
-    enableLight = true,   // allineato a WorldPickup
-    lightPoolSize = 8, 
+    inventory = null,
+    onPickup = null,
+    enableLight = true,
+    lightPoolSize = 8,
   } = {}) {
     this.scene = scene;
     this.inventory = inventory;
@@ -27,13 +26,11 @@ export class PickableManager {
     this.loader = new FBXLoader();
     this.itemsInWorld = [];
     this.lightPoolSize = lightPoolSize;
-    // ---- cache prefab per evitare reload/parse ad ogni spawn ----
-    this.modelCache = new Map();   // path -> prefab normalizzato pronto da clonare
-    this._didFirstSpawn = false;   // se vuoi applicare deferral solo al primo spawn
+    this.modelCache = new Map();
+    this._didFirstSpawn = false;
     try { WorldPickup.warmLightPool?.(this.scene, this.lightPoolSize); } catch {}
   }
 
-  // Carica un FBX, lo normalizza UNA volta, e mette in cache un "prefab" pronto.
   async _loadModel(path) {
     if (this.modelCache.has(path)) {
       const prefab = this.modelCache.get(path);
@@ -42,7 +39,6 @@ export class PickableManager {
 
     const raw = await this.loader.loadAsync(path);
 
-    // setup base (shadow, emissive "safe")
     raw.traverse(o => {
       if (o.isMesh) {
         o.castShadow = true;
@@ -51,7 +47,6 @@ export class PickableManager {
       }
     });
 
-    // normalizza scala a un'altezza target (~0.9m) e appoggia a y=0
     const box = new THREE.Box3().setFromObject(raw);
     const size = new THREE.Vector3(); box.getSize(size);
     const targetHeight = 0.9;
@@ -62,35 +57,20 @@ export class PickableManager {
     const box2 = new THREE.Box3().setFromObject(raw);
     raw.position.y -= box2.min.y;
 
-    // "fissa" i world matrices per clonazioni pulite
     raw.updateMatrixWorld(true);
 
-    // se il modello è skinnato, fai un clone profondo come prefab (per sicurezza)
     const prefab = _hasSkinnedMesh(raw) ? raw.clone(true) : raw;
-
-    // metti in cache il prefab
     this.modelCache.set(path, prefab);
-
-    // ritorna una copia per l'istanza corrente
     return prefab.clone(true);
   }
 
-  // Precarica una lista di item o di path per eliminare hitch al primo spawn
   async prewarm(itemsOrPaths = []) {
     const paths = itemsOrPaths.map(x => typeof x === 'string' ? x : x?.modelPath).filter(Boolean);
     const unique = [...new Set(paths)];
     await Promise.all(unique.map(p => this._loadModel(p).catch(() => {})));
-
     try { WorldPickup.warmLightPool?.(this.scene, this.lightPoolSize); } catch {}
   }
 
-  /**
-   * Spawna un GameItem nel mondo come pickup e lo registra all'interactionManager.
-   * @param {GameItem} item
-   * @param {THREE.Vector3} position
-   * @param {Object} opts { autoPickup, pickupRadius, enableLight, hover, rotate, enableRing, ... }
-   * @returns {Promise<WorldPickup>}
-   */
   spawnItem(item, position, opts = {}) {
     const {
       autoPickup = false,
@@ -104,7 +84,7 @@ export class PickableManager {
     return new Promise((resolve) => {
       const doSpawn = async () => {
         const pos = position.clone();
-        pos.y += 0.6; // piccolo lift per evitare compenetrazioni con il terreno
+        pos.y += 0.6;
 
         const model = await this._loadModel(item.modelPath);
 
@@ -120,14 +100,12 @@ export class PickableManager {
           rotate,
           enableRing,
           onPicked: (payload, gameItem) => {
-            // invio a inventario + callback utente
-            try { this.inventory?.addItem && this.inventory.addItem(payload);gameItem.specialPickup?.(); } catch {}
+            try { this.inventory?.addItem?.(payload); gameItem.specialPickup?.(); } catch {}
             try { typeof this.onPickup === 'function' && this.onPickup(payload, gameItem); } catch {}
             hudManager.showNotification?.(`+ ${gameItem?.label ?? gameItem?.id ?? 'Item'}`);
           }
         });
 
-        // Registrazione interazione "E"
         const interactable = {
           getWorldPosition: out => pickup.getWorldPosition(out),
           canInteract: () => pickup.canInteract(),
@@ -139,7 +117,6 @@ export class PickableManager {
         };
         interactionManager.register(interactable);
 
-        // cleanup automatico quando il pickup "muore"
         const removeOnDead = () => {
           if (pickup.isDead) {
             const idx = this.itemsInWorld.indexOf(pickup);
@@ -154,16 +131,10 @@ export class PickableManager {
         resolve(pickup);
       };
 
-      // Deferral: sposta la creazione al prossimo frame per evitare hitch nel frame del trigger
       requestAnimationFrame(doSpawn);
-
-      // Se preferisci solo al primo spawn:
-      // if (!this._didFirstSpawn) { this._didFirstSpawn = true; requestAnimationFrame(doSpawn); }
-      // else { doSpawn(); }
     });
   }
 
-  /** Da chiamare nel game loop */
   update(dt, playerPosition) {
     for (const p of this.itemsInWorld) {
       p.update(dt, playerPosition);
@@ -171,7 +142,6 @@ export class PickableManager {
     }
   }
 
-  /** Utility per spawnare molti oggetti */
   async spawnMany(items, positions, perItemOptions = {}) {
     const res = [];
     for (let i = 0; i < items.length; i++) {
@@ -183,7 +153,6 @@ export class PickableManager {
     return res;
   }
 
-  /** Pulisce tutto (cambio scena, ecc.) */
   dispose() {
     for (const p of this.itemsInWorld) p.dispose();
     this.itemsInWorld.length = 0;

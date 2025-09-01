@@ -10,15 +10,14 @@ import { setFireShadowBudget } from './particles/FireParticleSystem.js';
 import { InventorySystem } from './systems/inventorySystem.js';
 import { MainMenu } from './ui/mainMenu.js';
 import { StartMenu } from './ui/startMenu.js';
-import { createGameManager, gameManager } from './managers/gameManager.js';
+import {gameManager } from './managers/gameManager.js';
 import { updateLoadingProgress, hideLoadingScreen, showLoadingScreen, suspendLoadingScreen } from './loading.js';
 import { PickableManager } from './managers/pickableManager.js';
 import { camera, scene } from './scene.js';
-import { allItems, dragonheart } from './utils/items.js';
 import { preloadAllEntities } from './utils/entityFactory.js';
 import { abilitiesByForm, spawnPlayer } from './player/Player.js';
 import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";
-import { ironShield, ironSword,magicWand,ironHelmet } from './utils/items.js';
+import { ironShield, ironSword,magicWand,ironHelmet,allItems} from './utils/items.js';
 import { updateVitalsHUD } from './ui/hudVitals.js';
 import { setNoGoLevel } from './systems/GroundSystem.js';
 import { spawnarchersStone } from './objects/archerStone.js';
@@ -26,23 +25,20 @@ import { spawnWolfStone } from './objects/wolfStone.js';
 import {HitFeedbackSystem} from "./systems/HitFeedbackSystem.js";
 import { waterHeight } from './utils/entities.js';
 import * as THREE from 'three';
-// ⬇️ importa anche applyPendingSave per applicare Stats+Inventory dopo l’init dei sistemi
 import { loadGame, saveGame, applyPendingSave } from './managers/saveManager.js';
 import { createBridge } from './objects/bridge.js';
 import { deathScreen } from './ui/deathScreen.js';
-import { initFireBreathTest, updateFireBreathTest } from './testFireBreath.js';
 import { PortalSpawner } from './spawners/portalSpawner.js';
 import { victoryScreen } from './ui/victoryScreen.js';
 import { bossHealth } from './ui/bossHealth.js';
+import { spawnManaTreeAt } from './objects/manaTree.js';
 const settings = (window.__gameSettings = {
   quality: 'medium',
   shadows: true,
   resScale: 1.0,
   volume: 0.7,
 });
-
 let _initializing = false;
-
 function applyMenuSettings(s) {
   Object.assign(settings, s);
   setFireShadowBudget(settings.shadows ? 3 : 0);
@@ -53,21 +49,16 @@ window.addEventListener("DOMContentLoaded", () => {
   loadHudMap();
   loadHudPills();
 });
-
 async function init() {
   if (_initializing) return;
   _initializing = true;
   try {
-    // === INVENTORY: crea se manca, mantieni se esiste ===
     if(!gameManager.inventory){
       console.log("CREATING NEW INVENTORY SYSTEM");
       const inventory = new InventorySystem();
-      window.inventory = inventory;
       gameManager.inventory = inventory;
     }
     const inventory = gameManager.inventory;
-
-    // === PICKABLES manager ===
     gameManager.pickableManager = new PickableManager({
       scene,
       inventory,
@@ -76,45 +67,41 @@ async function init() {
       interactKey: 'KeyE',
     });
     gameManager.pickableManager.prewarm(allItems);
-
-    console.log('[Main] Inizializzazione del gioco...');
     updateLoadingProgress(5, 'Settings configuration...');
     applyMenuSettings(settings);
     await wait(80);
-
     updateLoadingProgress(15, 'Loading assets and resources...');
     await preloadAllEntities(Object.keys(abilitiesByForm));
-
     updateLoadingProgress(25, 'Controls configuration...');
     setupInput();
     await wait(80);
-
     updateLoadingProgress(45, 'Terrain Generation...');
     await createHeightmapTerrain();
-
     updateLoadingProgress(55, 'Creating sky and water...');
     createSky();
     const waterY = waterHeight;
     addWaterPlane(waterY);
     setNoGoLevel(waterY, 0.06);
     await wait(120);
-
     updateLoadingProgress(70, 'Populate vegetation...');
     await populateVegetation();
-
     updateLoadingProgress(80, 'Spawn enemies...');
     spawnEnemies();
     await wait(80);
-   // initFireBreathTest();
     updateLoadingProgress(90, 'Placing objects...');
     spawnCampfireAt(-60, 65);
     spawnChestAt(-65, 60, ironSword);
     spawnChestAt(-65, 70, magicWand);
     spawnChestAt(-55, 60, ironShield);
     spawnChestAt(-55, 70, ironHelmet);
+    spawnManaTreeAt(-70, 75, {
+      scale: 0.005,
+      maxEssence: 180, regenPerSec: 5, drainPerSec: 28, emptyCooldown: 25,
+      minInteractDist: 3.0,
+    });
     await spawnarchersStone({x:-55,z:90});
     await spawnWolfStone({x:-65,z:40});
-    const spawner = new PortalSpawner(scene, camera, () => {
+    const portalSpawner = new PortalSpawner(scene, camera, () => {
        console.log("Player escaped through portal!");
       // Pausa + mostra schermata di vittoria in stile soulslike
       victoryScreen.show({
@@ -134,9 +121,9 @@ async function init() {
         window.location.href = '/';
       }
     });
-    gameManager.spawner = spawner;
+    gameManager.spawner = portalSpawner;
     // spawn un portale di colore "fire" a (0,30,0)
-    spawner.spawn({
+    portalSpawner.spawn({
       position: new THREE.Vector3(-57, 50, 62),
       color: 0xff4500,   // colore principale → fuoco
       radius: 6.0        // grandezza opzionale
@@ -150,7 +137,6 @@ async function init() {
                 rotationY: 10,
                 uvTile: 2,  // aumenta/riduci tiling
               });
-
     updateLoadingProgress(95, 'Player initialization...');
     if (!gameManager.controller) {
       console.log("CREATING NEW CONTROLLER");
@@ -180,33 +166,21 @@ async function init() {
         window.location.href = '/';
       }
     });
-
-    // ⬇️ APPlica qui lo snapshot (StatsSystem + Inventory) ora che controller & inventory esistono
     applyPendingSave();
-
-    // === Sincronizzazioni post-load ===
     updateVitalsHUD(gameManager.controller.stats);
     gameManager.inventory.updateEquipmentVisibility();
     gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
-
-    // Se cambi l’inventario a runtime, riallinea arma/equip controller
     gameManager.inventory.onChange(() => {
       gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
     });
-
     await wait(80);
-
     updateLoadingProgress(100, 'Finalizing...');
     await wait(60);
-
     hideLoadingScreen();
     bossHealth.init();
-    // Stato gioco
     gameManager.running = true;
     gameManager.paused  = false;
     startLoop(gameManager.controller);
-
-    // Crea il PAUSE MENU se manca
     if (!gameManager.menu) {
       gameManager.menu = new MainMenu({
         mode: 'pause',
@@ -227,18 +201,14 @@ async function init() {
       });
       gameManager.menu.show(false);
     }
-
-    window.dispatchEvent(new Event('game:started'));
-    console.log('[Main] Gioco inizializzato con successo!');
   } catch (err) {
-    console.error('[Main] Errore durante inizializzazione:', err);
+    console.error('[Main] Error during initialization:', err);
     hideLoadingScreen();
     showFatal(err?.message || 'Errore sconosciuto');
   } finally {
     _initializing = false;
   }
 }
-
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 function showFatal(msg) {
   const errorDiv = document.createElement('div');
@@ -255,13 +225,6 @@ function showFatal(msg) {
     </button>`;
   document.body.appendChild(errorDiv);
 }
-function showCustomEscapeScreen() {
-  // Il tuo codice per mostrare schermata di vittoria
-  // Fermare musica, mostrare statistiche, etc.
-}
-// =====================
-// UI CONTROLLER
-// =====================
 const ui = {
   startMenu: null,
   ensureStartMenu() {
@@ -295,32 +258,5 @@ const ui = {
   },
   hideStartMenu() { this.startMenu?.show(false); },
 };
-
-// Avvio: mostra SOLO lo start menu
 ui.showStartMenu();
 suspendLoadingScreen?.();
-
-// Torna allo start menu quando ricevi 'game:quit'
-window.addEventListener('game:quit', () => {
-  gameManager.running = false;
-  gameManager.paused = false;
-  ui.showStartMenu();
-});
-
-// Debug
-if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-  window.__gameDebug = {
-    showStartMenu: () => ui.showStartMenu(),
-    hideStartMenu: () => ui.hideStartMenu(),
-    showPauseMenu: () => gameManager.menu?.openPause(),
-    hidePauseMenu: () => gameManager.menu?.show(false),
-    getSettings: () => ({ ...settings }),
-    restartGame: () => { gameManager.running = false; gameManager.paused = false; init(); }
-  };
-  console.log('[Main] Debug functions available at window.__gameDebug');
-}
-
-// Errori globali
-window.addEventListener('error', (e) => { console.error('[Main] Global error:', e.error); hideLoadingScreen(); });
-
-console.log('[Main] Sistema principale caricato, StartMenu pronto…');

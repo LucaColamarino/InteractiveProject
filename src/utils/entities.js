@@ -58,7 +58,6 @@ export const ENTITY_CONFIG = {
         diffuse: '/textures/archer/bow_diffuse.jpg',
         normal:  '/textures/archer/bow_normal.jpg'
       },
-      // unica definizione "arrow" (nessun duplicato)
       arrow: {
         diffuse:    '/textures/archer/arrow_diffuse.png',
         normal:     '/textures/archer/arrow_normal.jpg',

@@ -11,11 +11,10 @@ export class SmallRockSpawner {
       normalMap: '/textures/smallrock/smallrocksNormal.png',
       roughnessMap: '/textures/smallrock/smallrocksRoughness.png'
     },
-    rotationoffset= 0,
+    rotationoffset = 0,
     yoffset = -0.1,
-    baseScale = 0.008, // scala base della roccia
+    baseScale = 0.008,
     randomScaleRange = [0.2, 0.6],
-    alphaTest = 0.5,                  // (non usato qui, ma lo lascio se vorrai aggiungere cutout)
     anisotropy = 8,
     castShadow = true,
     receiveShadow = true,
@@ -28,15 +27,14 @@ export class SmallRockSpawner {
     cellSize = 120,
     updateThrottleMs = 16,
     useSpatialHashing = true,
-    enableOcclusion = false,          // placeholder
     maxVisibleInstances = 5000,
     shadowLODSettings = {
-      castShadow: ['L1'],             // solo L1 proietta ombre
-      receiveShadow: ['L1', 'L2']     // L1 e L2 ricevono ombre
+      castShadow: ['L1'],
+      receiveShadow: ['L1', 'L2']
     },
   } = {}) {
-    if (!scene) throw new Error('SmallRockSpawner: "scene" è richiesto.');
-    if (!getTerrainHeightAt) throw new Error('SmallRockSpawner: "getTerrainHeightAt" è richiesto.');
+    if (!scene) throw new Error('SmallRockSpawner: scene required');
+    if (!getTerrainHeightAt) throw new Error('SmallRockSpawner: getTerrainHeightAt required');
 
     this.scene = scene;
     this.getTerrainHeightAt = getTerrainHeightAt;
@@ -53,10 +51,9 @@ export class SmallRockSpawner {
     this.cellSize = cellSize;
     this.updateThrottleMs = updateThrottleMs;
     this.useSpatialHashing = useSpatialHashing;
-    this.enableOcclusion = enableOcclusion;
     this.maxVisibleInstances = maxVisibleInstances;
     this.shadowLODSettings = shadowLODSettings;
-    this.anisotropy = anisotropy;     // <— PRIMA mancava, serviva per _loadTex
+    this.anisotropy = anisotropy;
 
     this.loader = new FBXLoader();
     this.textureLoader = new THREE.TextureLoader();
@@ -65,14 +62,8 @@ export class SmallRockSpawner {
     this._geometryPool = new Map();
     this._spatialGrid = new Map();
 
-    this._stats = {
-      visibleInstances: 0,
-      culledInstances: 0,
-      lodSwitches: 0,
-      lastUpdateTime: 0
-    };
+    this._stats = { visibleInstances: 0, culledInstances: 0, lodSwitches: 0, lastUpdateTime: 0 };
 
-    // Materiale unico per la roccia
     const rockTex = this._loadTexSet(textures, anisotropy);
     this.stoneMaterial = new THREE.MeshStandardMaterial({
       map: rockTex.map || null,
@@ -88,7 +79,6 @@ export class SmallRockSpawner {
     this._castShadow = castShadow;
     this._receiveShadow = receiveShadow;
 
-    // temp objects
     this._pos = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
     this._tmp2 = new THREE.Vector3();
@@ -102,19 +92,10 @@ export class SmallRockSpawner {
     this._matrix = new THREE.Matrix4();
     this._box3Temp = new THREE.Box3();
 
-    // DEBUG
-    this._debug = {
-      enabled: false,
-      helpers: [],
-      showStats: false,
-      showSpatialGrid: false
-    };
-
     this._lastLODUpdate = 0;
     this._pendingLODUpdate = false;
   }
 
-  // === utilities ===
   _loadTex(path) {
     if (!path) return null;
     const t = this.textureLoader.load(path);
@@ -147,7 +128,6 @@ export class SmallRockSpawner {
     return `${Math.floor(x / gridSize)},${Math.floor(z / gridSize)}`;
   }
 
-  // === geometry extraction / loading ===
   _extractGroupGeometry(srcGeom, group) {
     const poolKey = `${srcGeom.uuid}_${group.start}_${group.count}_${group.materialIndex}`;
     if (this.useGeometryPooling && this._geometryPool.has(poolKey)) {
@@ -155,8 +135,6 @@ export class SmallRockSpawner {
     }
 
     const geom = new THREE.BufferGeometry();
-
-    // Copia attributi base
     const essentialAttribs = ['position', 'normal', 'uv'];
     for (const name of essentialAttribs) {
       if (srcGeom.attributes[name]) {
@@ -164,7 +142,6 @@ export class SmallRockSpawner {
       }
     }
 
-    // Indici del sotto-intervallo
     const index = srcGeom.getIndex();
     if (index) {
       const sub = index.array.slice(group.start, group.start + group.count);
@@ -180,9 +157,7 @@ export class SmallRockSpawner {
     geom.computeBoundingSphere();
     geom.computeVertexNormals();
 
-    if (this.useGeometryPooling) {
-      this._geometryPool.set(poolKey, geom.clone());
-    }
+    if (this.useGeometryPooling) this._geometryPool.set(poolKey, geom.clone());
     return geom;
   }
 
@@ -198,9 +173,7 @@ export class SmallRockSpawner {
 
     const meshes = [];
     fbx.traverse(child => {
-      if ((child.isMesh || child.isSkinnedMesh) && child.geometry) {
-        meshes.push(child);
-      }
+      if ((child.isMesh || child.isSkinnedMesh) && child.geometry) meshes.push(child);
     });
 
     for (const child of meshes) {
@@ -229,7 +202,6 @@ export class SmallRockSpawner {
     return rockGeom;
   }
 
-  // === spawn ===
   async spawn(modelPath, count, area, opts = {}) {
     const rockGeom = await this._getMergedGeometries(modelPath);
     const hasGeom = !!(rockGeom && rockGeom.attributes?.position);
@@ -290,11 +262,9 @@ export class SmallRockSpawner {
       mesh.count = mats.length;
       for (let i = 0; i < mats.length; i++) mesh.setMatrixAt(i, mats[i]);
       mesh.instanceMatrix.needsUpdate = true;
-
       mesh.castShadow = this._castShadow;
       mesh.receiveShadow = this._receiveShadow;
       mesh.frustumCulled = this.frustumCulling;
-
       if (mesh.material) {
         mesh.material.transparent = mesh.material.transparent || false;
         mesh.material.needsUpdate = true;
@@ -304,18 +274,12 @@ export class SmallRockSpawner {
     applyMatrices(rockIMesh, matrices);
     this.scene.add(rockIMesh);
 
-    // bounding del batch
     const box = new THREE.Box3().makeEmpty();
-    for (const m of matrices) {
-      box.expandByPoint(this._tmp.setFromMatrixPosition(m));
-    }
+    for (const m of matrices) box.expandByPoint(this._tmp.setFromMatrixPosition(m));
     const avgScale = this.baseScale * (this.randomScaleRange[0] + this.randomScaleRange[1]) / 2;
     box.expandByScalar(avgScale * 10);
-
     const center = new THREE.Vector3();
     box.getCenter(center);
-
-    const debugHelpers = this._createDebugHelpers(box, center);
 
     const createLODLevel = (mats, targetReduction) => {
       if (mats.length <= 4) return mats;
@@ -345,73 +309,18 @@ export class SmallRockSpawner {
       _prevLod: 'L1',
       visible: true,
       lastDistance: Infinity,
-      debug: debugHelpers,
       stats: { switches: 0, lastSwitch: 0 }
     });
-
-    if (this._debug.enabled) {
-      console.log('Batch created with LOD levels:', {
-        L1: lodMatrices.L1.length,
-        L2: lodMatrices.L2.length,
-        L3: lodMatrices.L3.length,
-        L4: lodMatrices.L4.length
-      });
-    }
   }
 
-  _createDebugHelpers(box, center) {
-    if (!this._debug.enabled) return null;
-
-    const baseHelper = new THREE.Box3Helper(box, 0x00ffff);
-    baseHelper.visible = false;
-    this.scene.add(baseHelper);
-    this._debug.helpers.push(baseHelper);
-
-    const shells = [];
-    const colors = [0x00ff00, 0xffff00, 0xff8800, 0xff0000];
-
-    for (let i = 0; i < this.lodDistances.length; i++) {
-      const shell = box.clone();
-      shell.expandByScalar(this.lodDistances[i]);
-      const helper = new THREE.Box3Helper(shell, colors[i]);
-      helper.visible = false;
-      this.scene.add(helper);
-      shells.push({ box: shell, helper });
-      this._debug.helpers.push(helper);
-    }
-
-    const closestGeom = new THREE.SphereGeometry(1.2, 8, 8);
-    const closestMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const closestMesh = new THREE.Mesh(closestGeom, closestMat);
-    closestMesh.visible = false;
-    this.scene.add(closestMesh);
-    this._debug.helpers.push(closestMesh);
-
-    const lineGeom = new THREE.BufferGeometry().setFromPoints([center, center]);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff });
-    const line = new THREE.Line(lineGeom, lineMat);
-    line.visible = false;
-    this.scene.add(line);
-    this._debug.helpers.push(line);
-
-    return { baseHelper, shells, closestMesh, line };
-  }
-
-  // === LOD ===
   updateLOD(camera) {
-    if (!this.enableLOD || !camera || !this._batches || this._batches.length === 0) {
-      return;
-    }
+    if (!this.enableLOD || !camera || !this._batches || this._batches.length === 0) return;
 
     const now = performance.now();
-    if (!this._debug.enabled && now - this._lastLODUpdate < this.updateThrottleMs) {
-      return;
-    }
+    if (now - this._lastLODUpdate < this.updateThrottleMs) return;
     this._lastLODUpdate = now;
 
     camera.getWorldPosition(this._camWorld);
-
-    // calcolo movimento camera (una sola volta!)
     const cameraMoved = this._camWorld.distanceTo(this._camPrevWorld) > 1.0;
     this._camPrevWorld.copy(this._camWorld);
 
@@ -453,14 +362,8 @@ export class SmallRockSpawner {
         this._stats.lodSwitches++;
       }
 
-      if (batch.visible) {
-        totalVisible += this._getBatchInstanceCount(batch);
-      }
-      if (totalVisible > this.maxVisibleInstances) {
-        this._setBatchVisibility(batch, false);
-      }
-
-      this._updateDebugHelpers(batch, distance);
+      if (batch.visible) totalVisible += this._getBatchInstanceCount(batch);
+      if (totalVisible > this.maxVisibleInstances) this._setBatchVisibility(batch, false);
     }
 
     this._stats.visibleInstances = totalVisible;
@@ -476,25 +379,21 @@ export class SmallRockSpawner {
         if (distance > L2) return 'L3';
         if (distance > L1) return 'L2';
         return 'L1';
-
       case 'L2':
         if (distance > L4) return 'OFF';
         if (distance > L3) return 'L4';
         if (distance > L2 + hysteresis) return 'L3';
         if (distance < L1 - hysteresis) return 'L1';
         return 'L2';
-
       case 'L3':
         if (distance > L4) return 'OFF';
         if (distance > L3 + hysteresis) return 'L4';
         if (distance < L2 - hysteresis) return distance < L1 - hysteresis ? 'L1' : 'L2';
         return 'L3';
-
       case 'L4':
         if (distance > L4 + hysteresis) return 'OFF';
         if (distance < L3 - hysteresis) return distance < L2 - hysteresis ? (distance < L1 - hysteresis ? 'L1' : 'L2') : 'L3';
         return 'L4';
-
       case 'OFF':
         if (distance < L4 - hysteresis) return 'L4';
         if (distance < L3 - hysteresis) return 'L3';
@@ -513,7 +412,6 @@ export class SmallRockSpawner {
     batch.stats.lastSwitch = performance.now();
 
     const isVisible = newLod !== 'OFF';
-
     if (isVisible) {
       this._setBatchVisibility(batch, true);
       const matrices = batch.matrices[newLod] || batch.matrices.L1;
@@ -543,66 +441,13 @@ export class SmallRockSpawner {
     if (!mesh || !matrices) return;
     mesh.count = matrices.length;
     const identity = new THREE.Matrix4();
-    for (let i = 0; i < matrices.length; i++) {
-      mesh.setMatrixAt(i, matrices[i] || identity);
-    }
+    for (let i = 0; i < matrices.length; i++) mesh.setMatrixAt(i, matrices[i] || identity);
     mesh.instanceMatrix.needsUpdate = true;
   }
 
   _getBatchInstanceCount(batch) {
     const lodKey = batch._lod === 'OFF' ? 'L1' : batch._lod;
     return batch.matrices[lodKey]?.length || 0;
-  }
-
-  _updateDebugHelpers(batch, distance) {
-    if (!this._debug.enabled || !batch.debug) return;
-
-    batch.box.clampPoint(this._camWorld, this._closest);
-    batch.debug.closestMesh.position.copy(this._closest);
-
-    const points = [this._camWorld.clone(), this._closest.clone()];
-    batch.debug.line.geometry.setFromPoints(points);
-
-    const visible = this._debug.enabled;
-    batch.debug.baseHelper.visible = visible;
-    batch.debug.closestMesh.visible = visible;
-    batch.debug.line.visible = visible;
-
-    for (const shell of batch.debug.shells) {
-      shell.helper.visible = visible;
-    }
-  }
-
-  // === debug api ===
-  setDebugLOD(enabled) {
-    this._debug.enabled = !!enabled;
-    console.log(`SmallRockSpawner debug ${enabled ? 'enabled' : 'disabled'}`);
-    for (const batch of this._batches) {
-      if (!batch.debug) continue;
-      batch.debug.baseHelper.visible = this._debug.enabled;
-      batch.debug.closestMesh.visible = this._debug.enabled;
-      batch.debug.line.visible = this._debug.enabled;
-      for (const shell of batch.debug.shells) shell.helper.visible = this._debug.enabled;
-    }
-  }
-
-  debugLODInfo(camera) {
-    if (!camera || this._batches.length === 0) return;
-    camera.getWorldPosition(this._camWorld);
-    console.group('LOD Debug Info');
-    console.log(`Camera position: ${this._camWorld.x.toFixed(1)}, ${this._camWorld.y.toFixed(1)}, ${this._camWorld.z.toFixed(1)}`);
-    console.log(`Total batches: ${this._batches.length}`);
-    console.log(`LOD distances: [${this.lodDistances.join(', ')}]`);
-    console.log(`Hysteresis: ${this.lodHysteresis}`);
-    let visibleCount = 0;
-    for (let i = 0; i < Math.min(5, this._batches.length); i++) {
-      const batch = this._batches[i];
-      const distance = batch.box.distanceToPoint(this._camWorld);
-      console.log(`Batch ${i}: LOD=${batch._lod}, distance=${distance.toFixed(1)}, visible=${batch.visible}, instances=${this._getBatchInstanceCount(batch)}`);
-      if (batch.visible) visibleCount++;
-    }
-    console.log(`Visible batches: ${visibleCount}/${this._batches.length}`);
-    console.groupEnd();
   }
 
   getStats() {
@@ -630,24 +475,10 @@ export class SmallRockSpawner {
   clear() {
     for (const batch of this._batches) {
       if (batch.rockIMesh?.parent) batch.rockIMesh.parent.remove(batch.rockIMesh);
-
-      if (batch.debug) {
-        batch.debug.baseHelper?.parent?.remove(batch.debug.baseHelper);
-        batch.debug.closestMesh?.parent?.remove(batch.debug.closestMesh);
-        batch.debug.line?.parent?.remove(batch.debug.line);
-        for (const shell of batch.debug.shells || []) {
-          shell.helper?.parent?.remove(shell.helper);
-        }
-      }
-
-      if (!this.useGeometryPooling) {
-        batch.rockIMesh?.geometry?.dispose();
-      }
+      if (!this.useGeometryPooling) batch.rockIMesh?.geometry?.dispose();
     }
-
     this._batches.length = 0;
     this._spatialGrid.clear();
-
     this._stats.visibleInstances = 0;
     this._stats.culledInstances = 0;
     this._stats.lodSwitches = 0;
@@ -655,7 +486,6 @@ export class SmallRockSpawner {
 
   dispose() {
     this.clear();
-
     const disposeMaterial = (mat) => {
       if (!mat) return;
       ['map', 'normalMap', 'alphaMap', 'roughnessMap'].forEach(prop => {
@@ -666,38 +496,21 @@ export class SmallRockSpawner {
       });
       mat.dispose();
     };
-
     disposeMaterial(this.stoneMaterial);
-
-    for (const geom of this._geometryPool.values()) {
-      geom.dispose();
-    }
+    for (const geom of this._geometryPool.values()) geom.dispose();
     this._geometryPool.clear();
-
     this._modelCache.clear();
-
-    for (const helper of this._debug.helpers) {
-      if (helper.parent) helper.parent.remove(helper);
-      if (helper.geometry) helper.geometry.dispose();
-      if (helper.material) helper.material.dispose();
-    }
-    this._debug.helpers.length = 0;
-
     this._spatialGrid.clear();
   }
 
-  // === spatial LOD (opzionale) ===
   updateLODSpatial(camera, radius = 500) {
     if (!this.enableLOD || !camera || !this.useSpatialHashing || !this._batches.length) {
       return this.updateLOD(camera);
     }
-
     camera.getWorldPosition(this._camWorld);
     const spatialKey = this._getSpatialKey(this._camWorld.x, this._camWorld.z);
-
     const nearbyKeys = this._getNearbyKeys(spatialKey, radius);
     const nearbyBatches = [];
-
     for (const key of nearbyKeys) {
       if (this._spatialGrid.has(key)) {
         for (const batch of this._batches) {
@@ -706,7 +519,6 @@ export class SmallRockSpawner {
         }
       }
     }
-
     const batchesToUpdate = nearbyBatches.length > 0 ? nearbyBatches : this._batches;
     this._updateLODForBatches(batchesToUpdate, camera);
   }
@@ -728,7 +540,6 @@ export class SmallRockSpawner {
     camera.getWorldPosition(this._camWorld);
     const [L1, L2, L3, L4] = this.lodDistances;
     const H = this.lodHysteresis;
-
     for (const batch of batches) {
       const distance = batch.box.distanceToPoint(this._camWorld);
       const newLod = this._calculateLOD(batch._lod, distance, L1, L2, L3, L4, H);
@@ -736,7 +547,6 @@ export class SmallRockSpawner {
         this._switchLOD(batch, newLod);
         this._stats.lodSwitches++;
       }
-      this._updateDebugHelpers(batch, distance);
     }
   }
 
@@ -773,43 +583,24 @@ export class SmallRockSpawner {
       if (group.length > 1) groups.push(group);
     }
 
-    for (const group of groups) {
-      this._combineBatches(group);
-    }
+    for (const group of groups) this._combineBatches(group);
   }
 
   _combineBatches(batches) {
     if (batches.length < 2) return;
-
     const allMatrices = [];
     let combinedBox = new THREE.Box3().makeEmpty();
-
     for (const batch of batches) {
       allMatrices.push(...(batch.matrices.L1 || []));
       combinedBox.union(batch.box);
-
       const index = this._batches.indexOf(batch);
       if (index !== -1) this._batches.splice(index, 1);
-
       if (batch.rockIMesh?.parent) batch.rockIMesh.parent.remove(batch.rockIMesh);
     }
-
     if (allMatrices.length > 0) {
       const first = batches[0];
       this._createBatch(allMatrices, first.rockIMesh?.geometry);
     }
-  }
-
-  logPerformanceStats() {
-    const stats = this.getStats();
-    console.group('SmallRockSpawner Performance Stats');
-    console.log('Istanze visibili:', stats.visibleInstances);
-    console.log('Istanze cullate:', stats.culledInstances);
-    console.log('Switch LOD:', stats.lodSwitches);
-    console.log('Batch totali:', stats.totalBatches);
-    console.log('Geometrie in pool:', stats.geometriesPooled);
-    console.log('Modelli caricati:', stats.modelsLoaded);
-    console.groupEnd();
   }
 
   adaptiveQuality(targetFPS = 60) {
@@ -817,11 +608,9 @@ export class SmallRockSpawner {
     if (currentFPS < targetFPS * 0.8) {
       this.lodDistances = this.lodDistances.map(d => d * 0.9);
       this.maxInstancesPerBatch = Math.max(500, Math.floor(this.maxInstancesPerBatch * 0.9));
-      console.log('Qualità ridotta per migliorare performance');
     } else if (currentFPS > targetFPS * 1.1) {
       this.lodDistances = this.lodDistances.map(d => d * 1.05);
       this.maxInstancesPerBatch = Math.min(2000, Math.ceil(this.maxInstancesPerBatch * 1.05));
-      console.log('Qualità aumentata');
     }
   }
 
@@ -835,19 +624,6 @@ export class SmallRockSpawner {
     }
     this._lastFrameTime = now;
     return 60;
-  }
-
-  async preloadModels(modelPaths) {
-    const promises = [];
-    for (const modelPath of modelPaths) {
-      promises.push(this._getMergedGeometries(modelPath));
-    }
-    try {
-      await Promise.all(promises);
-      console.log(`Precaricati ${promises.length} modelli`);
-    } catch (error) {
-      console.warn('Errore nel precaricamento modelli:', error);
-    }
   }
 
   exportOptimalConfig() {
@@ -867,6 +643,5 @@ export class SmallRockSpawner {
     if (config.lodHysteresis) this.lodHysteresis = config.lodHysteresis;
     if (config.cellSize) this.cellSize = config.cellSize;
     if (config.updateThrottleMs) this.updateThrottleMs = config.updateThrottleMs;
-    console.log('Configurazione ottimale importata:', config);
   }
 }
