@@ -71,7 +71,6 @@ export class WyvernEnemy extends BaseEnemy {
     this.mouthBoneName = opt.mouthBoneName ?? null;
     this.invertForward = !!opt.invertForward;
 
-    this._lastPlayerPos = new THREE.Vector3();
     this._playerCapsule = {
       height: opt.playerHeight ?? 1.7,
       radius: opt.playerRadius ?? 0.35,
@@ -81,11 +80,7 @@ export class WyvernEnemy extends BaseEnemy {
     this._tmpDir = new THREE.Vector3();
     this._tmpPos = new THREE.Vector3();
     this._up = new THREE.Vector3(0, 1, 0);
-    this._fireLinger = 0;
-    this._prevMouth = new THREE.Vector3(NaN, NaN, NaN);
     this._isFiring = false;
-
-
   }
 
   onModelReady() {
@@ -241,7 +236,6 @@ export class WyvernEnemy extends BaseEnemy {
       }
     }
 
-
     const far = this._distanceToPlayer() > Math.max(this.engageRange * 1.8, this._fire.length * 1.4);
     if (far || this._airTime >= this.airMaxTime) this._enterLandingGround();
   }
@@ -273,7 +267,6 @@ export class WyvernEnemy extends BaseEnemy {
     this._isFiring = true;
     this._fire.setActive(true);
   }
-
 
   _updateFireTimeline(dt) {
     this._atkT += dt;
@@ -307,25 +300,19 @@ export class WyvernEnemy extends BaseEnemy {
   }
 
   _applyConeDps(dt) {
-    const hitNow = this._playerInFireVolume(dt);
-    if (hitNow) this._fireLinger = 0.12; else this._fireLinger = Math.max(0, this._fireLinger - dt);
-    if (!(hitNow || this._fireLinger > 0)) return;
+    if (!this._playerInFireVolume()) return;
     const dmg = this.fireDps * dt;
     if (dmg > 0) gameManager?.controller?.stats?.damage?.(dmg);
   }
-  _playerInFireVolume(dt = 0) {
+
+  _playerInFireVolume() {
     if (!this._fire?.group || !this.player?.model) return false;
 
     this._fire.group.updateMatrixWorld(true);
     const origin = new THREE.Vector3().setFromMatrixPosition(this._fire.group.matrixWorld);
 
-    if (Number.isNaN(this._prevMouth.x)) this._prevMouth.copy(origin);
-    const mouthSpeed = this._prevMouth.distanceTo(origin) / Math.max(dt || 1/60, 1e-5);
-    this._prevMouth.copy(origin);
-
     const pp = this.player.model.position.clone();
-    const toPlayer = pp.clone().sub(origin).normalize();
-    const axis = toPlayer;
+    const axis = pp.clone().sub(origin).normalize();
 
     const L = this._fire.length;
     const baseR = this._fire.radius;
@@ -336,26 +323,19 @@ export class WyvernEnemy extends BaseEnemy {
     const pChest = new THREE.Vector3(pp.x, pp.y + this._playerCapsule.centerYOffset, pp.z);
     const pHead  = new THREE.Vector3(pp.x, pp.y + h, pp.z);
 
-    if (this._lastPlayerPos.lengthSq() === 0) this._lastPlayerPos.copy(pp);
-    const playerSpeed = this._lastPlayerPos.distanceTo(pp) / Math.max(dt || 1/60, 1e-5);
-    this._lastPlayerPos.copy(pp);
-
-    const speedMargin = Math.min(1.2, playerSpeed * 0.03 + mouthSpeed * 0.02);
-    const zSlack = 8.0 * speedMargin;
-
     const insideCone = (P) => {
       const v = new THREE.Vector3().subVectors(P, origin);
       const z = v.dot(axis);
-      if (z < -0.6 || z > (L + zSlack)) return false;
+      if (z < -0.2 || z > L) return false;
       const radial = v.sub(axis.clone().multiplyScalar(z)).length();
       const z01 = THREE.MathUtils.clamp(z / Math.max(L, 1e-3), 0, 1);
-      const maxR = THREE.MathUtils.lerp(baseR * 0.15, baseR * (1.2 + speedMargin), z01);
+      const maxR = THREE.MathUtils.lerp(baseR * 0.10, baseR, z01);
       return radial <= (maxR + r);
     };
-    const out = insideCone(pFeet) || insideCone(pChest) || insideCone(pHead);
-    console.log("IN CONE", out);
-    return out;
+
+    return insideCone(pFeet) || insideCone(pChest) || insideCone(pHead);
   }
+
   _breathEngageRange() { return this._fire.length * 1.15; }
   _randAltitude() { return this.altitudeMin + Math.random() * (this.altitudeMax - this.altitudeMin); }
   _terrainY() { const p = this.model.position; return getTerrainHeightAt(p.x, p.z); }

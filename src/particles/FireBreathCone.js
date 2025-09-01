@@ -1,3 +1,4 @@
+// FireBreathCone.js – visibilità migliorata + modalità colore selezionabile
 import * as THREE from 'three';
 import { FireJetSystem } from './FireJetSystem.js';
 
@@ -21,6 +22,11 @@ export class FireBreathCone {
     this.particleCount = 300;
     this.sparkCount    = 50;
     this.smokeCount    = 0;
+
+    // ===== NUOVO: controlli colore/visibilità =====
+    this._colorMode = 1;           // 0=fire ramp, 1=red-only (default compatibile), 2=blue flame
+    this._boost     = 0.65;        // 0..2 – aumenta visibilità additiva
+    this._tint      = new THREE.Color(1,1,1); // moltiplicatore opzionale
 
     this.group = new THREE.Group();
     this.group.name = 'FireBreathCone';
@@ -69,7 +75,11 @@ export class FireBreathCone {
         fade:      { value: 0 },
         intensity: { value: this.intensity },
         uLen:      { value: this.length },
-        coneRadius:{ value: this.radius }
+        coneRadius:{ value: this.radius },
+        // ===== NUOVI uniform =====
+        uBoost:    { value: this._boost },
+        uColorMode:{ value: this._colorMode },    // 0=fire,1=red,2=blue
+        uTint:     { value: new THREE.Color(this._tint.r, this._tint.g, this._tint.b) }
       },
       vertexShader: `
         attribute vec3 velocity;
@@ -105,8 +115,7 @@ export class FireBreathCone {
           pos.x += n1;
           pos.y += n2;
 
-          float baseR = 0.8;
-          float widen = mix(1.0, coneRadius / baseR, z01);
+          float widen = mix(1.0, coneRadius / 0.8, z01);
           pos.xy *= widen;
 
           float maxR = mix(coneRadius * 0.10, coneRadius, z01);
@@ -115,13 +124,17 @@ export class FireBreathCone {
 
           vZ = z01;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-          float sizeBase = mix(42.0, 70.0, smoothstep(0.0, 0.6, z01));
+          // ===== più leggibile a distanza =====
+          float sizeBase = mix(48.0, 82.0, smoothstep(0.0, 0.6, z01));
           gl_PointSize = sizeBase * scale * fade;
         }
       `,
       fragmentShader: `
         uniform float time;
         uniform float intensity;
+        uniform float uBoost;
+        uniform int   uColorMode;
+        uniform vec3  uTint;
         varying float vLife;
         varying float vZ;
         varying float vSeed;
@@ -138,35 +151,61 @@ export class FireBreathCone {
           for(int i=0;i<4;i++){ v += a*noise(p); p*=2.0; a*=0.5; }
           return v;
         }
-        vec3 fireRamp(float t){
-          vec3 red    = vec3(0.85, 0.12, 0.03);
-          vec3 orange = vec3(1.00, 0.50, 0.10);
-          vec3 yellow = vec3(1.00, 0.90, 0.50);
+
+        vec3 rampFire(float t){
+          vec3 red    = vec3(0.90, 0.10, 0.03);
+          vec3 orange = vec3(1.00, 0.48, 0.08);
+          vec3 yellow = vec3(1.00, 0.90, 0.55);
           vec3 white  = vec3(1.00);
-          vec3 mid    = mix(orange, yellow, smoothstep(0.30, 0.65, t));
-          vec3 hot    = mix(mid, white,   smoothstep(0.78, 1.00, t));
-          return red;
+          vec3 mid    = mix(orange, yellow, smoothstep(0.25, 0.65, t));
+          return mix(red, mix(mid, white, smoothstep(0.78, 1.00, t)), smoothstep(0.08, 1.0, t));
         }
+        vec3 rampRed(float t){
+          vec3 deep   = vec3(0.60, 0.06, 0.02);
+          vec3 red    = vec3(1.00, 0.15, 0.06);
+          vec3 hot    = vec3(1.00, 0.55, 0.35);
+          return mix(deep, mix(red, hot, smoothstep(0.65,1.0,t)), smoothstep(0.1,1.0,t));
+        }
+        vec3 rampBlue(float t){
+          vec3 blue   = vec3(0.20, 0.45, 1.00);
+          vec3 cyan   = vec3(0.50, 0.95, 1.00);
+          vec3 white  = vec3(1.00);
+          return mix(blue, mix(cyan, white, smoothstep(0.75,1.0,t)), smoothstep(0.2,1.0,t));
+        }
+
         void main(){
           vec2 uv = gl_PointCoord - 0.5;
-          float d = length(uv);
-          if(d > 0.5) discard;
+          float r = length(uv);
+          if(r > 0.5) discard;
 
-          float radial = pow(1.0 - d*2.0, 1.35);
-          float baseHeat = 1.0 - vZ;
+          // profilo disco + alone esterno per leggibilità
+          float disk   = pow(1.0 - r*2.0, 1.35);
+          float halo   = smoothstep(0.50, 0.32, r) * 0.25;
+
           float n = fbm(uv*5.0 + vec2(vSeed*13.0, time*1.2));
           float flick = 0.85 + 0.15 * sin(time*20.0 + vSeed*10.0);
-          float heat = clamp(baseHeat*0.85 + n*0.35, 0.0, 1.0) * flick;
+          float heat = clamp((1.0 - vZ)*0.85 + n*0.35, 0.0, 1.0) * flick;
 
-          float core = smoothstep(0.55, 0.0, d);
-          float coreBoost = mix(0.0, 0.35, core);
+          float core = smoothstep(0.55, 0.0, r);
+          float t = clamp(0.30 + heat*0.75 + core*0.35, 0.0, 1.0);
 
-          float t = clamp(0.35 + heat*0.75 + coreBoost, 0.0, 1.0);
-          vec3 col = fireRamp(t);
+          vec3 col;
+          if (uColorMode == 0)      col = rampFire(t);
+          else if (uColorMode == 2) col = rampBlue(t);
+          else                      col = rampRed(t); // default compatibile
 
-          float alpha = radial * (0.55 + 0.45*heat) * (1.0 - vZ*0.25);
-          alpha *= (0.35 + 0.65 * clamp(intensity/8.0, 0.0, 1.5));
-          float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453)-0.5) * 0.02;
+          col *= uTint;
+
+          // ==== boost additivo controllato ====
+          float boost = 1.0 + uBoost * 2.2;  // 1..~3.2
+          col *= boost;
+
+          // alpha guida l'additive ma aumentiamo anche il colore
+          float alpha = (disk * (0.55 + 0.45*heat) + halo*0.7) * (1.0 - vZ*0.22);
+          alpha *= (0.40 + 0.60 * clamp(intensity/8.0, 0.0, 1.5));
+
+          // leggero dithering per banding
+          float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453)-0.5) * 0.015;
           alpha = max(alpha + dither, 0.0);
 
           gl_FragColor = vec4(col, alpha);
@@ -189,11 +228,26 @@ export class FireBreathCone {
     this.fireMaterial = fireMaterial;
   }
 
+  // ===== API colore/visibilità =====
+  setColorMode(mode /* 'fire' | 'red' | 'blue' */){
+    const m = (mode === 'fire') ? 0 : (mode === 'blue' ? 2 : 1);
+    this._colorMode = m;
+    if (this.fireMaterial) this.fireMaterial.uniforms.uColorMode.value = m;
+  }
+  setBoost(value /* 0..2 */){
+    this._boost = Math.max(0, Math.min(2, value ?? 0));
+    if (this.fireMaterial) this.fireMaterial.uniforms.uBoost.value = this._boost;
+  }
+  setTint(color /* THREE.Color | number | [r,g,b] */){
+    if (Array.isArray(color)) this._tint.setRGB(color[0], color[1], color[2]);
+    else this._tint.set(color);
+    if (this.fireMaterial) this.fireMaterial.uniforms.uTint.value.copy(this._tint);
+  }
+
   setRotationOffsetEuler(euler) {
     this.aimOffsetEuler.copy(euler);
     this._applyLocalRotation();
   }
-
   setRotationOffsetDegrees(pitchDeg = 0, yawDeg = 0, rollDeg = 0) {
     this.aimOffsetEuler.set(
       THREE.MathUtils.degToRad(pitchDeg),
@@ -203,12 +257,10 @@ export class FireBreathCone {
     );
     this._applyLocalRotation();
   }
-
   invertForward(flag = true) {
     this._invertForward = !!flag;
     this._applyLocalRotation();
   }
-
   _applyLocalRotation() {
     const qOffset = new THREE.Quaternion().setFromEuler(this.aimOffsetEuler);
     if (this._invertForward) {
@@ -230,7 +282,6 @@ export class FireBreathCone {
     this.group.add(this.jet.group);
     this.jet.group.position.set(0, 0, 0);
   }
-
   _updateJetSync() {
     if (!this.jet) return;
     this.jet.setIntensity(this.intensity);
@@ -292,18 +343,21 @@ export class FireBreathCone {
           if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
 
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
-          gl_PointSize = size * (1.0 - age) * fade * 12.0;
+          // ++ più grandi per visibilità
+          gl_PointSize = size * (1.0 - age) * fade * 16.0;
         }
       `,
       fragmentShader: `
         varying float vLife;
         void main(){
           vec2 c = gl_PointCoord - 0.5;
-          if(length(c) > 0.5) discard;
-          float core = 1.0 - smoothstep(0.0, 0.5, length(c));
-          vec3 col = mix(vec3(1.0,0.4,0.1), vec3(1.0,0.85,0.5), core);
-          float alpha = core * (1.0 - vLife);
-          gl_FragColor = vec4(col, alpha * 0.9);
+          float d = length(c);
+          if(d > 0.5) discard;
+          float core = 1.0 - smoothstep(0.0, 0.5, d);
+          // più calde e leggibili
+          vec3 col = mix(vec3(1.0,0.35,0.10), vec3(1.0,0.90,0.55), core);
+          float alpha = (core*0.9 + (0.5 - d)*0.6) * (1.0 - vLife);
+          gl_FragColor = vec4(col, alpha);
         }
       `,
       transparent: true,
@@ -323,6 +377,7 @@ export class FireBreathCone {
   }
 
   _createSmokeSystem() {
+    // (lasciato com’è: smokeCount=0 di default)
     const smokeGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.smokeCount * 3);
     const velocities = new Float32Array(this.smokeCount * 3);
@@ -567,6 +622,10 @@ export class FireBreathCone {
       this.fireMaterial.uniforms.uLen.value = this.length;
       if (this.fireMaterial.uniforms.coneRadius)
         this.fireMaterial.uniforms.coneRadius.value = this.radius;
+      // mantieni boost/tint/colormode sincronizzati
+      this.fireMaterial.uniforms.uBoost.value = this._boost;
+      this.fireMaterial.uniforms.uColorMode.value = this._colorMode;
+      this.fireMaterial.uniforms.uTint.value.copy(this._tint);
     }
     if (this.sparkMaterial) {
       this.sparkMaterial.uniforms.time.value = this._time;
@@ -915,7 +974,9 @@ export class FireBreathCone {
       smokeCount: this.smokeCount,
       intensity: this.intensity,
       length: +this.length.toFixed(2),
-      radius: +this.radius.toFixed(2)
+      radius: +this.radius.toFixed(2),
+      colorMode: this._colorMode,
+      boost: this._boost
     };
   }
 }
