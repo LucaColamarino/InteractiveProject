@@ -5,7 +5,6 @@ export const wolfArea = { x: -95, z: -60, width: 150, depth: 150 };
 export const spawnPoint = {x:-57,z:62};
 export const archerObjective=0;
 export const wolfObjective=0;
-//(-60, 65);
  class GameManager {
    savedPos =null;
    controller = null;
@@ -26,7 +25,6 @@ export const wolfObjective=0;
    effects = null;
    isPaused = false;
    bridgeCreated = false;
-   manaTree = null;
   }
 export function createGameManager() {
   

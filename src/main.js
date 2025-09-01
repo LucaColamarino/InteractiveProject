@@ -1,4 +1,3 @@
-// main.js
 import { setupInput } from './systems/InputSystem.js';
 import { startLoop } from './gameLoop.js';
 import { createHeightmapTerrain, addWaterPlane, createSky, getTerrainHeightAt } from './map/map.js';
@@ -13,7 +12,7 @@ import { StartMenu } from './ui/startMenu.js';
 import {gameManager } from './managers/gameManager.js';
 import { updateLoadingProgress, hideLoadingScreen, showLoadingScreen, suspendLoadingScreen } from './loading.js';
 import { PickableManager } from './managers/pickableManager.js';
-import { camera, scene } from './scene.js';
+import { camera, renderer, scene } from './scene.js';
 import { preloadAllEntities } from './utils/entityFactory.js';
 import { abilitiesByForm, spawnPlayer } from './player/Player.js';
 import { loadHudVitals,loadHudMap, loadHudPills } from "./ui/hudManager.js";
@@ -32,6 +31,7 @@ import { PortalSpawner } from './spawners/portalSpawner.js';
 import { victoryScreen } from './ui/victoryScreen.js';
 import { bossHealth } from './ui/bossHealth.js';
 import { spawnManaTreeAt } from './objects/manaTree.js';
+import { PlayerBurnFX } from './particles/PlayerBurnFX.js';
 const settings = (window.__gameSettings = {
   quality: 'medium',
   shadows: true,
@@ -103,30 +103,25 @@ async function init() {
     await spawnWolfStone({x:-65,z:40});
     const portalSpawner = new PortalSpawner(scene, camera, () => {
        console.log("Player escaped through portal!");
-      // Pausa + mostra schermata di vittoria in stile soulslike
       victoryScreen.show({
         title: 'YOU ESCAPED',
         sub: 'The echo of the portal fades… but destiny still calls to you.'
       });
     });
      victoryScreen.init({
-      // “Continua”: ad esempio respawn al falò o teletrasporto in nuova area
       onContinue: () => {
-        // di default: riprende il gioco dalla situazione corrente
         if (gameManager) gameManager.isPaused = false;
         gameManager.spawner._gameEnded=false;
       },
-      // “Torna al menu”
       onQuit: () => {
         window.location.href = '/';
       }
     });
     gameManager.spawner = portalSpawner;
-    // spawn un portale di colore "fire" a (0,30,0)
     portalSpawner.spawn({
       position: new THREE.Vector3(-57, 50, 62),
-      color: 0xff4500,   // colore principale → fuoco
-      radius: 6.0        // grandezza opzionale
+      color: 0xff4500,
+      radius: 6.0     
     });
     if(gameManager.bridgeCreated)
       createBridge({
@@ -135,7 +130,7 @@ async function init() {
                 scale: 0.004,
                 position: new THREE.Vector3(-135,getTerrainHeightAt(-135,115),115),
                 rotationY: 10,
-                uvTile: 2,  // aumenta/riduci tiling
+                uvTile: 2,
               });
     updateLoadingProgress(95, 'Player initialization...');
     if (!gameManager.controller) {
@@ -150,7 +145,6 @@ async function init() {
     deathScreen.init({
       onRespawn: async () => {
         deathScreen.hide();
-        // Esempio: respawn al falò/checkpoint
         const cp = gameManager.lastCheckpoint;
         if (cp?.position) await gameManager.respawnAt(cp.position);
         else if (gameManager?.respawnAt) await gameManager.respawnAt(new THREE.Vector3(0,0,0));
@@ -162,7 +156,6 @@ async function init() {
         if (gameManager) gameManager.isPaused = false;
       },
       onQuit: () => {
-        // Vai al menu principale / ricarica scena
         window.location.href = '/';
       }
     });
@@ -173,8 +166,11 @@ async function init() {
     gameManager.inventory.onChange(() => {
       gameManager.controller.syncWeaponFromInventory(gameManager.inventory);
     });
+    gameManager.controller._burnFx = new PlayerBurnFX(gameManager.controller.player.model);
+    gameManager.controller._burnFx.prewarm(renderer, scene, camera);
     await wait(80);
-    updateLoadingProgress(100, 'Finalizing...');
+    updateLoadingProgress(100, 'Finalizing...')
+    renderer.compile(scene, camera);
     await wait(60);
     hideLoadingScreen();
     bossHealth.init();
@@ -189,7 +185,6 @@ async function init() {
           window.dispatchEvent(new Event('game:resume'));
         },
         onQuit: () => {
-          // ⬇️ salvataggio allo “quit”
           saveGame();
           gameManager.paused = false;
           gameManager.running = false;
@@ -238,7 +233,6 @@ const ui = {
         },
         onContinue: () => {
           console.log('[UI] ContinueGame dal menu iniziale');
-          // ⬇️ carica lo snapshot in memoria; verrà applicato in init() con applyPendingSave()
           loadGame();
           showLoadingScreen?.();
           updateLoadingProgress?.(0, 'Preparazione...');

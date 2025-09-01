@@ -14,8 +14,8 @@ export class PlayerBurnFX {
     this.anchor = new THREE.Object3D();
     this.anchor.position.set(0, this._yOffset, 0);
     this.root.add(this.anchor);
-
-    this._spriteTex = this._makeRadialSprite(128);
+    this._spriteTex = PlayerBurnFX._sharedSpriteTex || (PlayerBurnFX._sharedSpriteTex = this._makeRadialSprite(128));
+    this._spriteTex.needsUpdate = true;
 
     this._lifeMinMax = [0.5, 1.0];
     this._velYMinMax = [0.8, 1.6];
@@ -49,6 +49,7 @@ export class PlayerBurnFX {
       sizeAttenuation: true,
       opacity: 0.95
     });
+    mat.toneMapped = false; 
     this._pMat = mat;
 
     this.particles = new THREE.Points(geom, mat);
@@ -67,6 +68,23 @@ export class PlayerBurnFX {
     });
 
     this.setEnabled(false);
+  }
+
+  prewarm(renderer, scene, camera) {
+    const prevVisible = this.particles.visible;
+    const prevIntensity = this.light.intensity;
+
+    this.setEnabled(true);
+    if (!prevVisible) this.particles.visible = true;
+    this.light.intensity = Math.max(this.light.intensity, 0.001);
+    this.update(0.016);
+
+    if (renderer && scene && camera && renderer.compile) {
+      renderer.compile(scene, camera);
+    }
+    this.setEnabled(false);
+    this.particles.visible = prevVisible;
+    this.light.intensity = prevIntensity;
   }
 
   setEnabled(on){

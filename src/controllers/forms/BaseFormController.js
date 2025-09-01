@@ -60,7 +60,11 @@ export class BaseFormController {
 
   startBurning() { this._isBurning = true; this._burningLeft = BURNING_TIME; this.startBurningEffect(); }
   stopBurning()  { this._isBurning = false; this._burningLeft = 0; this.stopBurningEffect(); }
-  startBurningEffect(){ if (!this._burnFx) this._burnFx = new PlayerBurnFX(this.player.model); this._burnFx.setEnabled(true); }
+  startBurningEffect(){
+    if (!this._burnFx && this.player?._burnFx) this._burnFx = this.player._burnFx;
+    this._burnFx?.setEnabled(true);
+  }
+
   stopBurningEffect(){ this._burnFx?.setEnabled(false); }
   takeDamage(damage){ this.stats.damage(damage); }
 
