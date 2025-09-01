@@ -2,17 +2,20 @@ import * as THREE from 'three';
 
 export class FireJetSystem {
   constructor(opts = {}) {
-    this.length      = opts.length     ?? 7.0;
-    this.radius      = opts.radius     ?? 0.1;
-    this.intensity   = opts.intensity  ?? 3.0;
-    this.renderOrder = opts.renderOrder ?? 1001;
-    this.particleCount = opts.particleCount ?? 50;
+    this.length        = opts.length      ?? 7.0;
+    this.radius        = opts.radius      ?? 0.1;
+    this.coneRadius    = opts.coneRadius  ?? this.radius * 2.0;
+    this.intensity     = opts.intensity   ?? 3.0;
+    this.renderOrder   = opts.renderOrder ?? 1001;
+    this.particleCount = opts.particleCount ?? 500;
 
     this._time   = 0;
     this._active = false;
     this._fade   = 0;
     this._fadeInK  = 7.0;
     this._fadeOutK = 6.0;
+
+    this._tightness = 0.7;
 
     this.group = new THREE.Group();
     this.group.name = 'FireJetSystem';
@@ -48,6 +51,8 @@ export class FireJetSystem {
         fade:      { value: 0 },
         uLen:      { value: this.length },
         uRad:      { value: this.radius },
+        uConeR:    { value: this.coneRadius },
+        uTight:    { value: this._tightness },
         intensity: { value: this.intensity }
       },
       vertexShader: `
@@ -60,6 +65,8 @@ export class FireJetSystem {
         uniform float fade;
         uniform float uLen;
         uniform float uRad;
+        uniform float uConeR;
+        uniform float uTight;
 
         varying float vLife;
         varying float vZ01;
@@ -79,19 +86,23 @@ export class FireJetSystem {
           float z01 = clamp(pos.z / uLen, 0.0, 1.0);
           vZ01 = z01;
 
-          float spin = (1.6 + sin(time*1.8 + pseed*13.0)*0.4) * (1.0 - z01);
-          pos.xy = rot(spin * 0.65) * pos.xy;
+          float spin = (1.3 + sin(time*1.8 + pseed*13.0)*0.35) * (1.0 - z01);
+          pos.xy = rot(spin * 0.55) * pos.xy;
 
-          pos.xy *= (1.0 + z01 * 2.2);
-
-          float j1 = sin(time*3.2 + pseed*21.0 + pos.x*8.0) * 0.10;
-          float j2 = cos(time*2.7 + pseed*19.0 + pos.y*7.0) * 0.08;
+          float j1 = sin(time*2.8 + pseed*19.0 + pos.x*7.0) * 0.06;
+          float j2 = cos(time*2.3 + pseed*17.0 + pos.y*6.0) * 0.05;
           pos.x += j1;
           pos.y += j2;
 
+          float rNow = length(pos.xy);
+          float rTarget = mix(uRad*0.95, uConeR*0.96, z01);
+          float pull = clamp(uTight, 0.0, 1.0);
+          float safe = max(rNow, 1e-4);
+          pos.xy *= mix(1.0, rTarget / safe, pull);
+
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
 
-          float s = mix(38.0, 64.0, smoothstep(0.0, 0.55, z01));
+          float s = mix(22.0, 36.0, smoothstep(0.0, 0.55, z01));
           gl_PointSize = s * psize * fade;
         }
       `,
@@ -139,12 +150,12 @@ export class FireJetSystem {
           float heat = clamp(baseHeat*0.9 + n*0.35, 0.0, 1.0) * flick;
 
           float core = smoothstep(0.55, 0.0, d);
-          float coreBoost = mix(0.0, 0.4, core);
+          float coreBoost = mix(0.0, 0.35, core);
 
-          float t = clamp(0.4 + heat*0.7 + coreBoost, 0.0, 1.0);
+          float t = clamp(0.40 + heat*0.70 + coreBoost, 0.0, 1.0);
           vec3 col = fireRamp(t);
 
-          float alpha = radial * (0.6 + 0.4*heat) * (1.0 - vZ01*0.22);
+          float alpha = radial * (0.58 + 0.42*heat) * (1.0 - vZ01*0.22);
           alpha *= (0.35 + 0.65 * clamp(intensity/8.0, 0.0, 1.5));
 
           float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453)-0.5) * 0.02;
@@ -175,19 +186,19 @@ export class FireJetSystem {
   _reset(i, pos, vel, life, size, seed) {
     const i3 = i * 3;
     const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * Math.max(0.18, this.radius * 0.22);
+    const r = Math.random() * Math.max(0.12, this.radius * 0.18);
     pos[i3]     = Math.cos(a) * r;
     pos[i3 + 1] = Math.sin(a) * r;
     pos[i3 + 2] = Math.random() * (this.length * 0.95);
 
     const speed = 2.0 + Math.random() * 2.8;
-    const sXY   = (Math.random() - 0.5) * 0.5;
-    vel[i3]     = sXY * 0.45;
-    vel[i3 + 1] = (Math.random() - 0.5) * 0.25;
+    const sXY   = (Math.random() - 0.5) * 0.35;
+    vel[i3]     = sXY * 0.38;
+    vel[i3 + 1] = (Math.random() - 0.5) * 0.20;
     vel[i3 + 2] = speed;
 
     life[i] = Math.random();
-    size[i] = 0.65 + Math.random() * 0.55;
+    size[i] = 0.55 + Math.random() * 0.45; 
     seed[i] = Math.random();
   }
 
@@ -211,6 +222,16 @@ export class FireJetSystem {
       this.geometry.boundingSphere.center.set(0, 0, this.length * 0.5);
       this.geometry.boundingSphere.radius = this.length * 2.0;
     }
+  }
+
+  setConeRadius(r){
+    this.coneRadius = Math.max(0.01, r);
+    if (this.material) this.material.uniforms.uConeR.value = this.coneRadius;
+  }
+
+  setTightness(t){
+    this._tightness = THREE.MathUtils.clamp(t ?? 0.7, 0, 1);
+    if (this.material) this.material.uniforms.uTight.value = this._tightness;
   }
 
   attachTo(parent, localOffset = new THREE.Vector3()) {

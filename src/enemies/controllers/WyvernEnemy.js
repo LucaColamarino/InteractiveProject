@@ -31,7 +31,7 @@ export class WyvernEnemy extends BaseEnemy {
 
     const fireLength = opt.fireLength ?? 30;
     const fireRadius = opt.fireRadius ?? 1.5;
-    this.fireDps = opt.fireDps ?? 15;
+    this.fireDps = opt.fireDps ?? 5;
     this.breathIntensity = opt.breathIntensity ?? 10;
 
     this._fire = new FireBreathCone({

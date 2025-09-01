@@ -1,4 +1,3 @@
-// FireBreathCone.js – visibilità migliorata + modalità colore selezionabile
 import * as THREE from 'three';
 import { FireJetSystem } from './FireJetSystem.js';
 
@@ -6,8 +5,8 @@ export class FireBreathCone {
   constructor(opts = {}) {
     this.parent      = opts.parent || null;
     this.localOffset = (opts.localOffset || new THREE.Vector3(0, 0.6, 2.2)).clone();
-    this.length      = opts.length    ?? 8.0;
-    this.radius      = opts.radius    ?? 2.5;
+    this.length      = opts.length    ?? 9.0;
+    this.radius      = opts.radius    ?? 3.5;
     this.intensity   = opts.intensity ?? 6.0;
     this.renderOrder = opts.renderOrder ?? 999;
 
@@ -19,14 +18,14 @@ export class FireBreathCone {
     this._helpersOn = false;
     this._time = 0;
 
-    this.particleCount = 300;
+    this.particleCount = 2000;
     this.sparkCount    = 50;
-    this.smokeCount    = 0;
+    this.smokeCount    = 1;
 
-    // ===== NUOVO: controlli colore/visibilità =====
-    this._colorMode = 1;           // 0=fire ramp, 1=red-only (default compatibile), 2=blue flame
-    this._boost     = 0.65;        // 0..2 – aumenta visibilità additiva
-    this._tint      = new THREE.Color(1,1,1); // moltiplicatore opzionale
+    this._colorMode = 1;
+    this._boost     = 0.65;
+    this._tint      = new THREE.Color(1,1,1);
+    this._speed     = opts.speed ?? 7.0;
 
     this.group = new THREE.Group();
     this.group.name = 'FireBreathCone';
@@ -76,10 +75,10 @@ export class FireBreathCone {
         intensity: { value: this.intensity },
         uLen:      { value: this.length },
         coneRadius:{ value: this.radius },
-        // ===== NUOVI uniform =====
         uBoost:    { value: this._boost },
-        uColorMode:{ value: this._colorMode },    // 0=fire,1=red,2=blue
-        uTint:     { value: new THREE.Color(this._tint.r, this._tint.g, this._tint.b) }
+        uColorMode:{ value: this._colorMode },
+        uTint:     { value: new THREE.Color(this._tint.r, this._tint.g, this._tint.b) },
+        uSpeed:    { value: this._speed }
       },
       vertexShader: `
         attribute vec3 velocity;
@@ -90,6 +89,7 @@ export class FireBreathCone {
         uniform float fade;
         uniform float uLen;
         uniform float coneRadius;
+        uniform float uSpeed;
 
         varying float vLife;
         varying float vZ;
@@ -101,17 +101,17 @@ export class FireBreathCone {
           vLife = lifetime;
           vSeed = uv.x;
           vec3 pos = position;
-          pos.z = mod(position.z + velocity.z * time, uLen);
-          pos.x += velocity.x * time;
-          pos.y += velocity.y * time;
+          pos.z = mod(position.z + velocity.z * time * uSpeed, uLen);
+          pos.x += velocity.x * time * uSpeed;
+          pos.y += velocity.y * time * uSpeed;
 
           float z01 = clamp(pos.z / uLen, 0.0, 1.0);
 
-          float swirl = (1.5 + sin(time*1.2 + vSeed*12.0)*0.5) * (1.0 - z01);
+          float swirl = (1.5 + sin(time*1.2*uSpeed + vSeed*12.0)*0.5) * (1.0 - z01);
           pos.xy = rot(swirl * 0.6) * pos.xy;
 
-          float n1 = sin(time*2.7 + vSeed*20.0 + pos.x*6.0) * 0.12;
-          float n2 = cos(time*2.1 + vSeed*18.0 + pos.y*5.0) * 0.10;
+          float n1 = sin(time*2.7*uSpeed + vSeed*20.0 + pos.x*6.0) * 0.12;
+          float n2 = cos(time*2.1*uSpeed + vSeed*18.0 + pos.y*5.0) * 0.10;
           pos.x += n1;
           pos.y += n2;
 
@@ -124,7 +124,6 @@ export class FireBreathCone {
 
           vZ = z01;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-          // ===== più leggibile a distanza =====
           float sizeBase = mix(48.0, 82.0, smoothstep(0.0, 0.6, z01));
           gl_PointSize = sizeBase * scale * fade;
         }
@@ -135,6 +134,7 @@ export class FireBreathCone {
         uniform float uBoost;
         uniform int   uColorMode;
         uniform vec3  uTint;
+        uniform float uSpeed;
         varying float vLife;
         varying float vZ;
         varying float vSeed;
@@ -178,12 +178,11 @@ export class FireBreathCone {
           float r = length(uv);
           if(r > 0.5) discard;
 
-          // profilo disco + alone esterno per leggibilità
           float disk   = pow(1.0 - r*2.0, 1.35);
           float halo   = smoothstep(0.50, 0.32, r) * 0.25;
 
           float n = fbm(uv*5.0 + vec2(vSeed*13.0, time*1.2));
-          float flick = 0.85 + 0.15 * sin(time*20.0 + vSeed*10.0);
+          float flick = 0.85 + 0.15 * sin(time*20.0*uSpeed + vSeed*10.0);
           float heat = clamp((1.0 - vZ)*0.85 + n*0.35, 0.0, 1.0) * flick;
 
           float core = smoothstep(0.55, 0.0, r);
@@ -192,19 +191,15 @@ export class FireBreathCone {
           vec3 col;
           if (uColorMode == 0)      col = rampFire(t);
           else if (uColorMode == 2) col = rampBlue(t);
-          else                      col = rampRed(t); // default compatibile
+          else                      col = rampRed(t);
 
           col *= uTint;
-
-          // ==== boost additivo controllato ====
-          float boost = 1.0 + uBoost * 2.2;  // 1..~3.2
+          float boost = 1.0 + uBoost * 2.2;
           col *= boost;
 
-          // alpha guida l'additive ma aumentiamo anche il colore
           float alpha = (disk * (0.55 + 0.45*heat) + halo*0.7) * (1.0 - vZ*0.22);
           alpha *= (0.40 + 0.60 * clamp(intensity/8.0, 0.0, 1.5));
 
-          // leggero dithering per banding
           float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453)-0.5) * 0.015;
           alpha = max(alpha + dither, 0.0);
 
@@ -228,21 +223,27 @@ export class FireBreathCone {
     this.fireMaterial = fireMaterial;
   }
 
-  // ===== API colore/visibilità =====
-  setColorMode(mode /* 'fire' | 'red' | 'blue' */){
+  setColorMode(mode){
     const m = (mode === 'fire') ? 0 : (mode === 'blue' ? 2 : 1);
     this._colorMode = m;
     if (this.fireMaterial) this.fireMaterial.uniforms.uColorMode.value = m;
   }
-  setBoost(value /* 0..2 */){
+  setBoost(value){
     this._boost = Math.max(0, Math.min(2, value ?? 0));
     if (this.fireMaterial) this.fireMaterial.uniforms.uBoost.value = this._boost;
   }
-  setTint(color /* THREE.Color | number | [r,g,b] */){
+  setTint(color){
     if (Array.isArray(color)) this._tint.setRGB(color[0], color[1], color[2]);
     else this._tint.set(color);
     if (this.fireMaterial) this.fireMaterial.uniforms.uTint.value.copy(this._tint);
   }
+  setSpeed(v = 1.0){
+    this._speed = Math.max(0.1, v);
+    if (this.fireMaterial)  this.fireMaterial.uniforms.uSpeed.value  = this._speed;
+    if (this.sparkMaterial) this.sparkMaterial.uniforms.uSpeed.value = this._speed;
+    if (this.smokeMaterial) this.smokeMaterial.uniforms.uSpeed.value = this._speed;
+  }
+  getSpeed(){ return this._speed; }
 
   setRotationOffsetEuler(euler) {
     this.aimOffsetEuler.copy(euler);
@@ -313,6 +314,7 @@ export class FireBreathCone {
         uLen: { value: this.length },
         coneRadius: { value: this.radius },
         sparkRange: { value: this.length },
+        uSpeed: { value: this._speed }
       },
       vertexShader: `
         attribute vec3 velocity;
@@ -324,6 +326,7 @@ export class FireBreathCone {
         uniform float uLen;
         uniform float coneRadius;
         uniform float sparkRange;
+        uniform float uSpeed;
 
         varying float vLife;
 
@@ -333,8 +336,8 @@ export class FireBreathCone {
           float age = clamp(lifetime, 0.0, 1.0);
           vec3 pos = position;
 
-          pos += velocity * (age * sparkRange);
-          pos.y -= age * age * 0.9 * (sparkRange * 0.03);
+          pos += velocity * (age * sparkRange * uSpeed);
+          pos.y -= age * age * 0.9 * (sparkRange * 0.03 * uSpeed);
           pos.z = clamp(pos.z, 0.0, uLen);
 
           float z01 = clamp(pos.z / uLen, 0.0, 1.0);
@@ -343,7 +346,6 @@ export class FireBreathCone {
           if (m > maxR) pos.xy *= maxR / max(m, 1e-4);
 
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos,1.0);
-          // ++ più grandi per visibilità
           gl_PointSize = size * (1.0 - age) * fade * 16.0;
         }
       `,
@@ -354,7 +356,6 @@ export class FireBreathCone {
           float d = length(c);
           if(d > 0.5) discard;
           float core = 1.0 - smoothstep(0.0, 0.5, d);
-          // più calde e leggibili
           vec3 col = mix(vec3(1.0,0.35,0.10), vec3(1.0,0.90,0.55), core);
           float alpha = (core*0.9 + (0.5 - d)*0.6) * (1.0 - vLife);
           gl_FragColor = vec4(col, alpha);
@@ -377,7 +378,6 @@ export class FireBreathCone {
   }
 
   _createSmokeSystem() {
-    // (lasciato com’è: smokeCount=0 di default)
     const smokeGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(this.smokeCount * 3);
     const velocities = new Float32Array(this.smokeCount * 3);
@@ -401,7 +401,8 @@ export class FireBreathCone {
         time:   { value: 0 },
         fade:   { value: 0 },
         uLen:   { value: this.length },
-        coneRadius: { value: this.radius }
+        coneRadius: { value: this.radius },
+        uSpeed: { value: this._speed }
       },
       vertexShader: `
         attribute vec3 velocity;
@@ -413,6 +414,7 @@ export class FireBreathCone {
         uniform float fade;
         uniform float uLen;
         uniform float coneRadius;
+        uniform float uSpeed;
 
         varying float vLife;
         varying float vRot;
@@ -425,15 +427,15 @@ export class FireBreathCone {
           vRot  = rotation;
 
           vec3 pos = position;
-          pos.z = mod(position.z + velocity.z * time, uLen);
-          pos.x += velocity.x * time;
-          pos.y += velocity.y * time;
+          pos.z = mod(position.z + velocity.z * time * uSpeed, uLen);
+          pos.x += velocity.x * time * uSpeed;
+          pos.y += velocity.y * time * uSpeed;
 
           float z01 = clamp(pos.z / uLen, 0.0, 1.0);
           vZ01 = z01;
 
           float swirl = mix(0.2, 1.2, z01);
-          float ang = time * mix(0.8, 1.6, z01) + rotation;
+          float ang = time * mix(0.8, 1.6, z01) * uSpeed + rotation;
           pos.xy = rot(ang * swirl) * pos.xy;
 
           float maxR = mix(coneRadius * 0.15, coneRadius, z01);
@@ -622,10 +624,10 @@ export class FireBreathCone {
       this.fireMaterial.uniforms.uLen.value = this.length;
       if (this.fireMaterial.uniforms.coneRadius)
         this.fireMaterial.uniforms.coneRadius.value = this.radius;
-      // mantieni boost/tint/colormode sincronizzati
       this.fireMaterial.uniforms.uBoost.value = this._boost;
       this.fireMaterial.uniforms.uColorMode.value = this._colorMode;
       this.fireMaterial.uniforms.uTint.value.copy(this._tint);
+      this.fireMaterial.uniforms.uSpeed.value = this._speed;
     }
     if (this.sparkMaterial) {
       this.sparkMaterial.uniforms.time.value = this._time;
@@ -633,12 +635,14 @@ export class FireBreathCone {
       this.sparkMaterial.uniforms.uLen.value = this.length;
       this.sparkMaterial.uniforms.coneRadius.value = this.radius;
       this.sparkMaterial.uniforms.sparkRange.value = this.length;
+      this.sparkMaterial.uniforms.uSpeed.value = this._speed;
     }
     if (this.smokeMaterial) {
       this.smokeMaterial.uniforms.time.value = this._time;
       this.smokeMaterial.uniforms.fade.value = this._fade;
       this.smokeMaterial.uniforms.uLen.value = this.length;
       this.smokeMaterial.uniforms.coneRadius.value = this.radius;
+      this.smokeMaterial.uniforms.uSpeed.value = this._speed;
     }
     if (this.distortMaterial) {
       this.distortMaterial.uniforms.time.value = this._time;
@@ -682,7 +686,7 @@ export class FireBreathCone {
   _updateFireParticles(dt) {
     const lifetimes = this.fireGeometry.attributes.lifetime.array;
     for (let i = 0; i < this.particleCount; i++) {
-      lifetimes[i] += dt * (0.9 + Math.random() * 0.5);
+      lifetimes[i] += dt * (0.9 + Math.random() * 0.5) * this._speed;
       if (lifetimes[i] >= 1.0) {
         const pos = this.fireGeometry.attributes.position.array;
         const vel = this.fireGeometry.attributes.velocity.array;
@@ -697,7 +701,7 @@ export class FireBreathCone {
   _updateSparkParticles(dt) {
     const lifetimes = this.sparkGeometry.attributes.lifetime.array;
     for (let i = 0; i < this.sparkCount; i++) {
-      lifetimes[i] += dt * (1.2 + Math.random() * 0.6);
+      lifetimes[i] += dt * (1.2 + Math.random() * 0.6) * this._speed;
       if (lifetimes[i] >= 1.0) {
         const pos = this.sparkGeometry.attributes.position.array;
         const vel = this.sparkGeometry.attributes.velocity.array;
@@ -712,7 +716,7 @@ export class FireBreathCone {
   _updateSmokeParticles(dt) {
     const lifetimes = this.smokeGeometry.attributes.lifetime.array;
     for (let i = 0; i < this.smokeCount; i++) {
-      lifetimes[i] += dt * 0.32;
+      lifetimes[i] += dt * 0.32 * this._speed;
       if (lifetimes[i] >= 1.0) {
         const pos = this.smokeGeometry.attributes.position.array;
         const vel = this.smokeGeometry.attributes.velocity.array;
@@ -976,7 +980,8 @@ export class FireBreathCone {
       length: +this.length.toFixed(2),
       radius: +this.radius.toFixed(2),
       colorMode: this._colorMode,
-      boost: this._boost
+      boost: this._boost,
+      speed: +this._speed.toFixed(2)
     };
   }
 }
