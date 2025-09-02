@@ -7,7 +7,7 @@ export class Animator {
     this.comp = (animCompRaw instanceof AnimationComponent)
       ? animCompRaw
       : new AnimationComponent(animCompRaw?.mixer, animCompRaw?.actions);
-    this._getState = stateRefFn;
+    this._getState = stateRefFn; //{ speed, isFlying, isSitting, isBacking, isSprinting }
     this.names = {
       idle:    this._resolve(['idle','Idle','Idle_A','Idle_01','Breathing','DefaultIdle']),
       walk:    this._resolve(['walk','Walk','Walking','Walk_A']),

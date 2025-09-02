@@ -5,7 +5,7 @@ import { scene } from '../scene.js';
 import { getTerrainHeightAt } from '../map/map.js';
 import { LeafSiphonFX } from '../particles/LeafSiphonFX.js';
 import { gameManager } from '../managers/gameManager.js';
-
+import { registerObstacle, unregisterObstacle } from '../systems/ObstacleSystem.js';
 const _fbxLoader = new FBXLoader();
 const _texLoader = new THREE.TextureLoader();
 
@@ -254,6 +254,8 @@ export class ManaTree {
         n.geometry?.dispose?.();
       }
     });
+    if (this.colliderHandle) unregisterObstacle(this.colliderHandle);
+
   }
 }
 
@@ -265,6 +267,15 @@ export async function spawnManaTreeAt(x, z, opts = {}) {
   const mt = new ManaTree(new THREE.Vector3(x, y, z), opts);
   await mt.load();
   scene.add(mt.group);
+  const radius = opts.collider?.radius ?? 1.2;
+  const halfH  = opts.collider?.halfHeight ?? 1.5;
+  mt.colliderHandle = registerObstacle({
+    type: 'cylinder',
+    positionRef: mt.group.position,
+    radius,
+    halfHeight: halfH,
+    userData: { kind: 'manaTree', tree: mt },
+  });
   mt.registerInteraction();
   manaTrees.push(mt);
   return mt;
