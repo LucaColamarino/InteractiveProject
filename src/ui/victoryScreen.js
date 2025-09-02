@@ -115,12 +115,12 @@ class VictoryScreen {
 
     const continueBtn = document.createElement('button');
     continueBtn.className = 'vs-btn';
-    continueBtn.textContent = 'Continua';
+    continueBtn.textContent = 'Continue';
     continueBtn.addEventListener('click', () => this._continue());
 
     const quitBtn = document.createElement('button');
     quitBtn.className = 'vs-btn';
-    quitBtn.textContent = 'Torna al menu';
+    quitBtn.textContent = 'Back to menu';
     quitBtn.addEventListener('click', () => this._quit());
 
     btns.appendChild(continueBtn);
