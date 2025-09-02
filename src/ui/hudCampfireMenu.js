@@ -102,9 +102,6 @@ function ensureDom() {
             <span class="cf-btn-icon">✖</span>
             <span class="cf-btn-text">Close</span>
           </button>
-          <div class="cf-hints">
-            <span class="hint">Close <span class="kbd">Esc</span></span>
-          </div>
         </div>
       </div>
     </div>

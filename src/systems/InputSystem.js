@@ -77,7 +77,7 @@ function _recomputeMoveVec() {
 let _cachedCanvas = null;
 function _canvasEl() {
   if (_cachedCanvas && document.body.contains(_cachedCanvas)) return _cachedCanvas;
-  _cachedCanvas = /** @type {HTMLElement|null} */ (document.getElementById('three-canvas')) || null;
+  _cachedCanvas = (document.getElementById('three-canvas')) || null;
   return _cachedCanvas;
 }
 function _isCanvasEvent(e) {
