@@ -3,11 +3,11 @@ import { scene } from '../scene.js';
 
 export let sun;
 export let moon;
-const SHADOW_MAP_SIZE = 4096;
+const SHADOW_MAP_SIZE = 8148;
 const SHADOW_BOX_HALF_DEFAULT = 120;
 const SHADOW_DIST_DEFAULT = 280;
 const SHADOW_NEAR = 1;
-const SHADOW_FAR  = 700
+const SHADOW_FAR  = 500;
 function stabilizeDirectionalLight(light) {
   const cam = light.shadow.camera;
   const mapW = Math.max(1, light.shadow.mapSize.x);
