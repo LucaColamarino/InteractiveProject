@@ -28,7 +28,7 @@ export class TreeSpawner {
     defaultBarkMaterialIndex = 0,
     maxInstancesPerBatch = 1000,
     useGeometryPooling = true,
-    enableLOD = true,
+    enableLOD = false,
     lodDistances = [60, 140, 260, 400],
     lodHysteresis = 15,
     frustumCulling = true,
